@@ -1,0 +1,25 @@
+Subject: New Listing Alert: 123 Main St, Anytown, CA
+
+Dear Investor,
+
+We have a new listing that might interest you:
+
+**Property Address:** 123 Main St, Anytown, CA 90210
+**Property Type:** Single Family Home
+**Purchase Price:** $250,000
+**Estimated Monthly Rent:** $2,500
+**Bedrooms:** 3
+**Bathrooms:** 2.5
+**Square Footage:** 1500 sqft
+**Year Built:** 1985
+
+**Description:**
+This charming 3-bedroom, 2.5-bathroom single-family home is located in a desirable neighborhood in Anytown, CA. It features a spacious living area, a modern kitchen, and a large backyard. Perfect for a rental property.
+
+**Listing URL:** https://example.com/listing/123mainst
+
+Contact us for more details!
+
+Sincerely,
+Your Real Estate Team
+

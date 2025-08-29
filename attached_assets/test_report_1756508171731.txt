@@ -1,0 +1,53 @@
+Real Estate Deal Analysis Report
+========================================
+
+Property 1: 123 Main St, Anytown, CA 90210
+  Property Type: single-family
+  Purchase Price: $250,000.00
+  Monthly Rent: $2,500.00
+  Bedrooms: 3, Bathrooms: 2.5
+  Square Footage: 1500 sqft
+  Year Built: 1985
+  Listing URL: https://example.com/listing/123mainst
+
+  Financial Analysis:
+    Downpayment: $56,250.00
+    Closing Costs: $15,000.00
+    Initial Fixed Costs: $2,500.00
+    Total Cash Needed: $73,750.00
+    Estimated Maintenance Reserve: $125.00/month
+
+  Investment Criteria Check:
+    1% Rule: PASS
+    Cash Flow: $360.98/month (PASS)
+    COC Return: 5.87% (MINIMUM)
+    Cap Rate: 7.92% (MINIMUM)
+    Overall: MEETS CRITERIA
+
+----------------------------------------
+
+Property 2: 456 Oak Avenue, Sacramento, CA 95814
+  Property Type: multi-family
+  Purchase Price: $320,000.00
+  Monthly Rent: $2,800.00
+  Bedrooms: 4, Bathrooms: 3.0
+  Square Footage: 2200 sqft
+  Year Built: 1978
+  Listing URL: https://example.com/listing/456oak
+
+  Financial Analysis:
+    Downpayment: $72,000.00
+    Closing Costs: $19,200.00
+    Initial Fixed Costs: $3,200.00
+    Total Cash Needed: $94,400.00
+    Estimated Maintenance Reserve: $140.00/month
+
+  Investment Criteria Check:
+    1% Rule: FAIL
+    Cash Flow: $170.05/month (PASS)
+    COC Return: 2.16% (FAIL)
+    Cap Rate: 6.83% (MINIMUM)
+    Overall: DOES NOT MEET CRITERIA
+
+----------------------------------------
+
