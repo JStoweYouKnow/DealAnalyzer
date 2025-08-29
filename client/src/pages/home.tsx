@@ -5,14 +5,14 @@ import { AnalyzerForm } from "@/components/analyzer-form";
 import { AnalysisResults } from "@/components/analysis-results";
 import { LoadingState } from "@/components/loading-state";
 import { useToast } from "@/hooks/use-toast";
-import type { AnalyzePropertyResponse, DealAnalysis } from "@shared/schema";
+import type { AnalyzePropertyResponse, DealAnalysis, CriteriaResponse } from "@shared/schema";
 
 export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(null);
   const { toast } = useToast();
 
   // Get investment criteria
-  const { data: criteria } = useQuery({
+  const { data: criteria } = useQuery<CriteriaResponse>({
     queryKey: ["/api/criteria"],
   });
 
