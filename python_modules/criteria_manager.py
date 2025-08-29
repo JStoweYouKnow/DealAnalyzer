@@ -54,6 +54,23 @@ def load_investment_criteria(filepath="investment_criteria.md"):
         criteria["cap_benchmark_max"] = float(cap_match.group(2)) / 100
         criteria["cap_minimum"] = float(cap_match.group(3)) / 100
 
+    # Extracting STR Criteria
+    str_adr_match = re.search(r"\*\*Minimum ADR \(Average Daily Rate\):\*\*\s*\$(\d+)", content)
+    if str_adr_match:
+        criteria["str_adr_minimum"] = float(str_adr_match.group(1))
+
+    str_occ_match = re.search(r"\*\*Minimum Occupancy Rate:\*\*\s*(\d{1,2})%\s*\(([0-9.]+)\)", content)
+    if str_occ_match:
+        criteria["str_occupancy_rate_minimum"] = float(str_occ_match.group(2))
+
+    str_yield_match = re.search(r"\*\*Minimum Gross Yield:\*\*\s*(\d{1,2})%\s*\(([0-9.]+)\)", content)
+    if str_yield_match:
+        criteria["str_gross_yield_minimum"] = float(str_yield_match.group(2))
+
+    str_revenue_match = re.search(r"\*\*Minimum Annual Revenue:\*\*\s*\$(\d{1,3}(?:,\d{3})*)", content)
+    if str_revenue_match:
+        criteria["str_annual_revenue_minimum"] = float(str_revenue_match.group(1).replace(",", ""))
+
     return criteria
 
 if __name__ == "__main__":

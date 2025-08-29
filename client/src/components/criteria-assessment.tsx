@@ -74,6 +74,28 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
     }
   ];
 
+  // Add STR-specific criteria if available
+  if (analysis.projectedAnnualRevenue && criteria) {
+    const strCriteria = [
+      {
+        name: "STR Annual Revenue",
+        status: criteria.str_annual_revenue_minimum ? 
+          analysis.projectedAnnualRevenue >= criteria.str_annual_revenue_minimum : true,
+        value: `${formatCurrency(analysis.projectedAnnualRevenue)}${criteria.str_annual_revenue_minimum ? ` (Min: ${formatCurrency(criteria.str_annual_revenue_minimum)})` : ''}`,
+        testId: "criterion-str-revenue"
+      },
+      {
+        name: "STR Gross Yield",
+        status: criteria.str_gross_yield_minimum && analysis.projectedGrossYield ? 
+          analysis.projectedGrossYield >= criteria.str_gross_yield_minimum : true,
+        value: `${analysis.projectedGrossYield ? formatPercent(analysis.projectedGrossYield) : 'N/A'}${criteria.str_gross_yield_minimum ? ` (Min: ${formatPercent(criteria.str_gross_yield_minimum)})` : ''}`,
+        testId: "criterion-str-yield"
+      }
+    ];
+    
+    passingCriteria.push(...strCriteria);
+  }
+
   return (
     <Card className="analysis-card">
       <CardHeader className="border-b border-border">

@@ -17,6 +17,20 @@ export const propertySchema = z.object({
   yearBuilt: z.number(),
   description: z.string(),
   listingUrl: z.string(),
+  // Short-term rental metrics
+  adr: z.number().optional(), // Average Daily Rate
+  occupancyRate: z.number().optional(), // As decimal (0.75 = 75%)
+  // User-inputtable monthly expenses
+  monthlyExpenses: z.object({
+    propertyTaxes: z.number().optional(),
+    insurance: z.number().optional(),
+    utilities: z.number().optional(),
+    management: z.number().optional(),
+    maintenance: z.number().optional(),
+    cleaning: z.number().optional(),
+    supplies: z.number().optional(),
+    other: z.number().optional(),
+  }).optional(),
 });
 
 // Deal analysis result schema
@@ -38,6 +52,12 @@ export const dealAnalysisSchema = z.object({
   capRate: z.number(),
   capMeetsBenchmark: z.boolean(),
   capMeetsMinimum: z.boolean(),
+  // Short-term rental specific metrics
+  projectedAnnualRevenue: z.number().optional(),
+  projectedGrossYield: z.number().optional(), // As decimal
+  totalMonthlyExpenses: z.number().optional(),
+  strNetIncome: z.number().optional(), // STR-specific net income
+  strMeetsCriteria: z.boolean().optional(),
   meetsCriteria: z.boolean(),
   analysisDate: z.date().optional(),
 });
@@ -70,6 +90,11 @@ export const criteriaResponseSchema = z.object({
   cap_benchmark_min: z.number(),
   cap_benchmark_max: z.number(),
   cap_minimum: z.number(),
+  // Short-term rental criteria
+  str_adr_minimum: z.number().optional(),
+  str_occupancy_rate_minimum: z.number().optional(), // As decimal
+  str_gross_yield_minimum: z.number().optional(), // As decimal
+  str_annual_revenue_minimum: z.number().optional(),
 });
 
 // Export types

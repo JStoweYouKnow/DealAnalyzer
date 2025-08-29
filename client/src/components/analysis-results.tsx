@@ -1,5 +1,6 @@
 import { PropertyOverview } from "./property-overview";
 import { FinancialBreakdown } from "./financial-breakdown";
+import { STRMetrics } from "./str-metrics";
 import { CriteriaAssessment } from "./criteria-assessment";
 import type { DealAnalysis, CriteriaResponse } from "@shared/schema";
 
@@ -13,6 +14,7 @@ export function AnalysisResults({ analysis, criteria }: AnalysisResultsProps) {
     <div className="space-y-6">
       <PropertyOverview analysis={analysis} />
       <FinancialBreakdown analysis={analysis} />
+      <STRMetrics analysis={analysis} criteria={criteria} />
       <CriteriaAssessment analysis={analysis} criteria={criteria} />
     </div>
   );

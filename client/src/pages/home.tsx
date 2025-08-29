@@ -49,8 +49,8 @@ export default function Home() {
     },
   });
 
-  const handleAnalyze = (emailContent: string) => {
-    analysisMutation.mutate(emailContent);
+  const handleAnalyze = (data: { emailContent: string; strMetrics?: any; monthlyExpenses?: any }) => {
+    analysisMutation.mutate(data.emailContent); // For now, just pass email content until backend is updated
   };
 
   return (

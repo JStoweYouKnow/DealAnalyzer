@@ -1,4 +1,5 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
+from typing import Optional
 import json
 
 @dataclass
@@ -21,6 +22,18 @@ class Property:
     closing_costs_percentage: float = 0.05 # Default to 5%
     initial_fixed_costs_percentage: float = 0.01 # Default to 1%
     maintenance_reserve_percentage: float = 0.05 # Default to 5% of gross rents
+    # Short-term rental metrics
+    adr: Optional[float] = None  # Average Daily Rate
+    occupancy_rate: Optional[float] = None  # As decimal (0.75 = 75%)
+    # User-inputtable monthly expenses
+    property_taxes: Optional[float] = None
+    insurance: Optional[float] = None
+    utilities: Optional[float] = None
+    management: Optional[float] = None
+    maintenance: Optional[float] = None
+    cleaning: Optional[float] = None
+    supplies: Optional[float] = None
+    other_expenses: Optional[float] = None
 
     def to_dict(self):
         return asdict(self)
@@ -42,7 +55,13 @@ class DealAnalysis:
     cap_rate: float
     cap_meets_benchmark: bool
     cap_meets_minimum: bool
-    meets_criteria: bool
+    # Short-term rental specific metrics
+    projected_annual_revenue: Optional[float] = None
+    projected_gross_yield: Optional[float] = None  # As decimal
+    total_monthly_expenses: Optional[float] = None
+    str_net_income: Optional[float] = None  # STR-specific net income
+    str_meets_criteria: Optional[bool] = None
+    meets_criteria: bool = False
 
     def to_dict(self):
         result = asdict(self)
