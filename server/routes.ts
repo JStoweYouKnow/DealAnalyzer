@@ -8,6 +8,7 @@ import {
 } from "@shared/schema";
 import { spawn } from "child_process";
 import path from "path";
+import fs from "fs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -92,7 +93,7 @@ async function runPythonAnalysis(emailContent: string): Promise<AnalyzePropertyR
     const tempFile = path.join(pythonPath, `temp_email_${Date.now()}.txt`);
     
     // Write email content to temporary file
-    require("fs").writeFileSync(tempFile, emailContent);
+    fs.writeFileSync(tempFile, emailContent);
     
     const python = spawn("python3", [
       path.join(pythonPath, "main.py"),
@@ -116,7 +117,7 @@ async function runPythonAnalysis(emailContent: string): Promise<AnalyzePropertyR
     python.on("close", (code) => {
       // Clean up temp file
       try {
-        require("fs").unlinkSync(tempFile);
+        fs.unlinkSync(tempFile);
       } catch (e) {
         console.warn("Failed to clean up temp file:", e);
       }
