@@ -29,7 +29,7 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
   const passingCriteria = [
     {
       name: "Property Type Match",
-      status: criteria?.propertyTypes.includes(property.propertyType) ?? true,
+      status: criteria?.property_types?.includes(property.propertyType) ?? true,
       value: property.propertyType,
       testId: "criterion-property-type"
     },
@@ -41,8 +41,8 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
     },
     {
       name: "Price Under Max",
-      status: property.purchasePrice <= (criteria?.maxPurchasePrice ?? 300000),
-      value: `${formatCurrency(property.purchasePrice)} < ${formatCurrency(criteria?.maxPurchasePrice ?? 300000)}`,
+      status: property.purchasePrice <= (criteria?.max_purchase_price ?? 300000),
+      value: `${formatCurrency(property.purchasePrice)} < ${formatCurrency(criteria?.max_purchase_price ?? 300000)}`,
       testId: "criterion-price"
     },
     {
@@ -63,13 +63,13 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
     {
       name: "COC Return",
       status: analysis.cocMeetsBenchmark ? "benchmark" : analysis.cocMeetsMinimum ? "minimum" : "fail",
-      value: `${formatPercent(analysis.cocReturn)} (Min: ${formatPercent(criteria?.cocMinimumMin ?? 0.05)}-${formatPercent(criteria?.cocMinimumMax ?? 0.07)})`,
+      value: `${formatPercent(analysis.cocReturn)} (Min: ${formatPercent(criteria?.coc_minimum_min ?? 0.05)}-${formatPercent(criteria?.coc_minimum_max ?? 0.07)})`,
       testId: "improvement-coc"
     },
     {
       name: "Cap Rate", 
       status: analysis.capMeetsBenchmark ? "benchmark" : analysis.capMeetsMinimum ? "minimum" : "fail",
-      value: `${formatPercent(analysis.capRate)} (Min: ${formatPercent(criteria?.capMinimum ?? 0.04)})`,
+      value: `${formatPercent(analysis.capRate)} (Min: ${formatPercent(criteria?.cap_minimum ?? 0.04)})`,
       testId: "improvement-cap"
     }
   ];

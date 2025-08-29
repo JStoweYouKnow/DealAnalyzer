@@ -54,22 +54,22 @@ export const analyzePropertyResponseSchema = z.object({
 });
 
 export const criteriaResponseSchema = z.object({
-  propertyTypes: z.array(z.string()),
+  property_types: z.array(z.string()),
   location: z.string(),
-  maxPurchasePrice: z.number(),
-  downpaymentPercentageMin: z.number(),
-  downpaymentPercentageMax: z.number(),
-  closingCostsPercentageMin: z.number(),
-  closingCostsPercentageMax: z.number(),
-  initialFixedCostsPercentage: z.number(),
-  maintenanceReservePercentage: z.number(),
-  cocBenchmarkMin: z.number(),
-  cocBenchmarkMax: z.number(),
-  cocMinimumMin: z.number(),
-  cocMinimumMax: z.number(),
-  capBenchmarkMin: z.number(),
-  capBenchmarkMax: z.number(),
-  capMinimum: z.number(),
+  max_purchase_price: z.number(),
+  downpayment_percentage_min: z.number(),
+  downpayment_percentage_max: z.number(),
+  closing_costs_percentage_min: z.number(),
+  closing_costs_percentage_max: z.number(),
+  initial_fixed_costs_percentage: z.number(),
+  maintenance_reserve_percentage: z.number(),
+  coc_benchmark_min: z.number(),
+  coc_benchmark_max: z.number(),
+  coc_minimum_min: z.number(),
+  coc_minimum_max: z.number(),
+  cap_benchmark_min: z.number(),
+  cap_benchmark_max: z.number(),
+  cap_minimum: z.number(),
 });
 
 // Export types
