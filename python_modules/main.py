@@ -1,0 +1,75 @@
+import os
+import sys
+import argparse
+import json
+from email_parser import parse_email_alert
+from deal_analyzer import analyze_deal
+
+def main():
+    parser = argparse.ArgumentParser(description="Real Estate Deal Analyzer")
+    parser.add_argument("email_file", help="Path to email alert text file")
+    parser.add_argument("--json", action="store_true", help="Output results as JSON")
+    
+    args = parser.parse_args()
+    
+    if not os.path.exists(args.email_file):
+        print(f"Error: File '{args.email_file}' not found.", file=sys.stderr)
+        sys.exit(1)
+    
+    try:
+        with open(args.email_file, "r") as f:
+            email_content = f.read()
+        
+        property_data = parse_email_alert(email_content)
+        deal_analysis = analyze_deal(property_data)
+        
+        if args.json:
+            # Convert to format expected by frontend
+            result = {
+                "propertyId": "temp_id",
+                "property": {
+                    "address": property_data.address,
+                    "city": property_data.city, 
+                    "state": property_data.state,
+                    "zipCode": property_data.zip_code,
+                    "propertyType": property_data.property_type,
+                    "purchasePrice": property_data.purchase_price,
+                    "monthlyRent": property_data.monthly_rent,
+                    "bedrooms": property_data.bedrooms,
+                    "bathrooms": property_data.bathrooms,
+                    "squareFootage": property_data.square_footage,
+                    "yearBuilt": property_data.year_built,
+                    "description": property_data.description,
+                    "listingUrl": property_data.listing_url
+                },
+                "calculatedDownpayment": deal_analysis.calculated_downpayment,
+                "calculatedClosingCosts": deal_analysis.calculated_closing_costs,
+                "calculatedInitialFixedCosts": deal_analysis.calculated_initial_fixed_costs,
+                "estimatedMaintenanceReserve": deal_analysis.estimated_maintenance_reserve,
+                "totalCashNeeded": deal_analysis.total_cash_needed,
+                "passes1PercentRule": deal_analysis.passes_1_percent_rule,
+                "cashFlow": deal_analysis.cash_flow,
+                "cashFlowPositive": deal_analysis.cash_flow_positive,
+                "cocReturn": deal_analysis.coc_return,
+                "cocMeetsBenchmark": deal_analysis.coc_meets_benchmark,
+                "cocMeetsMinimum": deal_analysis.coc_meets_minimum,
+                "capRate": deal_analysis.cap_rate,
+                "capMeetsBenchmark": deal_analysis.cap_meets_benchmark,
+                "capMeetsMinimum": deal_analysis.cap_meets_minimum,
+                "meetsCriteria": deal_analysis.meets_criteria
+            }
+            print(json.dumps(result))
+        else:
+            # Text output format
+            print(f"Property: {property_data.address}")
+            print(f"Meets Criteria: {'YES' if deal_analysis.meets_criteria else 'NO'}")
+            print(f"Cash Flow: ${deal_analysis.cash_flow:.2f}")
+            print(f"COC Return: {deal_analysis.coc_return:.2%}")
+            print(f"Cap Rate: {deal_analysis.cap_rate:.2%}")
+        
+    except Exception as e:
+        print(f"Error processing file: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
