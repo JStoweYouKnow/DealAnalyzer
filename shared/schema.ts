@@ -65,6 +65,20 @@ export const dealAnalysisSchema = z.object({
 // API request/response schemas
 export const analyzePropertyRequestSchema = z.object({
   emailContent: z.string().min(1, "Email content is required"),
+  strMetrics: z.object({
+    adr: z.number().optional(),
+    occupancyRate: z.number().optional(),
+  }).optional(),
+  monthlyExpenses: z.object({
+    propertyTaxes: z.number().optional(),
+    insurance: z.number().optional(),
+    utilities: z.number().optional(),
+    management: z.number().optional(),
+    maintenance: z.number().optional(),
+    cleaning: z.number().optional(),
+    supplies: z.number().optional(),
+    other: z.number().optional(),
+  }).optional(),
 });
 
 export const analyzePropertyResponseSchema = z.object({

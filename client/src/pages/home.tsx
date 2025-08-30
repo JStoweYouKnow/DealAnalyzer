@@ -18,8 +18,8 @@ export default function Home() {
 
   // Analysis mutation
   const analysisMutation = useMutation({
-    mutationFn: async (emailContent: string) => {
-      const response = await apiRequest("POST", "/api/analyze", { emailContent });
+    mutationFn: async (data: { emailContent: string; strMetrics?: any; monthlyExpenses?: any }) => {
+      const response = await apiRequest("POST", "/api/analyze", data);
       return response.json() as Promise<AnalyzePropertyResponse>;
     },
     onSuccess: (data) => {
@@ -50,7 +50,7 @@ export default function Home() {
   });
 
   const handleAnalyze = (data: { emailContent: string; strMetrics?: any; monthlyExpenses?: any }) => {
-    analysisMutation.mutate(data.emailContent); // For now, just pass email content until backend is updated
+    analysisMutation.mutate(data);
   };
 
   return (

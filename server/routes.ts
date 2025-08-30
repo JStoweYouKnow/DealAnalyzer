@@ -40,10 +40,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const { emailContent } = validation.data;
+      const { emailContent, strMetrics, monthlyExpenses } = validation.data;
       
-      // Run Python analysis
-      const analysisResult = await runPythonAnalysis(emailContent);
+      // Run Python analysis with additional data
+      const analysisResult = await runPythonAnalysis(emailContent, strMetrics, monthlyExpenses);
       
       if (!analysisResult.success) {
         res.status(400).json({
@@ -87,18 +87,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 // Helper function to run Python analysis
-async function runPythonAnalysis(emailContent: string): Promise<AnalyzePropertyResponse> {
+async function runPythonAnalysis(
+  emailContent: string, 
+  strMetrics?: { adr?: number; occupancyRate?: number }, 
+  monthlyExpenses?: { propertyTaxes?: number; insurance?: number; utilities?: number; management?: number; maintenance?: number; cleaning?: number; supplies?: number; other?: number }
+): Promise<AnalyzePropertyResponse> {
   return new Promise((resolve) => {
     const pythonPath = path.join(process.cwd(), "python_modules");
     const tempFile = path.join(pythonPath, `temp_email_${Date.now()}.txt`);
+    const tempDataFile = path.join(pythonPath, `temp_data_${Date.now()}.json`);
     
     // Write email content to temporary file
     fs.writeFileSync(tempFile, emailContent);
     
+    // Write additional data to JSON file
+    const additionalData = {
+      str_metrics: strMetrics ? {
+        adr: strMetrics.adr,
+        occupancy_rate: strMetrics.occupancyRate,
+      } : null,
+      monthly_expenses: monthlyExpenses ? {
+        property_taxes: monthlyExpenses.propertyTaxes,
+        insurance: monthlyExpenses.insurance,
+        utilities: monthlyExpenses.utilities,
+        management: monthlyExpenses.management,
+        maintenance: monthlyExpenses.maintenance,
+        cleaning: monthlyExpenses.cleaning,
+        supplies: monthlyExpenses.supplies,
+        other: monthlyExpenses.other,
+      } : null,
+    };
+    fs.writeFileSync(tempDataFile, JSON.stringify(additionalData));
+    
     const python = spawn("python3", [
       path.join(pythonPath, "main.py"),
       tempFile,
-      "--json"
+      "--json",
+      "--data-file",
+      tempDataFile
     ], {
       cwd: pythonPath
     });
@@ -115,11 +141,12 @@ async function runPythonAnalysis(emailContent: string): Promise<AnalyzePropertyR
     });
 
     python.on("close", (code) => {
-      // Clean up temp file
+      // Clean up temp files
       try {
         fs.unlinkSync(tempFile);
+        fs.unlinkSync(tempDataFile);
       } catch (e) {
-        console.warn("Failed to clean up temp file:", e);
+        console.warn("Failed to clean up temp files:", e);
       }
 
       if (code !== 0) {
