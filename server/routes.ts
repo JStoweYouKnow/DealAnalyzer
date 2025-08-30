@@ -19,7 +19,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const upload = multer({
     dest: 'temp_uploads/',
     limits: {
-      fileSize: 10 * 1024 * 1024, // 10MB limit
+      fileSize: 50 * 1024 * 1024, // 50MB limit (increased from 10MB)
     },
     fileFilter: (req, file, cb) => {
       const allowedTypes = ['.pdf', '.csv', '.txt', '.xlsx', '.xls'];
@@ -184,7 +184,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analyze property from uploaded file
-  app.post("/api/analyze-file", upload.single('file'), async (req, res) => {
+  app.post("/api/analyze-file", (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+      if (err) {
+        // Handle specific multer errors
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({
+            success: false,
+            error: "File is too large. Maximum file size is 50MB. Please try with a smaller file."
+          });
+        }
+        if (err.message.includes('Invalid file type')) {
+          return res.status(400).json({
+            success: false,
+            error: err.message
+          });
+        }
+        // Handle other multer errors
+        return res.status(400).json({
+          success: false,
+          error: `File upload error: ${err.message}`
+        });
+      }
+      next();
+    });
+  }, async (req, res) => {
     try {
       if (!req.file) {
         res.status(400).json({
