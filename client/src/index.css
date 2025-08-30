@@ -143,6 +143,38 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     padding: 20px;
   }
+
+  .btn {
+    display: inline-block;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+  }
+
+  /* Primary */
+  .btn-primary {
+    background: var(--color-primary);
+    color: #fff;
+    border: none;
+  }
+  .btn-primary:hover {
+    background: #4A5D41;
+    transform: scale(1.02);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  /* Secondary */
+  .btn-secondary {
+    background: transparent;
+    border: 2px solid var(--color-accent);
+    color: var(--color-accent);
+  }
+  .btn-secondary:hover {
+    background: var(--color-accent);
+    color: #fff;
+  }
 }
 
 /* Custom animations and styles */
