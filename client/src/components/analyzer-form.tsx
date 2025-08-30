@@ -129,27 +129,31 @@ Your Real Estate Team`;
               <TabsContent value="input" className="space-y-4">
                 {/* Input Mode Selection */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
                     <input
                       type="radio"
                       id="text-mode"
                       name="inputMode"
                       checked={inputMode === 'text'}
                       onChange={() => setInputMode('text')}
-                      className="text-primary"
+                      className="w-4 h-4 text-primary focus:ring-primary"
                     />
-                    <Label htmlFor="text-mode">Paste Text/Email</Label>
+                    <Label htmlFor="text-mode" className="text-sm font-medium leading-none cursor-pointer">
+                      Paste Text/Email
+                    </Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
                     <input
                       type="radio"
                       id="file-mode"
                       name="inputMode"
                       checked={inputMode === 'file'}
                       onChange={() => setInputMode('file')}
-                      className="text-primary"
+                      className="w-4 h-4 text-primary focus:ring-primary"
                     />
-                    <Label htmlFor="file-mode">Upload File</Label>
+                    <Label htmlFor="file-mode" className="text-sm font-medium leading-none cursor-pointer">
+                      Upload File
+                    </Label>
                   </div>
                 </div>
 
