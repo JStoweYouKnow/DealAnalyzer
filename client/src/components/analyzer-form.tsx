@@ -128,7 +128,7 @@ Your Real Estate Team`;
               
               <TabsContent value="input" className="space-y-4">
                 {/* Input Mode Selection */}
-                <div className="flex gap-4 mb-4">
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
                   <div className="flex items-center space-x-2">
                     <input
                       type="radio"
@@ -160,19 +160,22 @@ Your Real Estate Team`;
                       id="email-content"
                       value={emailContent}
                       onChange={(e) => setEmailContent(e.target.value)}
-                      className="h-80 resize-none mt-2"
-                      placeholder="Paste your real estate email content here...
-
-The analyzer automatically detects property details from various email formats including:
-• Property address and location
-• Purchase/listing price and monthly rent
-• Bedrooms, bathrooms, square footage
-• Property type and year built
-• Listing URLs and descriptions
-
-Works with emails from MLS, Zillow, Realtor.com, and other real estate services."
+                      className="h-64 sm:h-80 resize-none mt-2"
+                      placeholder="Paste your real estate email content here..."
                       data-testid="input-email-content"
                     />
+                    <div className="mt-2 text-xs text-muted-foreground hidden sm:block">
+                      <div className="bg-muted/50 rounded-lg p-3">
+                        <div className="font-medium mb-1">Supported email formats:</div>
+                        <div className="text-xs space-y-1">
+                          <div>• Property address and location</div>
+                          <div>• Purchase/listing price and monthly rent</div>
+                          <div>• Bedrooms, bathrooms, square footage</div>
+                          <div>• Property type and year built</div>
+                          <div>• Works with MLS, Zillow, Realtor.com, and other services</div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div>
@@ -221,7 +224,7 @@ Works with emails from MLS, Zillow, Realtor.com, and other real estate services.
               <TabsContent value="str" className="space-y-4">
                 <div>
                   <h4 className="font-medium mb-4">Short-Term Rental Metrics (Optional)</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="adr">Average Daily Rate (ADR)</Label>
                       <Input
@@ -251,7 +254,7 @@ Works with emails from MLS, Zillow, Realtor.com, and other real estate services.
               <TabsContent value="expenses" className="space-y-4">
                 <div>
                   <h4 className="font-medium mb-4">Monthly Expenses (Optional - Override Estimates)</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="property-taxes">Property Taxes</Label>
                       <Input
@@ -345,15 +348,16 @@ Works with emails from MLS, Zillow, Realtor.com, and other real estate services.
               </TabsContent>
             </Tabs>
             
-            <div className="mt-6 flex items-center justify-between">
+            <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="text-xs text-muted-foreground">
                 <i className="fas fa-info-circle mr-1"></i>
-                STR metrics and expenses are optional - defaults will be used if not provided
+                <span className="hidden sm:inline">STR metrics and expenses are optional - defaults will be used if not provided</span>
+                <span className="sm:hidden">Optional fields - defaults used if empty</span>
               </div>
               <Button 
                 type="submit"
                 disabled={isLoading}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 w-full sm:w-auto"
                 data-testid="button-analyze"
               >
                 {isLoading ? (
@@ -374,7 +378,7 @@ Works with emails from MLS, Zillow, Realtor.com, and other real estate services.
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Button 
           variant="secondary" 
           className="p-4 h-auto text-left justify-start"
