@@ -126,6 +126,25 @@
   }
 }
 
+@layer components {
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+  }
+
+  .section {
+    margin-bottom: 24px;
+  }
+
+  .card {
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    padding: 20px;
+  }
+}
+
 /* Custom animations and styles */
 .deployment-badge {
   background: linear-gradient(135deg, var(--color-success), var(--color-primary));
