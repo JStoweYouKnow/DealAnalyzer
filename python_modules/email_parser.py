@@ -1,6 +1,37 @@
 import re
 from real_estate_data import Property
 
+def normalize_property_type(property_type):
+    """Normalize property type abbreviations and variations."""
+    if not property_type:
+        return "single-family"
+    
+    # Convert to lowercase for comparison
+    normalized = str(property_type).lower().strip()
+    
+    # Handle abbreviations
+    if normalized in ['sfr', 'sf', 'single family residential']:
+        return "single-family"
+    elif normalized in ['mfr', 'mf', 'multi family residential', 'multifamily residential']:
+        return "multi-family"
+    elif 'single' in normalized and 'family' in normalized:
+        return "single-family"
+    elif 'multi' in normalized and 'family' in normalized:
+        return "multi-family"
+    elif normalized in ['townhouse', 'townhome', 'town home']:
+        return "townhouse"
+    elif normalized in ['condo', 'condominium']:
+        return "condo"
+    elif normalized in ['duplex']:
+        return "duplex"
+    elif normalized in ['triplex']:
+        return "triplex"
+    elif normalized in ['fourplex', '4plex']:
+        return "fourplex"
+    else:
+        # Default normalization - replace spaces with hyphens and lowercase
+        return normalized.replace(" ", "-")
+
 def parse_email_alert(email_content: str) -> Property:
     """
     Enhanced email parser that auto-detects property information from various email formats.
@@ -52,8 +83,8 @@ def parse_email_alert(email_content: str) -> Property:
         r"\*\*Property Type:\*\*\s*(.*)",
         r"Type[:：]\s*([^\n\r]+)",
         r"Property Type[:：]\s*([^\n\r]+)",
-        r"(Single Family|Multi[- ]Family|Townhouse|Condo|Duplex|Triplex|Fourplex)(?:\s+Home)?",
-        r"Style[:：]\s*(Single Family|Multi Family|Townhouse|Condo)",
+        r"(Single Family|Multi[- ]Family|Townhouse|Condo|Duplex|Triplex|Fourplex|SFR|MFR)(?:\s+Home)?",
+        r"Style[:：]\s*(Single Family|Multi Family|Townhouse|Condo|SFR|MFR)",
     ]
 
     # Price patterns - look for purchase price, listing price, asking price
@@ -170,16 +201,7 @@ def parse_email_alert(email_content: str) -> Property:
 
     # Clean up property type
     if property_type != "N/A":
-        property_type = property_type.replace(" Home", "").replace(" ", "-").lower()
-        # Normalize common variations
-        if "single" in property_type.lower():
-            property_type = "single-family"
-        elif "multi" in property_type.lower():
-            property_type = "multi-family"
-        elif property_type.lower() in ["townhouse", "townhome"]:
-            property_type = "townhouse"
-        elif property_type.lower() in ["condo", "condominium"]:
-            property_type = "condo"
+        property_type = normalize_property_type(property_type)
 
     # Extract description from remaining email content (fallback)
     description_patterns = [

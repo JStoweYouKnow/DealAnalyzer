@@ -5,7 +5,7 @@ import numpy as np
 import pdfplumber
 from PyPDF2 import PdfReader
 from real_estate_data import Property
-from email_parser import parse_email_alert
+from email_parser import parse_email_alert, normalize_property_type
 
 def parse_file_content(file_path: str, file_type: str) -> Property:
     """
@@ -139,7 +139,7 @@ def parse_csv_file(file_path: str) -> Property:
             city=str(city),
             state=str(state),
             zip_code=str(zip_code),
-            property_type=str(property_type).lower().replace(" ", "-"),
+            property_type=normalize_property_type(property_type),
             purchase_price=purchase_price,
             monthly_rent=monthly_rent,
             bedrooms=bedrooms,
