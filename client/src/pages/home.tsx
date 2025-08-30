@@ -4,13 +4,22 @@ import { apiRequest } from "@/lib/queryClient";
 import { AnalyzerForm } from "@/components/analyzer-form";
 import { AnalysisResults } from "@/components/analysis-results";
 import { CriteriaConfig } from "@/components/criteria-config";
+import { QuickCompare } from "@/components/quick-compare";
 import { LoadingState } from "@/components/loading-state";
 import { useToast } from "@/hooks/use-toast";
+import { useComparison } from "@/hooks/use-comparison";
 import type { AnalyzePropertyResponse, DealAnalysis, CriteriaResponse } from "@shared/schema";
 
 export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(null);
   const { toast } = useToast();
+  const { 
+    comparisonList, 
+    addToComparison, 
+    removeFromComparison, 
+    clearComparison, 
+    isInComparison 
+  } = useComparison();
 
   // Get investment criteria
   const { data: criteria } = useQuery<CriteriaResponse>({
@@ -162,6 +171,8 @@ export default function Home() {
                 analysis={analysisResult} 
                 criteria={criteria}
                 onAnalysisUpdate={setAnalysisResult}
+                onAddToComparison={addToComparison}
+                isInComparison={isInComparison(analysisResult.propertyId)}
                 data-testid="analysis-results"
               />
             )}
@@ -177,6 +188,18 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* Quick Compare Dashboard */}
+        {comparisonList.length > 0 && (
+          <div className="mt-8">
+            <QuickCompare 
+              analyses={comparisonList}
+              criteria={criteria}
+              onRemoveProperty={removeFromComparison}
+              onClearAll={clearComparison}
+            />
+          </div>
+        )}
 
         {/* API Integration Status */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">

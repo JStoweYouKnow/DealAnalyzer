@@ -141,6 +141,25 @@ export const updateCriteriaRequestSchema = z.object({
   criteria: configurableCriteriaSchema
 });
 
+// Property comparison schema
+export const propertyComparisonSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(), // User-defined name for comparison
+  properties: z.array(dealAnalysisSchema).min(2, "Need at least 2 properties to compare").max(4, "Can compare up to 4 properties"),
+  createdAt: z.date().optional(),
+});
+
+export const createComparisonRequestSchema = z.object({
+  name: z.string().optional(),
+  propertyIds: z.array(z.string()).min(2, "Need at least 2 properties to compare").max(4, "Can compare up to 4 properties"),
+});
+
+export const comparisonResponseSchema = z.object({
+  success: z.boolean(),
+  data: propertyComparisonSchema.optional(),
+  error: z.string().optional(),
+});
+
 // Export types
 export type Property = z.infer<typeof propertySchema>;
 export type DealAnalysis = z.infer<typeof dealAnalysisSchema>;
@@ -149,6 +168,9 @@ export type AnalyzePropertyResponse = z.infer<typeof analyzePropertyResponseSche
 export type CriteriaResponse = z.infer<typeof criteriaResponseSchema>;
 export type ConfigurableCriteria = z.infer<typeof configurableCriteriaSchema>;
 export type UpdateCriteriaRequest = z.infer<typeof updateCriteriaRequestSchema>;
+export type PropertyComparison = z.infer<typeof propertyComparisonSchema>;
+export type CreateComparisonRequest = z.infer<typeof createComparisonRequestSchema>;
+export type ComparisonResponse = z.infer<typeof comparisonResponseSchema>;
 
 // Insert schemas
 export const insertPropertySchema = propertySchema.omit({ id: true });
