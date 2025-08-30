@@ -4,8 +4,10 @@ import multer from "multer";
 import { storage } from "./storage";
 import { 
   analyzePropertyRequestSchema, 
+  updateCriteriaRequestSchema,
   type AnalyzePropertyResponse,
-  type CriteriaResponse 
+  type CriteriaResponse,
+  type ConfigurableCriteria
 } from "@shared/schema";
 import { spawn } from "child_process";
 import path from "path";
@@ -95,6 +97,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error loading criteria:", error);
       res.status(500).json({ error: "Failed to load investment criteria" });
+    }
+  });
+
+  // Update investment criteria
+  app.put("/api/criteria", async (req, res) => {
+    try {
+      const validation = updateCriteriaRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        res.status(400).json({ 
+          success: false, 
+          error: "Invalid criteria: " + validation.error.errors.map((e: any) => e.message).join(", ")
+        });
+        return;
+      }
+
+      const { criteria } = validation.data;
+      
+      // Update criteria in Python backend
+      const result = await updateInvestmentCriteria(criteria);
+      
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: result.error || "Failed to update criteria"
+        });
+        return;
+      }
+
+      // Return updated criteria
+      const updatedCriteria = await loadInvestmentCriteria();
+      res.json({
+        success: true,
+        data: updatedCriteria
+      });
+    } catch (error) {
+      console.error("Error updating criteria:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Internal server error during criteria update"
+      });
     }
   });
 
@@ -542,6 +584,63 @@ print(json.dumps(criteria))
         resolve(criteria);
       } catch (e) {
         reject(new Error("Failed to parse criteria"));
+      }
+    });
+  });
+}
+
+// Helper function to update investment criteria
+async function updateInvestmentCriteria(criteria: ConfigurableCriteria): Promise<{success: boolean, error?: string}> {
+  return new Promise((resolve) => {
+    const pythonPath = path.join(process.cwd(), "python_modules");
+    
+    const python = spawn("python3", ["-c", `
+import sys
+sys.path.append('${pythonPath}')
+from criteria_manager import update_investment_criteria
+import json
+
+criteria_data = {
+    'price_min': ${criteria.price_min},
+    'price_max': ${criteria.price_max},
+    'coc_return_min': ${criteria.coc_return_min / 100},
+    'coc_return_max': ${criteria.coc_return_max / 100},
+    'cap_rate_min': ${criteria.cap_rate_min / 100},
+    'cap_rate_max': ${criteria.cap_rate_max / 100}
+}
+
+result = update_investment_criteria('${path.join(pythonPath, 'investment_criteria.md')}', criteria_data)
+print(json.dumps(result))
+`]);
+
+    let stdout = "";
+    let stderr = "";
+
+    python.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    python.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    python.on("close", (code) => {
+      if (code !== 0) {
+        resolve({
+          success: false,
+          error: "Failed to update criteria: " + stderr
+        });
+        return;
+      }
+
+      try {
+        const result = JSON.parse(stdout);
+        resolve(result);
+      } catch (e) {
+        resolve({
+          success: false,
+          error: "Failed to parse update result"
+        });
       }
     });
   });

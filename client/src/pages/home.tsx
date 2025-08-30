@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { AnalyzerForm } from "@/components/analyzer-form";
 import { AnalysisResults } from "@/components/analysis-results";
+import { CriteriaConfig } from "@/components/criteria-config";
 import { LoadingState } from "@/components/loading-state";
 import { useToast } from "@/hooks/use-toast";
 import type { AnalyzePropertyResponse, DealAnalysis, CriteriaResponse } from "@shared/schema";
@@ -129,6 +130,17 @@ export default function Home() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Paste your real estate listing email below to instantly analyze investment potential against your buy box criteria
           </p>
+        </div>
+
+        {/* Criteria Configuration */}
+        <div className="mb-8">
+          <CriteriaConfig 
+            criteria={criteria}
+            onUpdate={() => {
+              // Invalidate criteria cache to refresh
+              window.location.reload();
+            }}
+          />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">

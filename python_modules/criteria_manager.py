@@ -73,6 +73,46 @@ def load_investment_criteria(filepath="investment_criteria.md"):
 
     return criteria
 
+def update_investment_criteria(filepath, new_criteria):
+    """Update investment criteria in the markdown file"""
+    try:
+        # Read current file
+        with open(filepath, "r") as f:
+            content = f.read()
+        
+        # Update max purchase price
+        if 'price_max' in new_criteria:
+            content = re.sub(
+                r"\*\*Max Purchase Price:\*\*\s*\$[\d,]+", 
+                f"**Max Purchase Price:** ${new_criteria['price_max']:,.0f}",
+                content
+            )
+        
+        # Update COC Return ranges
+        if 'coc_return_min' in new_criteria and 'coc_return_max' in new_criteria:
+            content = re.sub(
+                r"\*\*Cash-on-Cash \(COC\) Return:\*\*\s*Benchmark of\s*\d{1,2}% to \d{1,2}%, bare minimum of \d{1,2}% to \d{1,2}%",
+                f"**Cash-on-Cash (COC) Return:** Benchmark of {new_criteria['coc_return_max']*100:.0f}% to {new_criteria['coc_return_max']*100:.0f}%, bare minimum of {new_criteria['coc_return_min']*100:.0f}% to {new_criteria['coc_return_max']*100:.0f}%",
+                content
+            )
+        
+        # Update Cap Rate ranges
+        if 'cap_rate_min' in new_criteria and 'cap_rate_max' in new_criteria:
+            content = re.sub(
+                r"\*\*Capitalization \(Cap\) Rate:\*\*\s*Benchmark of\s*\d{1,2}% to \d{1,2}%, bare minimum of \d{1,2}%",
+                f"**Capitalization (Cap) Rate:** Benchmark of {new_criteria['cap_rate_max']*100:.0f}% to {new_criteria['cap_rate_max']*100:.0f}%, bare minimum of {new_criteria['cap_rate_min']*100:.0f}%",
+                content
+            )
+        
+        # Write updated content back to file
+        with open(filepath, "w") as f:
+            f.write(content)
+        
+        return {"success": True}
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 if __name__ == "__main__":
     criteria = load_investment_criteria()
     print(criteria)

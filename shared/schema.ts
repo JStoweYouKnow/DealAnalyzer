@@ -112,12 +112,43 @@ export const criteriaResponseSchema = z.object({
   str_annual_revenue_minimum: z.number().optional(),
 });
 
+// Configurable criteria ranges schema for user input
+export const configurableCriteriaSchema = z.object({
+  // Price range
+  price_min: z.number().min(0, "Minimum price must be positive"),
+  price_max: z.number().min(0, "Maximum price must be positive"),
+  
+  // COC Return range (as percentages, will be converted to decimals)
+  coc_return_min: z.number().min(0, "COC return minimum must be positive").max(100, "COC return cannot exceed 100%"),
+  coc_return_max: z.number().min(0, "COC return maximum must be positive").max(100, "COC return cannot exceed 100%"),
+  
+  // Cap Rate range (as percentages, will be converted to decimals)
+  cap_rate_min: z.number().min(0, "Cap rate minimum must be positive").max(100, "Cap rate cannot exceed 100%"),
+  cap_rate_max: z.number().min(0, "Cap rate maximum must be positive").max(100, "Cap rate cannot exceed 100%"),
+}).refine(data => data.price_min <= data.price_max, {
+  message: "Minimum price cannot be greater than maximum price",
+  path: ["price_max"]
+}).refine(data => data.coc_return_min <= data.coc_return_max, {
+  message: "Minimum COC return cannot be greater than maximum COC return", 
+  path: ["coc_return_max"]
+}).refine(data => data.cap_rate_min <= data.cap_rate_max, {
+  message: "Minimum cap rate cannot be greater than maximum cap rate",
+  path: ["cap_rate_max"]
+});
+
+// Update criteria request schema
+export const updateCriteriaRequestSchema = z.object({
+  criteria: configurableCriteriaSchema
+});
+
 // Export types
 export type Property = z.infer<typeof propertySchema>;
 export type DealAnalysis = z.infer<typeof dealAnalysisSchema>;
 export type AnalyzePropertyRequest = z.infer<typeof analyzePropertyRequestSchema>;
 export type AnalyzePropertyResponse = z.infer<typeof analyzePropertyResponseSchema>;
 export type CriteriaResponse = z.infer<typeof criteriaResponseSchema>;
+export type ConfigurableCriteria = z.infer<typeof configurableCriteriaSchema>;
+export type UpdateCriteriaRequest = z.infer<typeof updateCriteriaRequestSchema>;
 
 // Insert schemas
 export const insertPropertySchema = propertySchema.omit({ id: true });
