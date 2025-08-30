@@ -93,6 +93,14 @@ export function PropertyOverview({ analysis }: PropertyOverviewProps) {
                   {property.squareFootage.toLocaleString()}
                 </span>
               </div>
+              {property.lotSize && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Lot Size:</span>
+                  <span className="font-medium" data-testid="text-lot-size">
+                    {property.lotSize.toLocaleString()} sq ft
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Year Built:</span>
                 <span className="font-medium" data-testid="text-year-built">

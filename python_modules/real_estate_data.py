@@ -4,6 +4,7 @@ import json
 
 @dataclass
 class Property:
+    # Required fields (no defaults)
     address: str
     city: str
     state: str
@@ -17,6 +18,8 @@ class Property:
     year_built: int
     description: str
     listing_url: str
+    # Optional fields (with defaults)
+    lot_size: Optional[int] = None  # Lot size in square feet
     # Financials (calculated or estimated)
     downpayment_percentage: float = 0.20 # Default to 20%
     closing_costs_percentage: float = 0.05 # Default to 5%

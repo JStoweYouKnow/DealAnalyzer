@@ -9,10 +9,10 @@ def normalize_property_type(property_type):
     # Convert to lowercase for comparison
     normalized = str(property_type).lower().strip()
     
-    # Handle abbreviations
-    if normalized in ['sfr', 'sf', 'single family residential']:
+    # Handle abbreviations and full forms
+    if normalized in ['sfr', 'sf', 'single family residential', 'single family', 'singlefamily']:
         return "single-family"
-    elif normalized in ['mfr', 'mf', 'multi family residential', 'multifamily residential']:
+    elif normalized in ['mfr', 'mf', 'multi family residential', 'multifamily residential', 'multifamily', 'multi family']:
         return "multi-family"
     elif 'single' in normalized and 'family' in normalized:
         return "single-family"
@@ -83,8 +83,8 @@ def parse_email_alert(email_content: str) -> Property:
         r"\*\*Property Type:\*\*\s*(.*)",
         r"Type[:：]\s*([^\n\r]+)",
         r"Property Type[:：]\s*([^\n\r]+)",
-        r"(Single Family|Multi[- ]Family|Townhouse|Condo|Duplex|Triplex|Fourplex|SFR|MFR)(?:\s+Home)?",
-        r"Style[:：]\s*(Single Family|Multi Family|Townhouse|Condo|SFR|MFR)",
+        r"(Single Family|Multifamily|Multi[- ]Family|Townhouse|Condo|Duplex|Triplex|Fourplex|SFR|MFR)(?:\s+(?:Home|House|Property|Residence))?",
+        r"Style[:：]\s*(Single Family|Multifamily|Multi Family|Townhouse|Condo|SFR|MFR)",
     ]
 
     # Price patterns - look for purchase price, listing price, asking price
@@ -126,11 +126,20 @@ def parse_email_alert(email_content: str) -> Property:
 
     # Square footage patterns
     sqft_patterns = [
-        r"\*\*Square Footage:\*\*\s*(\d+)\s*sqft",
-        r"Square Footage[:：]\s*(\d+)",
-        r"(\d+)\s*(?:sq\.?\s*ft\.?|sqft|square feet)",
-        r"Size[:：]\s*(\d+)\s*(?:sq\.?\s*ft\.?|sqft)",
-        r"(\d{3,4})\s*(?:sf|sq\.ft\.)",
+        r"\*\*Square Footage:\*\*\s*([\d,]+)\s*sqft",
+        r"Square Footage[:：]\s*([\d,]+)",
+        r"([\d,]+)\s*(?:sq\.?\s*ft\.?|sqft|square feet)",
+        r"Size[:：]\s*([\d,]+)\s*(?:sq\.?\s*ft\.?|sqft)",
+        r"(\d{3,5})\s*(?:sf|sq\.ft\.)",
+    ]
+
+    # Lot size patterns
+    lot_size_patterns = [
+        r"\*\*Lot Size:\*\*\s*([\d,]+)\s*(?:sq\.?\s*ft\.?|sqft|square feet)?",
+        r"Lot Size[:：]\s*([\d,]+)",
+        r"Lot[:：]\s*([\d,]+)\s*(?:sq\.?\s*ft\.?|sqft|square feet)",
+        r"Land Size[:：]\s*([\d,]+)",
+        r"([\d,]+)\s*(?:sq\.?\s*ft\.?|sqft)\s*lot",
     ]
 
     # Year built patterns
@@ -159,8 +168,13 @@ def parse_email_alert(email_content: str) -> Property:
     bedrooms = int(extract_number(bedroom_patterns, email_content))
     bathrooms = extract_number(bathroom_patterns, email_content, is_float=True)
     square_footage = int(extract_number(sqft_patterns, email_content))
+    lot_size = int(extract_number(lot_size_patterns, email_content)) if extract_number(lot_size_patterns, email_content) > 0 else None
     year_built = int(extract_number(year_patterns, email_content))
     listing_url = extract_field(url_patterns, email_content)
+    
+    # Use lot size as square footage fallback if square footage is missing or zero
+    if square_footage == 0 and lot_size and lot_size > 0:
+        square_footage = lot_size
 
     # Parse address into components
     if address != "N/A":
@@ -226,6 +240,7 @@ def parse_email_alert(email_content: str) -> Property:
         bedrooms=bedrooms,
         bathrooms=bathrooms,
         square_footage=square_footage,
+        lot_size=lot_size,
         year_built=year_built,
         description=description,
         listing_url=listing_url

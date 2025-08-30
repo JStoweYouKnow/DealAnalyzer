@@ -73,7 +73,7 @@ def parse_pdf_content(text_content: str) -> Property:
     
     property_type_patterns = [
         r'(?:Type|Property Type)[:=]?\s*([^\n\r]+?)(?:\n|$|,)',
-        r'(Single Family|Multi[- ]?Family|Townhouse|Condo|Duplex|Triplex|Fourplex|SFR|MFR)(?:\s+(?:Home|House|Property|Residence))?',
+        r'(Single Family|Multifamily|Multi[- ]?Family|Townhouse|Condo|Duplex|Triplex|Fourplex|SFR|MFR)(?:\s+(?:Home|House|Property|Residence))?',
         r'(?:Style)[:=]?\s*([^\n\r]+)',
     ]
     
@@ -93,6 +93,12 @@ def parse_pdf_content(text_content: str) -> Property:
         r'(?:Square Feet|Square Footage|Size|Sq\.?\s*Ft\.?)[:=]?\s*([\d,]+)',
         r'([\d,]+)\s*(?:sq\.?\s*ft\.?|sqft|square feet|sf)',
         r'(\d{3,5})\s*(?:SF|sq\s*ft)',
+    ]
+    
+    lot_size_patterns = [
+        r'(?:Lot Size|Lot|Land Size)[:=]?\s*([\d,]+)\s*(?:sq\.?\s*ft\.?|sqft|square feet|sf)?',
+        r'([\d,]+)\s*(?:sq\.?\s*ft\.?|sqft)\s*lot',
+        r'Lot[:=]?\s*([\d,]+)',
     ]
     
     year_patterns = [
@@ -126,7 +132,12 @@ def parse_pdf_content(text_content: str) -> Property:
     bedrooms = extract_number(bedroom_patterns, text_content, 0)
     bathrooms = extract_number(bathroom_patterns, text_content, 0.0, is_float=True)
     square_footage = extract_number(sqft_patterns, text_content, 0)
+    lot_size = extract_number(lot_size_patterns, text_content, 0) if extract_number(lot_size_patterns, text_content, 0) > 0 else None
     year_built = extract_number(year_patterns, text_content, 0)
+    
+    # Use lot size as square footage fallback if square footage is missing or zero
+    if square_footage == 0 and lot_size and lot_size > 0:
+        square_footage = lot_size
     
     city = extract_flexible_value(city_patterns, text_content, "Unknown")
     state = extract_flexible_value(state_patterns, text_content, "Unknown")
@@ -143,6 +154,7 @@ def parse_pdf_content(text_content: str) -> Property:
         bedrooms=bedrooms,
         bathrooms=bathrooms,
         square_footage=square_footage,
+        lot_size=lot_size,
         year_built=year_built,
         description="Property details extracted from PDF",
         listing_url="N/A"

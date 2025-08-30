@@ -14,6 +14,7 @@ export const propertySchema = z.object({
   bedrooms: z.number(),
   bathrooms: z.number(),
   squareFootage: z.number(),
+  lotSize: z.number().optional(), // Lot size in square feet
   yearBuilt: z.number(),
   description: z.string(),
   listingUrl: z.string(),
