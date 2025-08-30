@@ -5,6 +5,7 @@ import { AnalyzerForm } from "@/components/analyzer-form";
 import { AnalysisResults } from "@/components/analysis-results";
 import { CriteriaConfig } from "@/components/criteria-config";
 import { QuickCompare } from "@/components/quick-compare";
+import { RecentAnalyses } from "@/components/recent-analyses";
 import { LoadingState } from "@/components/loading-state";
 import { useToast } from "@/hooks/use-toast";
 import { useComparison } from "@/hooks/use-comparison";
@@ -12,6 +13,7 @@ import type { AnalyzePropertyResponse, DealAnalysis, CriteriaResponse } from "@s
 
 export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(null);
+  const [recentAnalyses, setRecentAnalyses] = useState<DealAnalysis[]>([]);
   const { toast } = useToast();
   const { 
     comparisonList, 
@@ -63,6 +65,11 @@ export default function Home() {
     onSuccess: (data) => {
       if (data.success && data.data) {
         setAnalysisResult(data.data);
+        // Add to recent analyses (keep last 10)
+        setRecentAnalyses(prev => {
+          const updated = [data.data!, ...prev.filter(a => a.propertyId !== data.data!.propertyId)];
+          return updated.slice(0, 10);
+        });
         toast({
           title: "Analysis Complete",
           description: data.data.meetsCriteria 
@@ -89,6 +96,16 @@ export default function Home() {
 
   const handleAnalyze = (data: { emailContent?: string; file?: File; strMetrics?: any; monthlyExpenses?: any }) => {
     analysisMutation.mutate(data);
+  };
+
+  const handleAnalysisUpdate = (updatedAnalysis: DealAnalysis) => {
+    setAnalysisResult(updatedAnalysis);
+    // Also update in recent analyses
+    setRecentAnalyses(prev => 
+      prev.map(analysis => 
+        analysis.propertyId === updatedAnalysis.propertyId ? updatedAnalysis : analysis
+      )
+    );
   };
 
   return (
@@ -170,7 +187,7 @@ export default function Home() {
               <AnalysisResults 
                 analysis={analysisResult} 
                 criteria={criteria}
-                onAnalysisUpdate={setAnalysisResult}
+                onAnalysisUpdate={handleAnalysisUpdate}
                 onAddToComparison={addToComparison}
                 isInComparison={isInComparison(analysisResult.propertyId)}
                 data-testid="analysis-results"
@@ -188,6 +205,17 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* Recent Analyses */}
+        {recentAnalyses.length > 0 && (
+          <div className="mt-8">
+            <RecentAnalyses 
+              analyses={recentAnalyses}
+              onAddToComparison={addToComparison}
+              isInComparison={isInComparison}
+            />
+          </div>
+        )}
 
         {/* Quick Compare Dashboard */}
         {comparisonList.length > 0 && (
