@@ -84,6 +84,57 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
     passingCriteria.push(...strCriteria);
   }
 
+  // Generate dynamic recommendation based on property performance
+  const getRecommendationText = (analysis: DealAnalysis, passingCriteria: any[], improvementAreas: any[]) => {
+    const allCriteriaPassing = passingCriteria.every(c => c.status);
+    const allMetricsPassing = improvementAreas.every(area => area.status === "benchmark" || area.status === "minimum");
+    const hasBenchmarkMetrics = improvementAreas.some(area => area.status === "benchmark");
+    const failedCriteria = passingCriteria.filter(c => !c.status);
+    const failedMetrics = improvementAreas.filter(area => area.status === "fail");
+
+    // Excellent property - exceeds conditions
+    if (allCriteriaPassing && allMetricsPassing && hasBenchmarkMetrics) {
+      return " 🌟 Excellent investment opportunity! This property exceeds benchmark criteria. Consider moving forward quickly or exploring value-add opportunities to maximize returns.";
+    }
+    
+    // Good property - meets all conditions
+    if (allCriteriaPassing && allMetricsPassing) {
+      return " ✅ Solid investment that meets all criteria. Consider strategies to boost cash flow or cap rate above benchmark levels for even better returns.";
+    }
+    
+    // Marginal property - meets basic criteria but weak metrics
+    if (allCriteriaPassing && !allMetricsPassing) {
+      const suggestions = [];
+      if (failedMetrics.some(m => m.name === "COC Return")) {
+        suggestions.push("increase down payment to improve cash-on-cash return");
+      }
+      if (failedMetrics.some(m => m.name === "Cap Rate")) {
+        suggestions.push("negotiate a lower purchase price to improve cap rate");
+      }
+      return ` ⚠️ Property meets basic criteria but has weak returns. Consider: ${suggestions.join(" or ")} before proceeding.`;
+    }
+    
+    // Failed property - specific advice
+    if (!allCriteriaPassing || !allMetricsPassing) {
+      const issues = [];
+      if (failedCriteria.some(c => c.name === "Price Under Max")) {
+        issues.push("negotiate lower purchase price");
+      }
+      if (failedCriteria.some(c => c.name === "1% Rule")) {
+        issues.push("find higher rent comps or lower purchase price");
+      }
+      if (failedCriteria.some(c => c.name === "Positive Cash Flow")) {
+        issues.push("reduce expenses or increase rent");
+      }
+      if (failedMetrics.length > 0) {
+        issues.push("improve investment returns through better financing or pricing");
+      }
+      return ` ❌ Property doesn't meet criteria. Focus on: ${issues.slice(0, 2).join(" and ")}. Consider looking for better opportunities.`;
+    }
+    
+    return " Property analysis complete. Review metrics for investment decision.";
+  };
+
   return (
     <Card className="analysis-card">
       <CardHeader className="border-b border-border">
@@ -166,10 +217,7 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
                 <p className="text-sm text-blue-800 dark:text-blue-200">
                   <i className="fas fa-lightbulb mr-2"></i>
                   <strong>Recommendation:</strong> 
-                  {analysis.meetsCriteria 
-                    ? " Property meets minimum requirements. Consider ways to improve returns."
-                    : " Property doesn't meet all criteria. Consider negotiating price or finding better opportunities."
-                  }
+                  {getRecommendationText(analysis, passingCriteria, improvementAreas)}
                 </p>
               </div>
             </div>
