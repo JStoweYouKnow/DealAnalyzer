@@ -18,9 +18,37 @@ export default function Home() {
 
   // Analysis mutation
   const analysisMutation = useMutation({
-    mutationFn: async (data: { emailContent: string; strMetrics?: any; monthlyExpenses?: any }) => {
-      const response = await apiRequest("POST", "/api/analyze", data);
-      return response.json() as Promise<AnalyzePropertyResponse>;
+    mutationFn: async (data: { emailContent?: string; file?: File; strMetrics?: any; monthlyExpenses?: any }) => {
+      if (data.file) {
+        // Handle file upload
+        const formData = new FormData();
+        formData.append('file', data.file);
+        if (data.strMetrics) {
+          formData.append('strMetrics', JSON.stringify(data.strMetrics));
+        }
+        if (data.monthlyExpenses) {
+          formData.append('monthlyExpenses', JSON.stringify(data.monthlyExpenses));
+        }
+        
+        const response = await fetch('/api/analyze-file', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return await response.json() as Promise<AnalyzePropertyResponse>;
+      } else {
+        // Handle text input (existing functionality)
+        const response = await apiRequest("POST", "/api/analyze", {
+          emailContent: data.emailContent,
+          strMetrics: data.strMetrics,
+          monthlyExpenses: data.monthlyExpenses,
+        });
+        return response.json() as Promise<AnalyzePropertyResponse>;
+      }
     },
     onSuccess: (data) => {
       if (data.success && data.data) {
@@ -49,7 +77,7 @@ export default function Home() {
     },
   });
 
-  const handleAnalyze = (data: { emailContent: string; strMetrics?: any; monthlyExpenses?: any }) => {
+  const handleAnalyze = (data: { emailContent?: string; file?: File; strMetrics?: any; monthlyExpenses?: any }) => {
     analysisMutation.mutate(data);
   };
 

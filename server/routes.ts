@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
 import { storage } from "./storage";
 import { 
   analyzePropertyRequestSchema, 
@@ -11,6 +12,24 @@ import path from "path";
 import fs from "fs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Configure multer for file uploads
+  const upload = multer({
+    dest: 'temp_uploads/',
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = ['.pdf', '.csv', '.txt', '.xlsx', '.xls'];
+      const fileExtension = path.extname(file.originalname).toLowerCase();
+      
+      if (allowedTypes.includes(fileExtension)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only PDF, CSV, TXT, and Excel files are allowed.'));
+      }
+    },
+  });
   
   // Health check endpoint
   app.get("/api/health", async (req, res) => {
@@ -67,6 +86,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false, 
         error: "Internal server error during analysis"
+      });
+    }
+  });
+
+  // Analyze property from uploaded file
+  app.post("/api/analyze-file", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          error: "No file uploaded"
+        });
+        return;
+      }
+
+      const filePath = req.file.path;
+      const fileExtension = path.extname(req.file.originalname).toLowerCase();
+      
+      // Parse additional form data
+      let strMetrics, monthlyExpenses;
+      try {
+        if (req.body.strMetrics) {
+          strMetrics = JSON.parse(req.body.strMetrics);
+        }
+        if (req.body.monthlyExpenses) {
+          monthlyExpenses = JSON.parse(req.body.monthlyExpenses);
+        }
+      } catch (e) {
+        console.warn("Failed to parse form data:", e);
+      }
+
+      // Run Python file analysis
+      const analysisResult = await runPythonFileAnalysis(filePath, fileExtension, strMetrics, monthlyExpenses);
+      
+      // Clean up uploaded file
+      try {
+        fs.unlinkSync(filePath);
+      } catch (e) {
+        console.warn("Failed to clean up uploaded file:", e);
+      }
+      
+      if (!analysisResult.success) {
+        res.status(400).json({
+          success: false,
+          error: analysisResult.error || "File analysis failed"
+        });
+        return;
+      }
+
+      // Store the analysis in memory
+      const storedAnalysis = await storage.createDealAnalysis(analysisResult.data!);
+
+      const response: AnalyzePropertyResponse = {
+        success: true,
+        data: storedAnalysis
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error in analyze-file endpoint:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Internal server error during file analysis"
       });
     }
   });
