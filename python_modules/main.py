@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import json
+import time
 from email_parser import parse_email_alert
 from deal_analyzer import analyze_deal
 
@@ -92,7 +93,7 @@ def main():
         if args.json:
             # Convert to format expected by frontend
             result = {
-                "propertyId": "temp_id",
+                "propertyId": f"temp-{int(time.time() * 1000)}",
                 "property": {
                     "address": property_data.address,
                     "city": property_data.city, 

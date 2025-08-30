@@ -5,9 +5,12 @@ export function useComparison() {
   const [comparisonList, setComparisonList] = useState<DealAnalysis[]>([]);
 
   const addToComparison = useCallback((analysis: DealAnalysis) => {
+    console.log('Adding to comparison:', analysis.propertyId, analysis.property.address);
     setComparisonList(prev => {
+      console.log('Current comparison list:', prev.map(p => p.propertyId));
       // Check if already exists
       if (prev.some(item => item.propertyId === analysis.propertyId)) {
+        console.log('Property already in comparison:', analysis.propertyId);
         return prev;
       }
       
@@ -16,7 +19,9 @@ export function useComparison() {
         return [...prev.slice(1), analysis]; // Remove oldest, add newest
       }
       
-      return [...prev, analysis];
+      const updated = [...prev, analysis];
+      console.log('Updated comparison list:', updated.map(p => p.propertyId));
+      return updated;
     });
   }, []);
 
@@ -29,7 +34,9 @@ export function useComparison() {
   }, []);
 
   const isInComparison = useCallback((propertyId: string) => {
-    return comparisonList.some(item => item.propertyId === propertyId);
+    const result = comparisonList.some(item => item.propertyId === propertyId);
+    console.log('Checking if in comparison:', propertyId, 'result:', result, 'comparison list:', comparisonList.map(p => p.propertyId));
+    return result;
   }, [comparisonList]);
 
   return {
