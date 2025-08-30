@@ -1,0 +1,12 @@
+Subject: New Investment Opportunity - 123 Main Street
+
+Dear Investor,
+
+Property: 123 Main St, Anytown, CA 90210
+Type: Single Family Home  
+Listing Price: $250,000
+Estimated Monthly Rent: $2,500
+Bedrooms: 3
+Bathrooms: 2.5
+Square Footage: 1500 sq ft
+Year Built: 1985

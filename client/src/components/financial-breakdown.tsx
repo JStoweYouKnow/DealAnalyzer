@@ -15,18 +15,20 @@ export function FinancialBreakdown({ analysis }: FinancialBreakdownProps) {
     }).format(amount);
   };
 
-  // Calculate estimated monthly expenses breakdown
+  // Use calculated values from Python analysis engine
   const loanAmount = analysis.property.purchasePrice - analysis.calculatedDownpayment;
   const monthlyInterestRate = 0.07 / 12; // Assuming 7% interest rate
   const numberOfPayments = 30 * 12; // 30 years
   const mortgagePayment = loanAmount * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, numberOfPayments)) / (Math.pow(1 + monthlyInterestRate, numberOfPayments) - 1);
   
+  // Estimated breakdown components (used for display breakdown)
   const propertyTax = analysis.property.purchasePrice * 0.012 / 12; // 1.2% annually
   const insurance = 100; // Estimated $100/month
   const vacancy = analysis.property.monthlyRent * 0.05; // 5% of rent
   const propertyManagement = analysis.property.monthlyRent * 0.10; // 10% of rent
   
-  const totalExpenses = mortgagePayment + propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement;
+  // Calculate total for display consistency with Python analysis
+  const totalExpensesEstimated = mortgagePayment + propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement;
 
   return (
     <Card className="analysis-card">
@@ -98,7 +100,7 @@ export function FinancialBreakdown({ analysis }: FinancialBreakdownProps) {
                 <div className="flex justify-between font-medium">
                   <span>Total Expenses</span>
                   <span className="text-red-600" data-testid="text-total-expenses">
-                    {formatCurrency(totalExpenses)}
+                    {formatCurrency(totalExpensesEstimated)}
                   </span>
                 </div>
               </div>
@@ -106,18 +108,53 @@ export function FinancialBreakdown({ analysis }: FinancialBreakdownProps) {
           </div>
         </div>
 
-        {/* Net Cash Flow */}
+        {/* Net Cash Flow from Analysis Engine */}
         <div className="mt-6 bg-primary/5 rounded-lg p-4 border-l-4 border-primary">
           <div className="flex justify-between items-center">
             <span className="font-semibold text-primary">Net Monthly Cash Flow</span>
             <span 
-              className={`text-xl font-bold ${analysis.cashFlowPositive ? 'text-primary' : 'text-red-600'}`}
+              className={`text-xl font-bold ${analysis.cashFlowPositive ? 'text-green-600' : 'text-red-600'}`}
               data-testid="text-net-cash-flow"
             >
               {formatCurrency(analysis.cashFlow)}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">Monthly income after all expenses</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Calculated by analysis engine: {formatCurrency(analysis.property.monthlyRent)} - expenses
+          </p>
+        </div>
+        
+        {/* Key Investment Metrics */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 text-center">
+            <div className="text-sm text-muted-foreground mb-1">Cash-on-Cash Return</div>
+            <div className="text-2xl font-bold text-blue-600" data-testid="text-coc-return">
+              {(analysis.cocReturn * 100).toFixed(1)}%
+            </div>
+            <div className={`text-xs mt-1 ${analysis.cocMeetsMinimum ? 'text-green-600' : 'text-red-600'}`}>
+              {analysis.cocMeetsMinimum ? '✓ Meets minimum' : '✗ Below minimum'}
+            </div>
+          </div>
+          
+          <div className="bg-purple-50 dark:bg-purple-950/20 rounded-lg p-4 text-center">
+            <div className="text-sm text-muted-foreground mb-1">Cap Rate</div>
+            <div className="text-2xl font-bold text-purple-600" data-testid="text-cap-rate">
+              {(analysis.capRate * 100).toFixed(1)}%
+            </div>
+            <div className={`text-xs mt-1 ${analysis.capMeetsMinimum ? 'text-green-600' : 'text-red-600'}`}>
+              {analysis.capMeetsMinimum ? '✓ Meets minimum' : '✗ Below minimum'}
+            </div>
+          </div>
+          
+          <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-4 text-center">
+            <div className="text-sm text-muted-foreground mb-1">Total Cash Needed</div>
+            <div className="text-2xl font-bold text-yellow-600" data-testid="text-cash-needed">
+              {formatCurrency(analysis.totalCashNeeded)}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Down payment + closing costs
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
