@@ -122,17 +122,9 @@ export default function Home() {
                 </div>
                 <h1 className="text-xl font-bold gradient-text">Real Estate Deal Analyzer</h1>
               </div>
-              <div className="deployment-badge px-3 py-1 rounded-full text-white text-xs font-medium flex items-center space-x-2">
-                <div className="status-indicator w-2 h-2"></div>
-                <span>LIVE ON REPLIT</span>
-              </div>
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className="api-status px-3 py-1 rounded-md text-xs font-medium text-green-800 flex items-center space-x-2">
-                <i className="fas fa-server text-green-600"></i>
-                <span>API Connected</span>
-              </div>
               
               <nav className="hidden md:flex space-x-6">
                 <a href="#analyzer" className="text-muted-foreground hover:text-primary transition-colors font-medium">
