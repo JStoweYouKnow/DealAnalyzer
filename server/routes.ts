@@ -265,6 +265,100 @@ async function runPythonAnalysis(
   });
 }
 
+// Helper function to run Python file analysis
+async function runPythonFileAnalysis(
+  filePath: string,
+  fileExtension: string, 
+  strMetrics?: { adr?: number; occupancyRate?: number }, 
+  monthlyExpenses?: { propertyTaxes?: number; insurance?: number; utilities?: number; management?: number; maintenance?: number; cleaning?: number; supplies?: number; other?: number }
+): Promise<AnalyzePropertyResponse> {
+  return new Promise((resolve) => {
+    const pythonPath = path.join(process.cwd(), "python_modules");
+    const tempDataFile = path.join(pythonPath, `temp_data_${Date.now()}.json`);
+    
+    // Write additional data to JSON file
+    const additionalData = {
+      str_metrics: strMetrics ? {
+        adr: strMetrics.adr,
+        occupancy_rate: strMetrics.occupancyRate,
+      } : null,
+      monthly_expenses: monthlyExpenses ? {
+        property_taxes: monthlyExpenses.propertyTaxes,
+        insurance: monthlyExpenses.insurance,
+        utilities: monthlyExpenses.utilities,
+        management: monthlyExpenses.management,
+        maintenance: monthlyExpenses.maintenance,
+        cleaning: monthlyExpenses.cleaning,
+        supplies: monthlyExpenses.supplies,
+        other: monthlyExpenses.other,
+      } : null,
+    };
+    fs.writeFileSync(tempDataFile, JSON.stringify(additionalData));
+    
+    const python = spawn("python3", [
+      path.join(pythonPath, "file_analysis.py"),
+      filePath,
+      fileExtension,
+      "--json",
+      "--data-file",
+      tempDataFile
+    ], {
+      cwd: pythonPath
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    python.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    python.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    python.on("close", (code) => {
+      // Clean up temp file
+      try {
+        fs.unlinkSync(tempDataFile);
+      } catch (e) {
+        console.warn("Failed to clean up temp data file:", e);
+      }
+
+      if (code !== 0) {
+        console.error("Python file analysis failed:", stderr);
+        resolve({
+          success: false,
+          error: "File analysis failed: " + stderr
+        });
+        return;
+      }
+
+      try {
+        const result = JSON.parse(stdout);
+        resolve({
+          success: true,
+          data: result
+        });
+      } catch (e) {
+        console.error("Failed to parse Python output:", e);
+        resolve({
+          success: false,
+          error: "Failed to parse file analysis results"
+        });
+      }
+    });
+
+    python.on("error", (error) => {
+      console.error("Failed to start Python process:", error);
+      resolve({
+        success: false,
+        error: "Failed to start file analysis process"
+      });
+    });
+  });
+}
+
 // Helper function to load investment criteria
 async function loadInvestmentCriteria(): Promise<CriteriaResponse> {
   return new Promise((resolve, reject) => {
