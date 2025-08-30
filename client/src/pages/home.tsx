@@ -6,6 +6,7 @@ import { AnalysisResults } from "@/components/analysis-results";
 import { CriteriaConfig } from "@/components/criteria-config";
 import { QuickCompare } from "@/components/quick-compare";
 import { RecentAnalyses } from "@/components/recent-analyses";
+import { Reports } from "@/components/reports";
 import { LoadingState } from "@/components/loading-state";
 import { useToast } from "@/hooks/use-toast";
 import { useComparison } from "@/hooks/use-comparison";
@@ -228,6 +229,14 @@ export default function Home() {
             />
           </div>
         )}
+
+        {/* Reports Section */}
+        <div className="mt-8">
+          <Reports 
+            analyses={recentAnalyses}
+            comparisonList={comparisonList}
+          />
+        </div>
 
         {/* API Integration Status */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">

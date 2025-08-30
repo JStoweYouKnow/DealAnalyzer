@@ -12,6 +12,7 @@ import {
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
+import { generateReport, type ReportOptions, type ReportData } from "./report-generator";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -278,6 +279,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting history:", error);
       res.status(500).json({ error: "Failed to get analysis history" });
+    }
+  });
+
+  // Generate report endpoint
+  app.post("/api/generate-report", async (req, res) => {
+    try {
+      const { analysisIds, format, title, includeComparison } = req.body;
+      
+      if (!analysisIds || !Array.isArray(analysisIds) || analysisIds.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: "Analysis IDs are required"
+        });
+        return;
+      }
+
+      if (!format || !['pdf', 'csv'].includes(format)) {
+        res.status(400).json({
+          success: false,
+          error: "Valid format (pdf or csv) is required"
+        });
+        return;
+      }
+
+      // Get analyses from storage
+      const analyses: any[] = [];
+      for (const id of analysisIds) {
+        const analysis = await storage.getDealAnalysis(id);
+        if (analysis) {
+          analyses.push(analysis);
+        }
+      }
+
+      if (analyses.length === 0) {
+        res.status(404).json({
+          success: false,
+          error: "No analyses found for the provided IDs"
+        });
+        return;
+      }
+
+      const reportData: ReportData = {
+        analyses
+      };
+
+      const options: ReportOptions = {
+        format: format as 'pdf' | 'csv',
+        title: title || `Property Analysis Report`,
+        includeComparison
+      };
+
+      // Generate the report
+      const result = await generateReport(reportData, options);
+
+      // Send file as download
+      res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+      res.setHeader('Content-Type', format === 'pdf' ? 'application/pdf' : 'text/csv');
+      
+      const fileStream = fs.createReadStream(result.filePath);
+      fileStream.pipe(res);
+      
+      // Clean up file after sending
+      fileStream.on('end', () => {
+        fs.unlink(result.filePath, (err) => {
+          if (err) console.warn('Failed to clean up report file:', err);
+        });
+      });
+
+    } catch (error) {
+      console.error("Error generating report:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to generate report"
+      });
     }
   });
 
