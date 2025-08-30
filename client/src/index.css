@@ -191,6 +191,25 @@
     border-color: var(--color-accent);
     outline: none;
   }
+
+  .navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: var(--color-neutral-light);
+  }
+
+  .navbar a {
+    margin-left: 20px;
+    text-decoration: none;
+    color: var(--color-neutral-dark);
+    font-weight: 500;
+  }
+
+  .navbar a.active {
+    color: var(--color-primary);
+  }
 }
 
 /* Custom animations and styles */
