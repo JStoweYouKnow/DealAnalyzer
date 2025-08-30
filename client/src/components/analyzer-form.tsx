@@ -42,29 +42,28 @@ export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
   };
 
   const loadExample = () => {
-    const exampleContent = `Subject: New Listing Alert: 123 Main St, Anytown, CA
+    const exampleContent = `Subject: New Investment Opportunity - 123 Main Street
 
 Dear Investor,
 
-We have a new listing that might interest you:
+We found a great property that matches your criteria:
 
-**Property Address:** 123 Main St, Anytown, CA 90210
-**Property Type:** Single Family Home
-**Purchase Price:** $250,000
-**Estimated Monthly Rent:** $2,500
-**Bedrooms:** 3
-**Bathrooms:** 2.5
-**Square Footage:** 1500 sqft
-**Year Built:** 1985
+Property: 123 Main St, Anytown, CA 90210
+Type: Single Family Home  
+Listing Price: $250,000
+Estimated Monthly Rent: $2,500
+Bedrooms: 3
+Bathrooms: 2.5
+Square Footage: 1500 sq ft
+Year Built: 1985
 
-**Description:**
-This charming 3-bedroom, 2.5-bathroom single-family home is located in a desirable neighborhood in Anytown, CA. It features a spacious living area, a modern kitchen, and a large backyard. Perfect for a rental property.
+This charming 3-bedroom, 2.5-bathroom home is located in a desirable neighborhood. The property features a spacious living area, modern kitchen, and large backyard. It's currently tenant-occupied with market-rate rent.
 
-**Listing URL:** https://example.com/listing/123mainst
+View listing: https://example.com/listing/123mainst
 
-Contact us for more details!
+Let me know if you'd like to schedule a showing!
 
-Sincerely,
+Best regards,
 Your Real Estate Team`;
     
     setEmailContent(exampleContent);
@@ -104,17 +103,14 @@ Your Real Estate Team`;
                     className="h-80 resize-none mt-2"
                     placeholder="Paste your real estate email content here...
 
-Example format:
-**Property Address:** 123 Main St, Anytown, CA 90210
-**Property Type:** Single Family Home
-**Purchase Price:** $250,000
-**Estimated Monthly Rent:** $2,500
-**Bedrooms:** 3
-**Bathrooms:** 2.5
-**Square Footage:** 1500 sqft
-**Year Built:** 1985
-**Description:** Beautiful property description...
-**Listing URL:** https://example.com/listing"
+The analyzer automatically detects property details from various email formats including:
+• Property address and location
+• Purchase/listing price and monthly rent
+• Bedrooms, bathrooms, square footage
+• Property type and year built
+• Listing URLs and descriptions
+
+Works with emails from MLS, Zillow, Realtor.com, and other real estate services."
                     data-testid="input-email-content"
                   />
                 </div>
