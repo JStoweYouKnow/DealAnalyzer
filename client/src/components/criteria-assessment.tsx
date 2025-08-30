@@ -124,17 +124,29 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
             </div>
           </div>
 
-          {/* Areas for Improvement */}
+          {/* Investment Metrics */}
           <div className="space-y-4">
-            <h4 className="font-semibold text-yellow-600 flex items-center mb-4">
-              <i className="fas fa-exclamation-triangle mr-2"></i>
+            <h4 className={`font-semibold flex items-center mb-4 ${
+              improvementAreas.every(area => area.status === "benchmark" || area.status === "minimum") 
+                ? 'text-green-600' 
+                : 'text-yellow-600'
+            }`}>
+              <i className={`mr-2 ${
+                improvementAreas.every(area => area.status === "benchmark" || area.status === "minimum") 
+                  ? 'fas fa-check-circle' 
+                  : 'fas fa-exclamation-triangle'
+              }`}></i>
               Investment Metrics
             </h4>
             <div className="space-y-3">
               {improvementAreas.map((area) => (
                 <div 
                   key={area.name}
-                  className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg"
+                  className={`flex items-center justify-between p-3 rounded-lg ${
+                    area.status === "benchmark" || area.status === "minimum" 
+                      ? 'bg-green-50 dark:bg-green-950/20' 
+                      : 'bg-red-50 dark:bg-red-950/20'
+                  }`}
                   data-testid={area.testId}
                 >
                   <span className="text-sm font-medium">{area.name}</span>
