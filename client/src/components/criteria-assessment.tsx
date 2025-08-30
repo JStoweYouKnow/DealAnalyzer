@@ -28,18 +28,6 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
 
   const passingCriteria = [
     {
-      name: "Property Type Match",
-      status: criteria?.property_types?.includes(property.propertyType) ?? true,
-      value: property.propertyType,
-      testId: "criterion-property-type"
-    },
-    {
-      name: "Location Requirement", 
-      status: property.state === criteria?.location,
-      value: property.state,
-      testId: "criterion-location"
-    },
-    {
       name: "Price Under Max",
       status: property.purchasePrice <= (criteria?.max_purchase_price ?? 300000),
       value: `${formatCurrency(property.purchasePrice)} < ${formatCurrency(criteria?.max_purchase_price ?? 300000)}`,
