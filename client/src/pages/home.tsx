@@ -207,6 +207,37 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Recent Analyses */}
+        {recentAnalyses.length > 0 && (
+          <div className="mt-8">
+            <RecentAnalyses 
+              analyses={recentAnalyses}
+              onAddToComparison={addToComparison}
+              isInComparison={isInComparison}
+            />
+          </div>
+        )}
+
+        {/* Quick Compare Dashboard */}
+        {comparisonList.length > 0 && (
+          <div className="mt-8">
+            <QuickCompare 
+              analyses={comparisonList}
+              criteria={criteria}
+              onRemoveProperty={removeFromComparison}
+              onClearAll={clearComparison}
+            />
+          </div>
+        )}
+
+        {/* Reports Section */}
+        <div className="mt-8">
+          <Reports 
+            analyses={recentAnalyses}
+            comparisonList={comparisonList}
+          />
+        </div>
+
       </main>
     </div>
   );
