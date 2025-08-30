@@ -10,6 +10,7 @@ import { Reports } from "@/components/reports";
 import { LoadingState } from "@/components/loading-state";
 import { useToast } from "@/hooks/use-toast";
 import { useComparison } from "@/hooks/use-comparison";
+import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
 import type { AnalyzePropertyResponse, DealAnalysis, CriteriaResponse } from "@shared/schema";
 
 export default function Home() {
@@ -118,7 +119,7 @@ export default function Home() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <img 
-                  src="/attached_assets/ADC2EBEF-0780-4116-9A4B-E55654060491_1756531105228.PNG" 
+                  src={comfortFinderLogo} 
                   alt="The Comfort Finder Logo" 
                   className="w-8 h-8 object-contain"
                 />
