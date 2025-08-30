@@ -36,15 +36,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Update monthly rent and re-analyze
-  app.post("/api/update-rent", async (req, res) => {
+  // Update property data and re-analyze
+  app.post("/api/update-property", async (req, res) => {
     try {
       const { property } = req.body;
       
-      if (!property || !property.monthlyRent || property.monthlyRent < 0) {
+      if (!property || property.monthlyRent < 0 || (property.adr && property.adr < 0)) {
         res.status(400).json({
           success: false,
-          error: "Invalid property data or monthly rent"
+          error: "Invalid property data"
         });
         return;
       }
@@ -72,12 +72,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(response);
     } catch (error) {
-      console.error("Error in update-rent endpoint:", error);
+      console.error("Error in update-property endpoint:", error);
       res.status(500).json({ 
         success: false, 
-        error: "Internal server error during rent update"
+        error: "Internal server error during property update"
       });
     }
+  });
+
+  // Legacy endpoint for backwards compatibility
+  app.post("/api/update-rent", async (req, res) => {
+    // Redirect to the new update-property endpoint
+    req.url = "/api/update-property";
+    return app._router.handle(req, res);
   });
 
   // Get investment criteria
@@ -230,6 +237,8 @@ async function runPythonPropertyUpdate(
         property_type: property.propertyType,
         purchase_price: property.purchasePrice,
         monthly_rent: property.monthlyRent, // This is the updated value
+        adr: property.adr, // Average Daily Rate for STR
+        occupancy_rate: property.occupancyRate, // Occupancy rate for STR
         bedrooms: property.bedrooms,
         bathrooms: property.bathrooms,
         square_footage: property.squareFootage,

@@ -15,7 +15,7 @@ export function AnalysisResults({ analysis, criteria, onAnalysisUpdate }: Analys
     <div className="space-y-6">
       <PropertyOverview analysis={analysis} onAnalysisUpdate={onAnalysisUpdate} />
       <FinancialBreakdown analysis={analysis} />
-      <STRMetrics analysis={analysis} criteria={criteria} />
+      <STRMetrics analysis={analysis} criteria={criteria} onAnalysisUpdate={onAnalysisUpdate} />
       <CriteriaAssessment analysis={analysis} criteria={criteria} />
     </div>
   );

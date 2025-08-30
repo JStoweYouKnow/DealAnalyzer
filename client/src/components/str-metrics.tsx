@@ -1,13 +1,66 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { DealAnalysis, CriteriaResponse } from "@shared/schema";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { DealAnalysis, CriteriaResponse, AnalyzePropertyResponse } from "@shared/schema";
 
 interface STRMetricsProps {
   analysis: DealAnalysis;
   criteria?: CriteriaResponse;
+  onAnalysisUpdate?: (updatedAnalysis: DealAnalysis) => void;
 }
 
-export function STRMetrics({ analysis, criteria }: STRMetricsProps) {
+export function STRMetrics({ analysis, criteria, onAnalysisUpdate }: STRMetricsProps) {
+  const { property } = analysis;
+  const [editableAdr, setEditableAdr] = useState(property.adr || 0);
+  const [isEditingAdr, setIsEditingAdr] = useState(false);
+  const { toast } = useToast();
+
+  // Mutation for updating ADR and re-analyzing
+  const updateAdrMutation = useMutation({
+    mutationFn: async (newAdr: number) => {
+      const updatedProperty = { ...property, adr: newAdr };
+      const response = await apiRequest("POST", "/api/update-property", {
+        property: updatedProperty,
+      });
+      return response.json() as Promise<AnalyzePropertyResponse>;
+    },
+    onSuccess: (data) => {
+      if (data.success && data.data && onAnalysisUpdate) {
+        onAnalysisUpdate(data.data);
+        setIsEditingAdr(false);
+        toast({
+          title: "ADR Updated",
+          description: "Analysis recalculated with new ADR.",
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: data.error || "Failed to update ADR",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAdrUpdate = async () => {
+    if (editableAdr !== property.adr && editableAdr >= 0) {
+      updateAdrMutation.mutate(editableAdr);
+    } else {
+      setIsEditingAdr(false);
+      setEditableAdr(property.adr || 0); // Reset to original value
+    }
+  };
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -62,12 +115,38 @@ export function STRMetrics({ analysis, criteria }: STRMetricsProps) {
               Performance Metrics
             </h4>
             <div className="space-y-3">
-              {analysis.property.adr && (
-                <div className="flex justify-between p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+              {(analysis.property.adr || editableAdr > 0 || isEditingAdr) && (
+                <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
                   <span className="text-sm font-medium">Average Daily Rate</span>
-                  <span className="font-bold text-blue-600" data-testid="text-adr">
-                    {formatCurrency(analysis.property.adr)}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    {isEditingAdr ? (
+                      <Input
+                        type="number"
+                        value={editableAdr}
+                        onChange={(e) => setEditableAdr(Number(e.target.value))}
+                        onBlur={handleAdrUpdate}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAdrUpdate()}
+                        className="w-20 h-6 text-right text-sm"
+                        data-testid="input-adr"
+                      />
+                    ) : (
+                      <span 
+                        className="font-bold text-blue-600 cursor-pointer hover:bg-blue-100 px-1 rounded" 
+                        data-testid="text-adr"
+                        onClick={() => setIsEditingAdr(true)}
+                        title="Click to edit ADR"
+                      >
+                        {formatCurrency(editableAdr || 0)}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setIsEditingAdr(!isEditingAdr)}
+                      className="text-xs text-muted-foreground hover:text-primary"
+                      title={isEditingAdr ? "Cancel" : "Edit ADR"}
+                    >
+                      <i className={`fas ${isEditingAdr ? 'fa-times' : 'fa-edit'}`}></i>
+                    </button>
+                  </div>
                 </div>
               )}
               
