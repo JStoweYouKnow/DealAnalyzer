@@ -295,9 +295,12 @@ async function runPythonFileAnalysis(
     };
     fs.writeFileSync(tempDataFile, JSON.stringify(additionalData));
     
+    // Convert to absolute path since Python script runs from different directory
+    const absoluteFilePath = path.resolve(filePath);
+    
     const python = spawn("python3", [
       path.join(pythonPath, "file_analysis.py"),
-      filePath,
+      absoluteFilePath,
       fileExtension,
       "--json",
       "--data-file",
