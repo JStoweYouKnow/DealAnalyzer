@@ -17,6 +17,21 @@ def parse_pdf_content(text_content: str) -> Property:
                         return match.strip()
         return default
     
+    def extract_header_text(text, max_lines=10):
+        """Extract header text (first few lines) for fallback parsing."""
+        lines = text.split('\n')
+        return '\n'.join(lines[:max_lines])
+    
+    def extract_with_header_fallback(patterns, header_patterns, text, header_text, default=None):
+        """Try main patterns first, then header patterns as fallback."""
+        # Try main patterns first
+        result = extract_flexible_value(patterns, text, None)
+        if result and result != default:
+            return result
+        
+        # Fallback to header patterns
+        return extract_flexible_value(header_patterns, header_text, default)
+    
     def extract_price(patterns, text, default=0.0):
         """Extract price values and convert to float."""
         for pattern in patterns:
@@ -77,6 +92,13 @@ def parse_pdf_content(text_content: str) -> Property:
         r'(?:Style)[:=]?\s*([^\n\r]+)',
     ]
     
+    # Header-specific patterns for property type (often in titles/headers)
+    header_property_type_patterns = [
+        r'^.*?(Single Family|Multifamily|Multi[- ]?Family|Townhouse|Condo|Duplex|Triplex|Fourplex|SFR|MFR).*?$',
+        r'(Single Family|Multifamily|Multi[- ]?Family|Townhouse|Condo|Duplex|Triplex|Fourplex|SFR|MFR)(?:\s+(?:Home|House|Property|Residence|Listing))?',
+        r'(?:FOR SALE|LISTING).*?(Single Family|Multifamily|Multi[- ]?Family|Townhouse|Condo|Duplex|Triplex|Fourplex|SFR|MFR)',
+    ]
+    
     bedroom_patterns = [
         r'(?:Bedrooms?|Beds?)[:=]?\s*(\d+)',
         r'(\d+)\s*(?:bed|bedroom|br)s?',
@@ -93,6 +115,19 @@ def parse_pdf_content(text_content: str) -> Property:
         r'(?:Square Feet|Square Footage|Size|Sq\.?\s*Ft\.?)[:=]?\s*([\d,]+)',
         r'([\d,]+)\s*(?:sq\.?\s*ft\.?|sqft|square feet|sf)',
         r'(\d{3,5})\s*(?:SF|sq\s*ft)',
+    ]
+    
+    # Header-specific patterns for square footage (often in title lines)
+    # These patterns avoid matching street addresses by requiring specific context
+    header_sqft_patterns = [
+        r'(?:Property|Home|House).*?(\d{1,2},\d{3})\s*(?:sq\.?\s*ft\.?|sqft|SF|square feet)',  # Property context with comma
+        r'(?:Property|Home|House).*?(\d{3,5})\s*(?:sq\.?\s*ft\.?|sqft|SF|square feet)',        # Property context without comma
+        r'.*?(\d{1,2},\d{3})\s*(?:sq\.?\s*ft\.?|sqft|SF)\s*(?:Property|Home|House)',           # Sqft before property type
+        r'.*?(\d{3,5})\s*(?:sq\.?\s*ft\.?|sqft|SF)\s*(?:Property|Home|House)',                 # Sqft before property type
+        r'-\s*(\d{1,2},\d{3})\s*(?:sq\.?\s*ft\.?|sqft|SF)',                                    # Dash separator with comma
+        r'-\s*(\d{3,5})\s*(?:sq\.?\s*ft\.?|sqft|SF)',                                          # Dash separator without comma
+        r'(\d{1,2},\d{3})\s*SF(?!\w)',                                                         # SF with word boundary (not Street)
+        r'(\d{3,5})\s*SF(?!\w)',                                                               # SF with word boundary
     ]
     
     lot_size_patterns = [
@@ -122,20 +157,43 @@ def parse_pdf_content(text_content: str) -> Property:
         r',\s*[A-Z]{2}\s*(\d{5})',
     ]
     
-    # Extract values
+    # Extract header text for fallback parsing
+    header_text = extract_header_text(text_content)
+    
+    # Extract values with header fallback for property type and square footage
     address = extract_flexible_value(address_patterns, text_content, "Unknown Address")
     purchase_price = extract_price(price_patterns, text_content, 0.0)
     monthly_rent = extract_price(rent_patterns, text_content, 0.0)  # Default to 0 since most listings don't include rent
-    property_type_raw = extract_flexible_value(property_type_patterns, text_content, "single-family")
+    
+    # Property type with header fallback
+    property_type_raw = extract_with_header_fallback(
+        property_type_patterns, 
+        header_property_type_patterns, 
+        text_content, 
+        header_text, 
+        "single-family"
+    )
     property_type = normalize_property_type(property_type_raw)
     
     bedrooms = extract_number(bedroom_patterns, text_content, 0)
     bathrooms = extract_number(bathroom_patterns, text_content, 0.0, is_float=True)
+    
+    # Square footage with header fallback
     square_footage = extract_number(sqft_patterns, text_content, 0)
+    
+    # If no square footage found, or if the found value seems too small (likely from address),
+    # try header patterns as fallback
+    if square_footage == 0 or square_footage < 500:  # 500 sq ft is very small for most properties
+        header_sqft = extract_number(header_sqft_patterns, header_text, 0)
+        if header_sqft > 0:
+            # Use header value if it's significantly larger than what we found in the main text
+            if header_sqft > square_footage:
+                square_footage = header_sqft
+    
     lot_size = extract_number(lot_size_patterns, text_content, 0) if extract_number(lot_size_patterns, text_content, 0) > 0 else None
     year_built = extract_number(year_patterns, text_content, 0)
     
-    # Use lot size as square footage fallback if square footage is missing or zero
+    # Use lot size as square footage fallback if square footage is still missing or zero
     if square_footage == 0 and lot_size and lot_size > 0:
         square_footage = lot_size
     
