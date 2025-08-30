@@ -6,6 +6,7 @@ import pdfplumber
 from PyPDF2 import PdfReader
 from real_estate_data import Property
 from email_parser import parse_email_alert, normalize_property_type
+from pdf_parser_helper import parse_pdf_content
 
 def parse_file_content(file_path: str, file_type: str) -> Property:
     """
@@ -66,7 +67,16 @@ def parse_pdf_file(file_path: str) -> Property:
                 listing_url="N/A"
             )
         
-        # Use existing email parser on extracted text
+        # Try PDF-specific parsing first, fall back to email parser
+        try:
+            result = parse_pdf_content(text_content)
+            # Use PDF result if it extracted meaningful data
+            if result.purchase_price > 0 or result.address != "Unknown Address":
+                return result
+        except Exception:
+            pass
+        
+        # Fall back to email parser
         return parse_email_alert(text_content)
         
     except Exception as e:
@@ -258,7 +268,8 @@ def clean_numeric(value, default=0):
     
     return default
 
-if __name__ == "__main__":
+
+if __name__ == \"__main__\":
     # Test the file parser
     import sys
     if len(sys.argv) > 1:
