@@ -77,9 +77,30 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    color: var(--color-neutral-dark);
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1, h2, h3, h4 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+  }
+
+  h1 { 
+    font-size: 32px; 
+  }
+  
+  h2 { 
+    font-size: 24px; 
+  }
+  
+  h3 { 
+    font-size: 20px; 
+  }
+
+  h5, h6 {
     @apply font-heading;
   }
 }
@@ -91,6 +112,16 @@
   
   .font-accent {
     font-family: var(--font-accent);
+    font-style: italic;
+  }
+
+  .small-text {
+    font-size: 14px;
+    color: #555;
+  }
+
+  .accent-text {
+    font-family: 'Playfair Display', serif;
     font-style: italic;
   }
 }
