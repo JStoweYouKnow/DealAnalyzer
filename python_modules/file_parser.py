@@ -269,7 +269,7 @@ def clean_numeric(value, default=0):
     return default
 
 
-if __name__ == \"__main__\":
+if __name__ == "__main__":
     # Test the file parser
     import sys
     if len(sys.argv) > 1:
