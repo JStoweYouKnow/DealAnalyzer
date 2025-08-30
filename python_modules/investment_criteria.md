@@ -15,7 +15,7 @@
 **Rules/Benchmarks:**
 *   **1% Rule:** Property must pass the 1% rule (monthly rent >= 1% of purchase price)
 *   **Cash Flow:** Property must cash flow (positive cash flow)
-*   **Cash-on-Cash (COC) Return:** Benchmark of 8% to 12%, bare minimum of 5% to 7%
+*   **Cash-on-Cash (COC) Return:** Benchmark of 10% to 15%, bare minimum of 8% to 10%
 *   **Capitalization (Cap) Rate:** Benchmark of 10% to 12%, bare minimum of 4%
 
 **Short-Term Rental (STR) Criteria:**
