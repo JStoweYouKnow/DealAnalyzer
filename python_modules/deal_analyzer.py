@@ -142,8 +142,6 @@ def analyze_deal(property: Property) -> DealAnalysis:
 
     # Overall criteria check (includes STR if applicable)
     meets_criteria = (
-        property.property_type in criteria["property_types"] and
-        property.state == criteria["location"] and
         property.purchase_price <= criteria["max_purchase_price"] and
         passes_1_percent_rule and
         cash_flow_positive and
