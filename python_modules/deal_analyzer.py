@@ -5,7 +5,7 @@ def analyze_deal(property: Property) -> DealAnalysis:
     criteria = load_investment_criteria()
 
     # Financial Calculations
-    downpayment_percentage = (criteria["downpayment_percentage_min"] + criteria["downpayment_percentage_max"]) / 2
+    downpayment_percentage = criteria["downpayment_percentage_min"]  # Use minimum (20%) instead of average
     closing_costs_percentage = (criteria["closing_costs_percentage_min"] + criteria["closing_costs_percentage_max"]) / 2
     initial_fixed_costs_percentage = criteria["initial_fixed_costs_percentage"]
     maintenance_reserve_percentage = criteria["maintenance_reserve_percentage"]
