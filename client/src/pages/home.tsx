@@ -117,10 +117,12 @@ export default function Home() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <i className="fas fa-home text-primary-foreground text-sm"></i>
-                </div>
-                <h1 className="text-xl font-bold gradient-text">Real Estate Deal Analyzer</h1>
+                <img 
+                  src="/attached_assets/ADC2EBEF-0780-4116-9A4B-E55654060491_1756531105228.PNG" 
+                  alt="The Comfort Finder Logo" 
+                  className="w-8 h-8 object-contain"
+                />
+                <h1 className="text-xl font-bold gradient-text">The Comfort Finder</h1>
               </div>
             </div>
             
@@ -145,9 +147,9 @@ export default function Home() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-foreground mb-2">Investment Property Analysis</h2>
+          <h2 className="text-3xl font-bold text-foreground mb-2">Find Your Perfect Investment Property</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Paste your real estate listing email below to instantly analyze investment potential against your buy box criteria
+            Paste your real estate listing email below to instantly analyze investment potential and find your comfort zone
           </p>
         </div>
 
