@@ -1,6 +1,7 @@
 import os
 import csv
 import pandas as pd
+import numpy as np
 import pdfplumber
 from PyPDF2 import PdfReader
 from real_estate_data import Property
@@ -127,7 +128,7 @@ def parse_csv_file(file_path: str) -> Property:
         # Property details
         bedrooms = int(clean_numeric(get_value(['bedrooms', 'beds', 'br'], 0)))
         bathrooms = float(clean_numeric(get_value(['bathrooms', 'baths', 'ba'], 0)))
-        square_footage = int(clean_numeric(get_value(['sqft', 'square_feet', 'size', 'sq_ft'], 0)))
+        square_footage = int(clean_numeric(get_value(['sqft', 'square_feet', 'square feet', 'size', 'sq_ft'], 0)))
         year_built = int(clean_numeric(get_value(['year_built', 'built', 'construction_year'], 0)))
         
         description = str(get_value(['description', 'details', 'notes'], "CSV property listing"))
@@ -239,8 +240,8 @@ def clean_numeric(value, default=0):
     if value is None or pd.isna(value):
         return default
     
-    if isinstance(value, (int, float)):
-        return value
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        return float(value) if isinstance(value, np.floating) else int(value)
     
     if isinstance(value, str):
         # Remove common currency symbols and commas
