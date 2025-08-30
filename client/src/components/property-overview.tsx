@@ -1,13 +1,65 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { DealAnalysis } from "@shared/schema";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { DealAnalysis, AnalyzePropertyResponse } from "@shared/schema";
 
 interface PropertyOverviewProps {
   analysis: DealAnalysis;
+  onAnalysisUpdate?: (updatedAnalysis: DealAnalysis) => void;
 }
 
-export function PropertyOverview({ analysis }: PropertyOverviewProps) {
+export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOverviewProps) {
   const { property } = analysis;
+  const [editableRent, setEditableRent] = useState(property.monthlyRent);
+  const [isEditing, setIsEditing] = useState(false);
+  const { toast } = useToast();
+
+  // Mutation for updating rent and re-analyzing
+  const updateRentMutation = useMutation({
+    mutationFn: async (newRent: number) => {
+      const updatedProperty = { ...property, monthlyRent: newRent };
+      const response = await apiRequest("POST", "/api/update-rent", {
+        property: updatedProperty,
+      });
+      return response.json() as Promise<AnalyzePropertyResponse>;
+    },
+    onSuccess: (data) => {
+      if (data.success && data.data && onAnalysisUpdate) {
+        onAnalysisUpdate(data.data);
+        setIsEditing(false);
+        toast({
+          title: "Rent Updated",
+          description: "Analysis recalculated with new monthly rent.",
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: data.error || "Failed to update rent",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRentUpdate = async () => {
+    if (editableRent !== property.monthlyRent && editableRent >= 0) {
+      updateRentMutation.mutate(editableRent);
+    } else {
+      setIsEditing(false);
+      setEditableRent(property.monthlyRent); // Reset to original value
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -75,11 +127,37 @@ export function PropertyOverview({ analysis }: PropertyOverviewProps) {
                   {formatCurrency(property.purchasePrice)}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Monthly Rent:</span>
-                <span className="font-medium text-green-600" data-testid="text-monthly-rent">
-                  {formatCurrency(property.monthlyRent)}
-                </span>
+                <div className="flex items-center space-x-2">
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      value={editableRent}
+                      onChange={(e) => setEditableRent(Number(e.target.value))}
+                      onBlur={handleRentUpdate}
+                      onKeyDown={(e) => e.key === 'Enter' && handleRentUpdate()}
+                      className="w-24 h-6 text-right text-sm"
+                      data-testid="input-monthly-rent"
+                    />
+                  ) : (
+                    <span 
+                      className="font-medium text-green-600 cursor-pointer hover:bg-green-50 px-1 rounded" 
+                      data-testid="text-monthly-rent"
+                      onClick={() => setIsEditing(true)}
+                      title="Click to edit monthly rent"
+                    >
+                      {formatCurrency(editableRent)}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setIsEditing(!isEditing)}
+                    className="text-xs text-muted-foreground hover:text-primary"
+                    title={isEditing ? "Cancel" : "Edit rent"}
+                  >
+                    <i className={`fas ${isEditing ? 'fa-times' : 'fa-edit'}`}></i>
+                  </button>
+                </div>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Beds/Baths:</span>

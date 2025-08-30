@@ -164,7 +164,7 @@ def parse_email_alert(email_content: str) -> Property:
     address = extract_field(address_patterns, email_content)
     property_type = extract_field(property_type_patterns, email_content)
     purchase_price = extract_price(price_patterns, email_content)
-    monthly_rent = extract_price(rent_patterns, email_content)
+    monthly_rent = extract_price(rent_patterns, email_content, 0.0)  # Default to 0 since most listings don't include rent
     bedrooms = int(extract_number(bedroom_patterns, email_content))
     bathrooms = extract_number(bathroom_patterns, email_content, is_float=True)
     square_footage = int(extract_number(sqft_patterns, email_content))

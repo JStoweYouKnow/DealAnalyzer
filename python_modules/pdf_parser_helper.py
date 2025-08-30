@@ -125,7 +125,7 @@ def parse_pdf_content(text_content: str) -> Property:
     # Extract values
     address = extract_flexible_value(address_patterns, text_content, "Unknown Address")
     purchase_price = extract_price(price_patterns, text_content, 0.0)
-    monthly_rent = extract_price(rent_patterns, text_content, 0.0)
+    monthly_rent = extract_price(rent_patterns, text_content, 0.0)  # Default to 0 since most listings don't include rent
     property_type_raw = extract_flexible_value(property_type_patterns, text_content, "single-family")
     property_type = normalize_property_type(property_type_raw)
     

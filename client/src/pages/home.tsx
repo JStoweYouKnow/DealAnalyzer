@@ -149,6 +149,7 @@ export default function Home() {
               <AnalysisResults 
                 analysis={analysisResult} 
                 criteria={criteria}
+                onAnalysisUpdate={setAnalysisResult}
                 data-testid="analysis-results"
               />
             )}

@@ -7,21 +7,52 @@ from deal_analyzer import analyze_deal
 
 def main():
     parser = argparse.ArgumentParser(description="Real Estate Deal Analyzer")
-    parser.add_argument("email_file", help="Path to email alert text file")
+    parser.add_argument("email_file", nargs='?', help="Path to email alert text file")
     parser.add_argument("--json", action="store_true", help="Output results as JSON")
     parser.add_argument("--data-file", help="Path to additional data JSON file")
+    parser.add_argument("--property-data", help="Path to property data JSON file for re-analysis")
     
     args = parser.parse_args()
     
-    if not os.path.exists(args.email_file):
-        print(f"Error: File '{args.email_file}' not found.", file=sys.stderr)
-        sys.exit(1)
-    
     try:
-        with open(args.email_file, "r") as f:
-            email_content = f.read()
-        
-        property_data = parse_email_alert(email_content)
+        # Handle property data re-analysis mode
+        if args.property_data:
+            if not os.path.exists(args.property_data):
+                print(f"Error: Property data file '{args.property_data}' not found.", file=sys.stderr)
+                sys.exit(1)
+                
+            with open(args.property_data, "r") as f:
+                data = json.load(f)
+                property_info = data["property"]
+                
+            # Convert from frontend format to Property object
+            from real_estate_data import Property
+            property_data = Property(
+                address=property_info["address"],
+                city=property_info["city"],
+                state=property_info["state"],
+                zip_code=property_info["zip_code"],
+                property_type=property_info["property_type"],
+                purchase_price=property_info["purchase_price"],
+                monthly_rent=property_info["monthly_rent"],
+                bedrooms=property_info["bedrooms"],
+                bathrooms=property_info["bathrooms"],
+                square_footage=property_info["square_footage"],
+                lot_size=property_info.get("lot_size"),
+                year_built=property_info["year_built"],
+                description=property_info["description"],
+                listing_url=property_info["listing_url"]
+            )
+        else:
+            # Handle regular email parsing mode
+            if not args.email_file or not os.path.exists(args.email_file):
+                print(f"Error: File '{args.email_file}' not found.", file=sys.stderr)
+                sys.exit(1)
+                
+            with open(args.email_file, "r") as f:
+                email_content = f.read()
+            
+            property_data = parse_email_alert(email_content)
         
         # Merge additional data if provided
         if args.data_file and os.path.exists(args.data_file):

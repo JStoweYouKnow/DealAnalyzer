@@ -36,6 +36,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Update monthly rent and re-analyze
+  app.post("/api/update-rent", async (req, res) => {
+    try {
+      const { property } = req.body;
+      
+      if (!property || !property.monthlyRent || property.monthlyRent < 0) {
+        res.status(400).json({
+          success: false,
+          error: "Invalid property data or monthly rent"
+        });
+        return;
+      }
+
+      // Convert property back to analysis format by running Python analysis
+      // We'll serialize the property data and pass it to Python for re-analysis
+      const propertyData = JSON.stringify(property);
+      const analysisResult = await runPythonPropertyUpdate(property);
+      
+      if (!analysisResult.success) {
+        res.status(400).json({
+          success: false,
+          error: analysisResult.error || "Re-analysis failed"
+        });
+        return;
+      }
+
+      // Store the updated analysis
+      const storedAnalysis = await storage.createDealAnalysis(analysisResult.data!);
+
+      const response: AnalyzePropertyResponse = {
+        success: true,
+        data: storedAnalysis
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error in update-rent endpoint:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Internal server error during rent update"
+      });
+    }
+  });
+
   // Get investment criteria
   app.get("/api/criteria", async (req, res) => {
     try {
@@ -169,6 +213,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 // Helper function to run Python analysis
+async function runPythonPropertyUpdate(
+  property: any
+): Promise<AnalyzePropertyResponse> {
+  return new Promise((resolve) => {
+    const pythonPath = path.join(process.cwd(), "python_modules");
+    const tempDataFile = path.join(pythonPath, `temp_property_${Date.now()}.json`);
+    
+    // Write property data to JSON file for Python to process
+    const propertyData = {
+      property: {
+        address: property.address,
+        city: property.city,
+        state: property.state,
+        zip_code: property.zipCode,
+        property_type: property.propertyType,
+        purchase_price: property.purchasePrice,
+        monthly_rent: property.monthlyRent, // This is the updated value
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        square_footage: property.squareFootage,
+        lot_size: property.lotSize,
+        year_built: property.yearBuilt,
+        description: property.description,
+        listing_url: property.listingUrl
+      }
+    };
+    fs.writeFileSync(tempDataFile, JSON.stringify(propertyData));
+    
+    const python = spawn("python3", [
+      path.join(pythonPath, "main.py"),
+      "--property-data",
+      tempDataFile,
+      "--json"
+    ], {
+      cwd: pythonPath
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    python.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    python.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    python.on("close", (code) => {
+      // Clean up temp files
+      try {
+        fs.unlinkSync(tempDataFile);
+      } catch (e) {
+        console.warn("Failed to clean up temp files:", e);
+      }
+
+      if (code !== 0) {
+        console.error("Python property update failed:", stderr);
+        resolve({
+          success: false,
+          error: "Python analysis failed: " + stderr
+        });
+        return;
+      }
+
+      try {
+        const result = JSON.parse(stdout);
+        resolve({
+          success: true,
+          data: result
+        });
+      } catch (e) {
+        console.error("Failed to parse Python output:", e);
+        resolve({
+          success: false,
+          error: "Failed to parse analysis results"
+        });
+      }
+    });
+
+    python.on("error", (error) => {
+      console.error("Failed to start Python process:", error);
+      resolve({
+        success: false,
+        error: "Failed to start analysis process"
+      });
+    });
+  });
+}
+
 async function runPythonAnalysis(
   emailContent: string, 
   strMetrics?: { adr?: number; occupancyRate?: number }, 
