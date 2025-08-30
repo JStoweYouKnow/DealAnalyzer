@@ -116,12 +116,6 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
             </h4>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Type:</span>
-                <span className="font-medium" data-testid="text-property-type">
-                  {property.propertyType}
-                </span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-muted-foreground">Price:</span>
                 <span className="font-medium text-primary" data-testid="text-purchase-price">
                   {formatCurrency(property.purchasePrice)}

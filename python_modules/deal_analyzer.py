@@ -60,8 +60,9 @@ def analyze_deal(property: Property) -> DealAnalysis:
     else:
         coc_return = 0.0
 
-    coc_meets_benchmark = (coc_return >= criteria["coc_benchmark_min"] and coc_return <= criteria["coc_benchmark_max"])
-    coc_meets_minimum = (coc_return >= criteria["coc_minimum_min"] and coc_return <= criteria["coc_minimum_max"])
+    # COC return should be above minimum thresholds, not within ranges
+    coc_meets_benchmark = (coc_return >= criteria["coc_benchmark_min"])
+    coc_meets_minimum = (coc_return >= criteria["coc_minimum_min"])
     
     # Capitalization Rate (Cap Rate)
     # Cap Rate = Net Operating Income (NOI) / Property Purchase Price
