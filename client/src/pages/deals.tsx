@@ -258,29 +258,32 @@ export default function DealsPage() {
                       </p>
 
                       {deal.extractedProperty && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                           {deal.extractedProperty.address && (
-                            <div>
+                            <div className="md:col-span-2">
                               <span className="text-sm text-muted-foreground">Address:</span>
                               <p className="font-medium">{deal.extractedProperty.address}</p>
+                              {deal.extractedProperty.city && deal.extractedProperty.state && (
+                                <p className="text-sm text-muted-foreground">{deal.extractedProperty.city}, {deal.extractedProperty.state}</p>
+                              )}
                             </div>
                           )}
                           {deal.extractedProperty.price && (
                             <div>
                               <span className="text-sm text-muted-foreground">Price:</span>
-                              <p className="font-medium">{formatCurrency(deal.extractedProperty.price)}</p>
+                              <p className="font-medium text-lg">{formatCurrency(deal.extractedProperty.price)}</p>
                             </div>
                           )}
-                          {deal.extractedProperty.bedrooms && (
+                          {(deal.extractedProperty.bedrooms || deal.extractedProperty.bathrooms || deal.extractedProperty.sqft) && (
                             <div>
-                              <span className="text-sm text-muted-foreground">Bedrooms:</span>
-                              <p className="font-medium">{deal.extractedProperty.bedrooms}</p>
-                            </div>
-                          )}
-                          {deal.extractedProperty.sqft && (
-                            <div>
-                              <span className="text-sm text-muted-foreground">Sq Ft:</span>
-                              <p className="font-medium">{deal.extractedProperty.sqft.toLocaleString()}</p>
+                              <span className="text-sm text-muted-foreground">Details:</span>
+                              <p className="font-medium">
+                                {deal.extractedProperty.bedrooms && `${deal.extractedProperty.bedrooms} bd`}
+                                {deal.extractedProperty.bedrooms && deal.extractedProperty.bathrooms && ' | '}
+                                {deal.extractedProperty.bathrooms && `${deal.extractedProperty.bathrooms} ba`}
+                                {(deal.extractedProperty.bedrooms || deal.extractedProperty.bathrooms) && deal.extractedProperty.sqft && ' | '}
+                                {deal.extractedProperty.sqft && `${deal.extractedProperty.sqft.toLocaleString()} sqft`}
+                              </p>
                             </div>
                           )}
                         </div>
