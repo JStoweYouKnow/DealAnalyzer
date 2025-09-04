@@ -212,6 +212,7 @@ export const emailDealSchema = z.object({
   }).optional(),
   status: emailDealStatus,
   analysis: dealAnalysisSchema.optional(),
+  contentHash: z.string().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

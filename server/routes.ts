@@ -450,7 +450,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tokens = await emailMonitoringService.getTokens(code);
       
       // Store tokens in session (in production, store securely)
-      req.session.gmailTokens = tokens;
+      req.session.gmailTokens = {
+        access_token: tokens.access_token || '',
+        refresh_token: tokens.refresh_token || '',
+        scope: tokens.scope || '',
+        token_type: tokens.token_type || 'Bearer',
+        expiry_date: tokens.expiry_date
+      };
       
       // Redirect to deals page
       res.redirect('/deals');
@@ -484,13 +490,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Search for real estate emails
       const emailDeals = await emailMonitoringService.searchRealEstateEmails();
       
-      // Store new deals in storage
+      // Store new deals in storage, checking for duplicates
       const storedDeals = [];
       for (const deal of emailDeals) {
-        // Check if deal already exists
+        // Check if deal already exists by ID
         const existingDeal = await storage.getEmailDeal(deal.id);
-        if (!existingDeal) {
-          const storedDeal = await storage.createEmailDeal(deal);
+        
+        // Generate content hash for duplicate detection
+        const contentHash = emailMonitoringService.generateContentHash(deal.subject, deal.sender, deal.emailContent);
+        const duplicateByHash = await storage.findEmailDealByContentHash(contentHash);
+        
+        if (!existingDeal && !duplicateByHash) {
+          const dealWithHash = { ...deal, contentHash };
+          const storedDeal = await storage.createEmailDeal(dealWithHash);
           storedDeals.push(storedDeal);
         }
       }

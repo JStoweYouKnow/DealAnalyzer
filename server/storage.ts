@@ -19,6 +19,7 @@ export interface IStorage {
   createEmailDeal(deal: Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
   updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>): Promise<EmailDeal | undefined>;
   deleteEmailDeal(id: string): Promise<boolean>;
+  findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | undefined>;
   
   // Comparison methods
   createComparison(propertyIds: string[], name?: string): Promise<PropertyComparison | null>;
@@ -172,6 +173,11 @@ export class MemStorage implements IStorage {
 
   async deleteEmailDeal(id: string): Promise<boolean> {
     return this.emailDeals.delete(id);
+  }
+
+  async findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | undefined> {
+    const deals = Array.from(this.emailDeals.values());
+    return deals.find(deal => deal.contentHash === contentHash);
   }
 }
 

@@ -81,8 +81,8 @@ export class EmailMonitoringService {
   // Search for real estate related emails
   async searchRealEstateEmails(maxResults: number = 50): Promise<EmailDeal[]> {
     try {
-      // Search query specifically for trusted real estate platforms, excluding meetups
-      const query = 'from:(zillow.com OR redfin.com OR realtor.com OR mls.com OR homes.com OR trulia.com OR hotpads.com OR apartments.com OR rent.com OR loopnet.com OR crexi.com OR rocketmortgage.com OR quickenloans.com OR compass.com OR coldwellbanker.com OR remax.com OR kw.com OR century21.com OR sothebysrealty.com OR bhhsnymetro.com OR "MLS" OR "Multiple Listing Service") -from:(meetup.com OR eventbrite.com) -subject:(meetup OR "meet up" OR networking OR event OR "real estate meetup" OR "investor meetup")';
+      // Search query specifically for trusted real estate platforms, excluding meetups and zoom
+      const query = 'from:(zillow.com OR redfin.com OR realtor.com OR mls.com OR homes.com OR trulia.com OR hotpads.com OR apartments.com OR rent.com OR loopnet.com OR crexi.com OR rocketmortgage.com OR quickenloans.com OR compass.com OR coldwellbanker.com OR remax.com OR kw.com OR century21.com OR sothebysrealty.com OR bhhsnymetro.com OR "MLS" OR "Multiple Listing Service") -from:(meetup.com OR eventbrite.com OR zoom.us) -subject:(meetup OR "meet up" OR networking OR event OR "real estate meetup" OR "investor meetup" OR zoom OR "zoom meeting")';
       
       const response = await this.gmail.users.messages.list({
         userId: 'me',
@@ -156,7 +156,7 @@ export class EmailMonitoringService {
         receivedDate: new Date(date),
         emailContent,
         extractedProperty,
-        status: 'new'
+        status: 'new' as const
       };
     } catch (error) {
       console.error('Error getting email details:', error);
@@ -241,11 +241,13 @@ export class EmailMonitoringService {
       'century21.com', 'sothebysrealty.com', 'rocketmortgage.com', 'quickenloans.com'
     ];
 
-    // Exclude meetup and event-related emails
+    // Exclude meetup, event, and zoom-related emails
     const meetupExclusions = [
       'meetup', 'meet up', 'networking', 'event', 'webinar', 'workshop', 
       'seminar', 'conference', 'gathering', 'rsvp', 'attending', 'join us',
-      'real estate meetup', 'investor meetup', 'rei meetup', 'investment club'
+      'real estate meetup', 'investor meetup', 'rei meetup', 'investment club',
+      'zoom.us', 'zoom meeting', 'zoom link', 'join zoom', 'zoom call',
+      'microsoft teams', 'teams meeting', 'google meet', 'meet.google.com'
     ];
 
     const combined = `${subject} ${content}`.toLowerCase();
@@ -277,6 +279,21 @@ export class EmailMonitoringService {
     }
     
     return false;
+  }
+
+  // Generate a hash for duplicate detection
+  generateContentHash(subject: string, sender: string, content: string): string {
+    // Create a simple hash based on key content elements
+    const normalized = `${subject.toLowerCase().trim()}_${sender.toLowerCase().trim()}_${content.substring(0, 500).toLowerCase().trim()}`;
+    
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < normalized.length; i++) {
+      const char = normalized.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return hash.toString();
   }
 }
 
