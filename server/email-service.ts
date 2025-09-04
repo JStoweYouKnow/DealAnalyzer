@@ -81,8 +81,8 @@ export class EmailMonitoringService {
   // Search for real estate related emails
   async searchRealEstateEmails(maxResults: number = 50): Promise<EmailDeal[]> {
     try {
-      // Search query for real estate emails
-      const query = 'subject:(listing OR property OR "real estate" OR "for sale" OR "new listing" OR MLS OR realtor OR "price reduction") OR from:(realty OR realtor OR mls OR listing)';
+      // Search query specifically for trusted real estate platforms
+      const query = 'from:(zillow.com OR redfin.com OR realtor.com OR mls.com OR homes.com OR trulia.com OR hotpads.com OR apartments.com OR rent.com OR loopnet.com OR crexi.com OR rocketmortgage.com OR quickenloans.com OR compass.com OR coldwellbanker.com OR remax.com OR kw.com OR century21.com OR sothebysrealty.com OR bhhsnymetro.com OR "MLS" OR "Multiple Listing Service")';
       
       const response = await this.gmail.users.messages.list({
         userId: 'me',
@@ -139,6 +139,11 @@ export class EmailMonitoringService {
             }
           }
         }
+      }
+
+      // Only process if it's from a trusted real estate source
+      if (!this.isRealEstateEmail(subject, emailContent, sender)) {
+        return null;
       }
 
       // Parse property information from email content
@@ -227,17 +232,30 @@ export class EmailMonitoringService {
     };
   }
 
-  // Filter emails that likely contain property listings
-  isRealEstateEmail(subject: string, content: string): boolean {
-    const realEstateKeywords = [
-      'listing', 'property', 'real estate', 'for sale', 'new listing',
-      'mls', 'realtor', 'realty', 'price reduction', 'open house',
-      'showing', 'tour', 'bedroom', 'bathroom', 'square feet', 'sqft',
-      'acre', 'lot size', 'zoning', 'subdivision'
+  // Filter emails that likely contain property listings from trusted sources
+  isRealEstateEmail(subject: string, content: string, sender: string): boolean {
+    const trustedDomains = [
+      'zillow.com', 'redfin.com', 'realtor.com', 'mls.com', 'homes.com',
+      'trulia.com', 'hotpads.com', 'apartments.com', 'rent.com', 'loopnet.com',
+      'crexi.com', 'compass.com', 'coldwellbanker.com', 'remax.com', 'kw.com',
+      'century21.com', 'sothebysrealty.com', 'rocketmortgage.com', 'quickenloans.com'
     ];
 
-    const combined = `${subject} ${content}`.toLowerCase();
-    return realEstateKeywords.some(keyword => combined.includes(keyword));
+    const senderLower = sender.toLowerCase();
+    const isDomainTrusted = trustedDomains.some(domain => senderLower.includes(domain));
+    
+    // If from trusted domain, check for real estate content
+    if (isDomainTrusted) {
+      const realEstateKeywords = [
+        'listing', 'property', 'for sale', 'new listing', 'price', 'bedroom', 
+        'bathroom', 'sqft', 'square feet', 'home', 'house', 'condo', 'townhome'
+      ];
+      
+      const combined = `${subject} ${content}`.toLowerCase();
+      return realEstateKeywords.some(keyword => combined.includes(keyword));
+    }
+    
+    return false;
   }
 }
 
