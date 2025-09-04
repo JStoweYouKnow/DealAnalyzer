@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,20 @@ export function Reports({ analyses, comparisonList }: ReportsProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [includeComparison, setIncludeComparison] = useState(false);
   const { toast } = useToast();
+
+  // Combine analyses and comparison list, avoiding duplicates
+  const allAnalyses = [...analyses, ...comparisonList.filter(comp => 
+    comp.id && !analyses.some(analysis => analysis.id === comp.id)
+  )].filter(analysis => analysis.id); // Only include analyses with valid IDs
+
+  // Reset selected analyses when the analyses list changes (e.g., when rent is updated)
+  useEffect(() => {
+    // Clear invalid selections when analyses change
+    setSelectedAnalyses(prev => {
+      const validIds = allAnalyses.map(a => a.id).filter((id): id is string => Boolean(id));
+      return prev.filter(id => validIds.includes(id));
+    });
+  }, [analyses, comparisonList]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -113,10 +127,6 @@ export function Reports({ analyses, comparisonList }: ReportsProps) {
       setIsGenerating(false);
     }
   };
-
-  const allAnalyses = [...analyses, ...comparisonList.filter(comp => 
-    comp.id && !analyses.some(analysis => analysis.id === comp.id)
-  )].filter(analysis => analysis.id); // Only include analyses with valid IDs
 
   if (allAnalyses.length === 0) {
     return (
