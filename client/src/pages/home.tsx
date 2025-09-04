@@ -237,7 +237,7 @@ export default function Home() {
         {/* Reports Section */}
         <div className="mt-8">
           <Reports 
-            analyses={recentAnalyses}
+            analyses={analysisResult ? [analysisResult, ...recentAnalyses.filter(a => a.propertyId !== analysisResult.propertyId)] : recentAnalyses}
             comparisonList={comparisonList}
           />
         </div>
