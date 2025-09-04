@@ -6,35 +6,35 @@
 @tailwind utilities;
 
 :root {
-  /* Custom Color Palette */
-  --color-primary: #5A6E4F;       /* Olive Green */
-  --color-secondary: #E8DCC6;     /* Warm Sand */
-  --color-neutral-dark: #2D2D2D;  /* Charcoal */
-  --color-neutral-light: #F9F9F9; /* Cloud White */
-  --color-accent: #243447;        /* Deep Navy */
-  --color-success: #87A878;       /* Sage Green */
-  --color-alert: #C76D52;         /* Burnt Clay */
+  /* Custom Color Palette - Matching Logo */
+  --color-primary: #1a1a1a;       /* Deep Black (logo text) */
+  --color-secondary: #f5f1e8;     /* Cream/Beige (logo background) */
+  --color-neutral-dark: #1a1a1a;  /* Deep Black */
+  --color-neutral-light: #f8f6f0; /* Light Cream */
+  --color-accent: #2d2d2d;        /* Charcoal Grey */
+  --color-success: #4a5c3a;       /* Muted Green */
+  --color-alert: #8b4513;         /* Warm Brown */
 
-  /* Shadcn Theme Variables */
-  --background: hsl(0, 0%, 98%);
-  --foreground: hsl(0, 0%, 18%);
-  --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(0, 0%, 18%);
-  --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(0, 0%, 18%);
-  --primary: hsl(100, 16%, 37%);
-  --primary-foreground: hsl(0, 0%, 98%);
-  --secondary: hsl(43, 37%, 85%);
-  --secondary-foreground: hsl(0, 0%, 18%);
-  --muted: hsl(43, 37%, 90%);
-  --muted-foreground: hsl(100, 8%, 45%);
-  --accent: hsl(206, 31%, 21%);
-  --accent-foreground: hsl(0, 0%, 98%);
-  --destructive: hsl(12, 47%, 56%);
-  --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(43, 37%, 88%);
-  --input: hsl(43, 37%, 88%);
-  --ring: hsl(100, 16%, 37%);
+  /* Shadcn Theme Variables - Logo Inspired */
+  --background: hsl(45, 25%, 96%);
+  --foreground: hsl(0, 0%, 10%);
+  --card: hsl(45, 30%, 98%);
+  --card-foreground: hsl(0, 0%, 10%);
+  --popover: hsl(45, 30%, 98%);
+  --popover-foreground: hsl(0, 0%, 10%);
+  --primary: hsl(0, 0%, 10%);
+  --primary-foreground: hsl(45, 30%, 98%);
+  --secondary: hsl(45, 25%, 92%);
+  --secondary-foreground: hsl(0, 0%, 15%);
+  --muted: hsl(45, 20%, 94%);
+  --muted-foreground: hsl(0, 0%, 40%);
+  --accent: hsl(0, 0%, 18%);
+  --accent-foreground: hsl(45, 30%, 98%);
+  --destructive: hsl(25, 50%, 45%);
+  --destructive-foreground: hsl(45, 30%, 98%);
+  --border: hsl(45, 20%, 90%);
+  --input: hsl(45, 20%, 90%);
+  --ring: hsl(0, 0%, 10%);
   --chart-1: hsl(12, 47%, 56%);
   --chart-2: hsl(103, 20%, 56%);
   --chart-3: hsl(206, 31%, 21%);
@@ -49,25 +49,25 @@
 }
 
 .dark {
-  --background: hsl(0, 0%, 18%);
-  --foreground: hsl(0, 0%, 98%);
-  --card: hsl(206, 31%, 15%);
-  --card-foreground: hsl(0, 0%, 98%);
-  --popover: hsl(206, 31%, 15%);
-  --popover-foreground: hsl(0, 0%, 98%);
-  --primary: hsl(103, 20%, 56%);
-  --primary-foreground: hsl(0, 0%, 18%);
-  --secondary: hsl(206, 31%, 25%);
-  --secondary-foreground: hsl(0, 0%, 98%);
-  --muted: hsl(206, 31%, 20%);
-  --muted-foreground: hsl(43, 20%, 70%);
-  --accent: hsl(100, 16%, 47%);
-  --accent-foreground: hsl(0, 0%, 98%);
-  --destructive: hsl(12, 47%, 50%);
-  --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(206, 31%, 25%);
-  --input: hsl(206, 31%, 25%);
-  --ring: hsl(103, 20%, 56%);
+  --background: hsl(0, 0%, 12%);
+  --foreground: hsl(45, 25%, 95%);
+  --card: hsl(0, 0%, 15%);
+  --card-foreground: hsl(45, 25%, 95%);
+  --popover: hsl(0, 0%, 15%);
+  --popover-foreground: hsl(45, 25%, 95%);
+  --primary: hsl(45, 25%, 95%);
+  --primary-foreground: hsl(0, 0%, 10%);
+  --secondary: hsl(0, 0%, 20%);
+  --secondary-foreground: hsl(45, 25%, 95%);
+  --muted: hsl(0, 0%, 18%);
+  --muted-foreground: hsl(45, 10%, 60%);
+  --accent: hsl(45, 20%, 85%);
+  --accent-foreground: hsl(0, 0%, 10%);
+  --destructive: hsl(25, 60%, 55%);
+  --destructive-foreground: hsl(45, 25%, 95%);
+  --border: hsl(0, 0%, 22%);
+  --input: hsl(0, 0%, 22%);
+  --ring: hsl(45, 25%, 85%);
 }
 
 @layer base {
