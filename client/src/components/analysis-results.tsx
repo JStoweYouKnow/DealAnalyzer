@@ -39,10 +39,10 @@ export function AnalysisResults({ analysis, criteria, onAnalysisUpdate, onAddToC
       )}
       
       <PropertyOverview analysis={analysis} onAnalysisUpdate={onAnalysisUpdate} />
-      <FinancialBreakdown analysis={analysis} />
+      <FinancialBreakdown key={`financial-${analysis.propertyId}-${analysis.analysisDate}`} analysis={analysis} />
       <STRMetrics analysis={analysis} criteria={criteria} onAnalysisUpdate={onAnalysisUpdate} />
-      {analysis.aiAnalysis && <AIInsights aiAnalysis={analysis.aiAnalysis} />}
-      <CriteriaAssessment analysis={analysis} criteria={criteria} />
+      {analysis.aiAnalysis && <AIInsights key={`ai-${analysis.propertyId}-${analysis.analysisDate}`} aiAnalysis={analysis.aiAnalysis} />}
+      <CriteriaAssessment key={`criteria-${analysis.propertyId}-${analysis.analysisDate}`} analysis={analysis} criteria={criteria} />
     </div>
   );
 }

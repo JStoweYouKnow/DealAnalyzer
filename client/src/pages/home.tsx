@@ -108,6 +108,15 @@ export default function Home() {
         analysis.propertyId === updatedAnalysis.propertyId ? updatedAnalysis : analysis
       )
     );
+    
+    // Show toast notification about criteria refresh
+    toast({
+      title: "Analysis Updated",
+      description: updatedAnalysis.meetsCriteria 
+        ? "Property now meets investment criteria!" 
+        : "Criteria assessment refreshed with updated data.",
+      variant: updatedAnalysis.meetsCriteria ? "default" : "secondary",
+    });
   };
 
   return (

@@ -33,7 +33,7 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
         setIsEditing(false);
         toast({
           title: "Rent Updated",
-          description: "Analysis recalculated with new monthly rent.",
+          description: "Analysis and criteria assessment refreshed with new rent data.",
         });
       } else {
         toast({
