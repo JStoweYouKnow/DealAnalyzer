@@ -21,7 +21,13 @@ export async function generateReport(data: ReportData, options: ReportOptions): 
   const baseFileName = `${options.title.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}`;
   
   if (options.format === 'pdf') {
-    return generatePDFReport(data, options, baseFileName);
+    try {
+      return await generatePDFReport(data, options, baseFileName);
+    } catch (error) {
+      console.warn('PDF generation failed, falling back to CSV:', error);
+      // Fallback to CSV if PDF fails
+      return generateCSVReport(data, options, baseFileName.replace('.pdf', '.csv'));
+    }
   } else {
     return generateCSVReport(data, options, baseFileName);
   }

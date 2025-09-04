@@ -170,10 +170,11 @@ export default function DealsPage() {
       
       return { success: true };
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      const reportType = variables.format === 'pdf' ? 'PDF' : 'CSV';
       toast({
         title: "Report Generated",
-        description: "Property report has been downloaded",
+        description: `${reportType} property report has been downloaded`,
       });
     },
     onError: (error) => {
