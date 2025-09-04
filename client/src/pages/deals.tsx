@@ -138,39 +138,32 @@ export default function DealsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/90">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-bold gradient-text">Deal Pipeline</h1>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <Button
-                onClick={() => connectGmailMutation.mutate()}
-                variant="outline"
-                size="sm"
-              >
-                <i className="fas fa-envelope mr-2"></i>
-                Connect Gmail
-              </Button>
-              <Button
-                onClick={() => syncEmailsMutation.mutate()}
-                disabled={syncEmailsMutation.isPending}
-                size="sm"
-              >
-                <i className="fas fa-sync mr-2"></i>
-                {syncEmailsMutation.isPending ? 'Syncing...' : 'Sync Emails'}
-              </Button>
-            </div>
-          </div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Deal Pipeline</h1>
+          <p className="text-muted-foreground">Review and analyze your real estate opportunities</p>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <div className="flex items-center space-x-4">
+          <Button
+            onClick={() => connectGmailMutation.mutate()}
+            variant="outline"
+            size="sm"
+          >
+            <i className="fas fa-envelope mr-2"></i>
+            Connect Gmail
+          </Button>
+          <Button
+            onClick={() => syncEmailsMutation.mutate()}
+            disabled={syncEmailsMutation.isPending}
+            size="sm"
+          >
+            <i className="fas fa-sync mr-2"></i>
+            {syncEmailsMutation.isPending ? 'Syncing...' : 'Sync Emails'}
+          </Button>
+        </div>
+      </div>
         
         {/* Filters and Search */}
         <Card className="analysis-card mb-8">
@@ -336,7 +329,7 @@ export default function DealsPage() {
             ))
           )}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
