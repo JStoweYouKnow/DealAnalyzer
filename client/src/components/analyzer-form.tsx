@@ -92,15 +92,24 @@ export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
                 <div>
                   <Label htmlFor="file-upload">Upload Property Data File</Label>
                   <div className="mt-2 space-y-4">
-                    <Input
-                      ref={fileInputRef}
-                      id="file-upload"
-                      type="file"
-                      accept=".pdf,.csv,.txt,.xlsx,.xls"
-                      onChange={handleFileChange}
-                      className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                      data-testid="input-file-upload"
-                    />
+                    <div className="relative">
+                      <Input
+                        ref={fileInputRef}
+                        id="file-upload"
+                        type="file"
+                        accept=".pdf,.csv,.txt,.xlsx,.xls"
+                        onChange={handleFileChange}
+                        className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 text-transparent file:text-primary-foreground"
+                        data-testid="input-file-upload"
+                      />
+                      {!selectedFile && (
+                        <div className="absolute inset-0 flex items-center px-3 pointer-events-none">
+                          <span className="text-muted-foreground text-sm">
+                            Choose file...
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     
                     {selectedFile && (
                       <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
