@@ -420,6 +420,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/gmail-auth-url", async (req, res) => {
     try {
       const authUrl = emailMonitoringService.getAuthUrl();
+      console.log("Generated auth URL:", authUrl);
+      console.log("Redirect URI in use:", process.env.GMAIL_REDIRECT_URI);
       res.json({
         success: true,
         authUrl

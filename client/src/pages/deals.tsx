@@ -31,7 +31,8 @@ export default function DealsPage() {
       const response = await apiRequest('GET', '/api/gmail-auth-url');
       const data = await response.json();
       if (data.success) {
-        window.location.href = data.authUrl;
+        // Open in new tab to avoid iframe restrictions
+        window.open(data.authUrl, '_blank');
       }
       return data;
     },
