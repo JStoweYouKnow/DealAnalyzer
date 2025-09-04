@@ -20,8 +20,9 @@ export default function DealsPage() {
     queryKey: ['/api/email-deals'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/email-deals');
-      const data = await response.json() as EmailMonitoringResponse;
-      return data.success ? data.data || [] : [];
+      const data = await response.json();
+      console.log('Email deals response:', data);
+      return Array.isArray(data) ? data : data.data || [];
     }
   });
 
@@ -52,11 +53,18 @@ export default function DealsPage() {
       return response.json() as Promise<EmailMonitoringResponse>;
     },
     onSuccess: (data) => {
+      console.log('Sync response:', data);
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ['/api/email-deals'] });
         toast({
           title: "Emails Synced",
           description: `Found ${data.data?.length || 0} new real estate emails`,
+        });
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: data.error || "Unknown error occurred",
+          variant: "destructive",
         });
       }
     },
