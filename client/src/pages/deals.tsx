@@ -12,6 +12,8 @@ import type { EmailDeal, EmailMonitoringResponse, AnalyzePropertyResponse } from
 export default function DealsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'reviewed' | 'analyzed' | 'archived'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingDeal, setEditingDeal] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<{[key: string]: {price?: number, rent?: number}}>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -108,6 +110,78 @@ export default function DealsPage() {
     }
   });
 
+  // Update property mutation
+  const updatePropertyMutation = useMutation({
+    mutationFn: async ({ dealId, price, rent }: { dealId: string; price: number; rent: number }) => {
+      const deal = emailDeals.find(d => d.id === dealId);
+      if (!deal || !deal.extractedProperty) {
+        throw new Error('Deal or property not found');
+      }
+      
+      const updatedProperty = {
+        ...deal.extractedProperty,
+        purchasePrice: price,
+        monthlyRent: rent
+      };
+      
+      const response = await apiRequest('POST', '/api/update-property', { property: updatedProperty });
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/email-deals'] });
+      setEditingDeal(null);
+      setEditValues(prev => ({ ...prev, [variables.dealId]: {} }));
+      toast({
+        title: "Property Updated",
+        description: "Property data has been updated and re-analyzed",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Generate report mutation
+  const generateReportMutation = useMutation({
+    mutationFn: async ({ analysisId, format = 'pdf' }: { analysisId: string; format?: 'pdf' | 'csv' }) => {
+      const response = await apiRequest('POST', '/api/generate-report', {
+        analysisIds: [analysisId],
+        format,
+        title: 'Property Analysis Report'
+      });
+      
+      // Handle file download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `property-report-${Date.now()}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Report Generated",
+        description: "Property report has been downloaded",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Report Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   // Filter deals based on status and search
   const filteredDeals = emailDeals.filter(deal => {
     const matchesStatus = statusFilter === 'all' || deal.status === statusFilter;
@@ -141,8 +215,8 @@ export default function DealsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Deal Pipeline</h1>
-          <p className="text-muted-foreground">Review and analyze your real estate opportunities</p>
+          <h1 className="text-3xl font-bold">Email Deal Pipeline</h1>
+          <p className="text-muted-foreground">Review and analyze your real estate email opportunities</p>
         </div>
         
         <div className="flex items-center space-x-4">
@@ -251,33 +325,136 @@ export default function DealsPage() {
                       </p>
 
                       {deal.extractedProperty && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                          {deal.extractedProperty.address && (
-                            <div className="md:col-span-2">
-                              <span className="text-sm text-muted-foreground">Address:</span>
-                              <p className="font-medium">{deal.extractedProperty.address}</p>
-                              {deal.extractedProperty.city && deal.extractedProperty.state && (
-                                <p className="text-sm text-muted-foreground">{deal.extractedProperty.city}, {deal.extractedProperty.state}</p>
+                        <div className="space-y-4 mb-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {deal.extractedProperty.address && (
+                              <div className="md:col-span-2">
+                                <span className="text-sm text-muted-foreground">Address:</span>
+                                <p className="font-medium">{deal.extractedProperty.address}</p>
+                                {deal.extractedProperty.city && deal.extractedProperty.state && (
+                                  <p className="text-sm text-muted-foreground">{deal.extractedProperty.city}, {deal.extractedProperty.state}</p>
+                                )}
+                              </div>
+                            )}
+                            {(deal.extractedProperty.bedrooms || deal.extractedProperty.bathrooms || deal.extractedProperty.sqft) && (
+                              <div className="md:col-span-2">
+                                <span className="text-sm text-muted-foreground">Details:</span>
+                                <p className="font-medium">
+                                  {deal.extractedProperty.bedrooms && `${deal.extractedProperty.bedrooms} bd`}
+                                  {deal.extractedProperty.bedrooms && deal.extractedProperty.bathrooms && ' | '}
+                                  {deal.extractedProperty.bathrooms && `${deal.extractedProperty.bathrooms} ba`}
+                                  {(deal.extractedProperty.bedrooms || deal.extractedProperty.bathrooms) && deal.extractedProperty.sqft && ' | '}
+                                  {deal.extractedProperty.sqft && `${deal.extractedProperty.sqft.toLocaleString()} sqft`}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Editable Price and Rent Section */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                            <div>
+                              <span className="text-sm text-muted-foreground">Purchase Price:</span>
+                              {editingDeal === deal.id ? (
+                                <Input
+                                  type="number"
+                                  placeholder="Enter purchase price"
+                                  value={editValues[deal.id]?.price ?? deal.extractedProperty.price ?? ''}
+                                  onChange={(e) => setEditValues(prev => ({
+                                    ...prev,
+                                    [deal.id]: {
+                                      ...prev[deal.id],
+                                      price: e.target.value ? Number(e.target.value) : undefined
+                                    }
+                                  }))}
+                                  className="mt-1"
+                                  data-testid={`input-price-${deal.id}`}
+                                />
+                              ) : (
+                                <p className="font-medium text-lg mt-1">
+                                  {deal.extractedProperty.price
+                                    ? formatCurrency(deal.extractedProperty.price)
+                                    : 'Not specified'}
+                                </p>
                               )}
                             </div>
-                          )}
-                          {deal.extractedProperty.price && (
+                            
                             <div>
-                              <span className="text-sm text-muted-foreground">Price:</span>
-                              <p className="font-medium text-lg">{formatCurrency(deal.extractedProperty.price)}</p>
+                              <span className="text-sm text-muted-foreground">Monthly Rent:</span>
+                              {editingDeal === deal.id ? (
+                                <Input
+                                  type="number"
+                                  placeholder="Enter monthly rent"
+                                  value={editValues[deal.id]?.rent ?? deal.extractedProperty.monthlyRent ?? ''}
+                                  onChange={(e) => setEditValues(prev => ({
+                                    ...prev,
+                                    [deal.id]: {
+                                      ...prev[deal.id],
+                                      rent: e.target.value ? Number(e.target.value) : undefined
+                                    }
+                                  }))}
+                                  className="mt-1"
+                                  data-testid={`input-rent-${deal.id}`}
+                                />
+                              ) : (
+                                <p className="font-medium text-lg mt-1">
+                                  {deal.extractedProperty.monthlyRent
+                                    ? formatCurrency(deal.extractedProperty.monthlyRent)
+                                    : 'Not specified'}
+                                </p>
+                              )}
                             </div>
-                          )}
-                          {(deal.extractedProperty.bedrooms || deal.extractedProperty.bathrooms || deal.extractedProperty.sqft) && (
-                            <div>
-                              <span className="text-sm text-muted-foreground">Details:</span>
-                              <p className="font-medium">
-                                {deal.extractedProperty.bedrooms && `${deal.extractedProperty.bedrooms} bd`}
-                                {deal.extractedProperty.bedrooms && deal.extractedProperty.bathrooms && ' | '}
-                                {deal.extractedProperty.bathrooms && `${deal.extractedProperty.bathrooms} ba`}
-                                {(deal.extractedProperty.bedrooms || deal.extractedProperty.bathrooms) && deal.extractedProperty.sqft && ' | '}
-                                {deal.extractedProperty.sqft && `${deal.extractedProperty.sqft.toLocaleString()} sqft`}
-                              </p>
+                          </div>
+                          
+                          {/* Edit Controls */}
+                          {editingDeal === deal.id ? (
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  const price = editValues[deal.id]?.price ?? deal.extractedProperty.price;
+                                  const rent = editValues[deal.id]?.rent ?? deal.extractedProperty.monthlyRent;
+                                  if (price && rent) {
+                                    updatePropertyMutation.mutate({ dealId: deal.id, price, rent });
+                                  }
+                                }}
+                                disabled={updatePropertyMutation.isPending || 
+                                  !editValues[deal.id]?.price || !editValues[deal.id]?.rent}
+                                data-testid={`button-save-${deal.id}`}
+                              >
+                                <i className="fas fa-save mr-2"></i>
+                                {updatePropertyMutation.isPending ? 'Saving...' : 'Save'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingDeal(null);
+                                  setEditValues(prev => ({ ...prev, [deal.id]: {} }));
+                                }}
+                                data-testid={`button-cancel-${deal.id}`}
+                              >
+                                Cancel
+                              </Button>
                             </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingDeal(deal.id);
+                                setEditValues(prev => ({
+                                  ...prev,
+                                  [deal.id]: {
+                                    price: deal.extractedProperty?.price,
+                                    rent: deal.extractedProperty?.monthlyRent
+                                  }
+                                }));
+                              }}
+                              data-testid={`button-edit-${deal.id}`}
+                            >
+                              <i className="fas fa-edit mr-2"></i>
+                              Edit Price & Rent
+                            </Button>
                           )}
                         </div>
                       )}
@@ -306,9 +483,21 @@ export default function DealsPage() {
                       )}
 
                       {deal.analysis && (
-                        <Badge variant={deal.analysis.meetsCriteria ? "default" : "destructive"}>
-                          {deal.analysis.meetsCriteria ? 'Meets Criteria' : 'Does Not Meet'}
-                        </Badge>
+                        <div className="space-y-2">
+                          <Badge variant={deal.analysis.meetsCriteria ? "default" : "destructive"}>
+                            {deal.analysis.meetsCriteria ? 'Meets Criteria' : 'Does Not Meet'}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => generateReportMutation.mutate({ analysisId: deal.analysis!.id })}
+                            disabled={generateReportMutation.isPending}
+                            data-testid={`button-report-${deal.id}`}
+                          >
+                            <i className="fas fa-file-pdf mr-2"></i>
+                            {generateReportMutation.isPending ? 'Generating...' : 'Generate Report'}
+                          </Button>
+                        </div>
                       )}
 
                       <Button

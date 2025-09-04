@@ -139,7 +139,7 @@ export default function Home() {
             <div className="flex items-center space-x-4">
               <nav className="hidden md:flex space-x-6">
                 <a href="/deals" className="text-muted-foreground hover:text-primary transition-colors font-medium">
-                  <i className="fas fa-inbox mr-2"></i>Deal Pipeline
+                  <i className="fas fa-inbox mr-2"></i>Email Deal Pipeline
                 </a>
               </nav>
             </div>
