@@ -115,7 +115,7 @@ export default function Home() {
       description: updatedAnalysis.meetsCriteria 
         ? "Property now meets investment criteria!" 
         : "Criteria assessment refreshed with updated data.",
-      variant: updatedAnalysis.meetsCriteria ? "default" : "secondary",
+      variant: updatedAnalysis.meetsCriteria ? "default" : "destructive",
     });
   };
 

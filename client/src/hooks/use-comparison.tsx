@@ -5,6 +5,11 @@ export function useComparison() {
   const [comparisonList, setComparisonList] = useState<DealAnalysis[]>([]);
 
   const addToComparison = useCallback((analysis: DealAnalysis) => {
+    if (!analysis.propertyId) {
+      console.warn('Cannot add analysis to comparison: missing propertyId');
+      return;
+    }
+    
     console.log('Adding to comparison:', analysis.propertyId, analysis.property.address);
     setComparisonList(prev => {
       console.log('Current comparison list:', prev.map(p => p.propertyId));
@@ -33,7 +38,8 @@ export function useComparison() {
     setComparisonList([]);
   }, []);
 
-  const isInComparison = useCallback((propertyId: string) => {
+  const isInComparison = useCallback((propertyId: string | undefined) => {
+    if (!propertyId) return false;
     const result = comparisonList.some(item => item.propertyId === propertyId);
     console.log('Checking if in comparison:', propertyId, 'result:', result, 'comparison list:', comparisonList.map(p => p.propertyId));
     return result;

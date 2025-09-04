@@ -22,14 +22,14 @@ export function Reports({ analyses, comparisonList }: ReportsProps) {
 
   // Combine analyses and comparison list, avoiding duplicates
   const allAnalyses = [...analyses, ...comparisonList.filter(comp => 
-    comp.id && !analyses.some(analysis => analysis.id === comp.id)
-  )].filter(analysis => analysis.id); // Only include analyses with valid IDs
+    comp.propertyId && !analyses.some(analysis => analysis.propertyId === comp.propertyId)
+  )];
 
   // Reset selected analyses when the analyses list changes (e.g., when rent is updated)
   useEffect(() => {
     // Clear invalid selections when analyses change
     setSelectedAnalyses(prev => {
-      const validIds = allAnalyses.map(a => a.id).filter((id): id is string => Boolean(id));
+      const validIds = allAnalyses.map((a, index) => a.id || `${a.propertyId}-${index}`);
       return prev.filter(id => validIds.includes(id));
     });
   }, [analyses, comparisonList]);
@@ -51,7 +51,7 @@ export function Reports({ analyses, comparisonList }: ReportsProps) {
     if (selectedAnalyses.length === allAnalyses.length) {
       setSelectedAnalyses([]);
     } else {
-      setSelectedAnalyses(allAnalyses.map(a => a.id).filter((id): id is string => Boolean(id)));
+      setSelectedAnalyses(allAnalyses.map((a, index) => a.id || `${a.propertyId}-${index}`));
     }
   };
 
@@ -229,7 +229,7 @@ export function Reports({ analyses, comparisonList }: ReportsProps) {
           
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {allAnalyses.map((analysis, index) => {
-              const analysisId = analysis.id || `temp-${analysis.property.address}-${index}`;
+              const analysisId = analysis.id || `${analysis.propertyId}-${index}`;
               return (
                 <div
                   key={analysisId}

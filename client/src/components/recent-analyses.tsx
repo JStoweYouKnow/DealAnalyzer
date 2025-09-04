@@ -87,7 +87,7 @@ export function RecentAnalyses({ analyses, onAddToComparison, isInComparison }: 
                 <div className="ml-4 flex flex-col space-y-2">
                   <Button
                     onClick={() => onAddToComparison(analysis)}
-                    disabled={isInComparison(analysis.propertyId)}
+                    disabled={!analysis.propertyId || isInComparison(analysis.propertyId)}
                     variant={isInComparison(analysis.propertyId) ? "secondary" : "default"}
                     size="sm"
                     data-testid={`button-add-to-comparison-${index}`}

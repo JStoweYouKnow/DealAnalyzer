@@ -169,14 +169,12 @@ export class EmailMonitoringService {
     const combined = `${subject} ${content}`;
     console.log('Parsing property info from:', combined.substring(0, 500));
     
-    // Address extraction (simplified and more targeted patterns)
+    // Address extraction (more restrictive patterns to avoid false matches)
     const addressPatterns = [
-      // Match "2627 Azelda St" type patterns - most common in emails
-      /(\d+\s+[A-Za-z\s.'-]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Way|Circle|Cir|Court|Ct|Boulevard|Blvd|Place|Pl|Terrace|Ter|Trail|Trl|Parkway|Pkwy|Square|Sq))/gi,
-      // Simplified street abbreviations that are very common
-      /(\d+\s+[A-Za-z\s.'-]+\s+(?:St|Ave|Rd|Dr|Ln|Way|Cir|Ct|Blvd|Pl))/gi,
-      // Even simpler - just number + words + common endings
-      /(\d+\s+[A-Za-z\s]+\s+St\b)/gi,
+      // Match full address format: "123 Main Street" but not phrases containing these words
+      /\b(\d+\s+[A-Za-z][A-Za-z\s.'-]*[A-Za-z]\s+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Way|Circle|Cir|Court|Ct|Boulevard|Blvd|Place|Pl))\b/gi,
+      // More restrictive - require word boundaries and proper capitalization
+      /\b(\d+\s+[A-Z][a-zA-Z\s.'-]*\s+(?:St|Ave|Rd|Dr|Ln|Way|Blvd))\b/g,
     ];
     
     let address = '';
@@ -185,10 +183,16 @@ export class EmailMonitoringService {
       console.log(`Pattern ${pattern} found matches:`, matches.map(m => m[1] || m[0]));
       
       if (matches.length > 0) {
-        // Take the first valid match
+        // Take the first valid match - add more validation
         for (const match of matches) {
           const candidate = (match[1] || match[0])?.trim();
-          if (candidate && candidate.length > 8 && candidate.length < 80) {
+          if (candidate && 
+              candidate.length > 8 && 
+              candidate.length < 80 &&
+              !candidate.toLowerCase().includes('credit score') &&
+              !candidate.toLowerCase().includes('minutes') &&
+              !candidate.toLowerCase().includes('impact') &&
+              !/^\d+\s+\w+\s+with\s/.test(candidate.toLowerCase())) {
             address = candidate;
             console.log('Selected address:', address);
             break;

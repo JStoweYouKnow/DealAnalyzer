@@ -185,7 +185,7 @@ export function QuickCompare({ analyses, criteria, onRemoveProperty, onClearAll 
         <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: `200px repeat(${analyses.length}, 1fr)` }}>
           <div className="font-medium text-sm text-muted-foreground">Metric</div>
           {analyses.map((analysis, index) => (
-            <div key={analysis.propertyId} className="text-center">
+            <div key={analysis.propertyId || `analysis-${index}`} className="text-center">
               <div className="bg-muted rounded-lg p-3 mb-2">
                 <div className="flex items-center justify-between mb-2">
                   <Badge variant={analysis.meetsCriteria ? "default" : "destructive"} className="text-xs">
@@ -225,7 +225,7 @@ export function QuickCompare({ analyses, criteria, onRemoveProperty, onClearAll 
                 const comparison = getMetricComparison(analyses, metric.key, index);
                 return (
                   <div
-                    key={`${analysis.propertyId}-${metric.key}`}
+                    key={`${analysis.propertyId || `analysis-${index}`}-${metric.key}`}
                     className={`p-3 rounded-lg border text-center ${getComparisonColor(comparison)}`}
                     data-testid={`metric-${metric.key}-${index}`}
                   >
