@@ -1,4 +1,4 @@
-import { type Property, type DealAnalysis, type InsertProperty, type InsertDealAnalysis, type PropertyComparison } from "@shared/schema";
+import { type Property, type DealAnalysis, type InsertProperty, type InsertDealAnalysis, type PropertyComparison, type EmailDeal } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -13,6 +13,13 @@ export interface IStorage {
   findAnalysisByPropertyAddress(address: string): Promise<DealAnalysis | undefined>;
   getAnalysisHistory(): Promise<DealAnalysis[]>;
   
+  // Email deal methods
+  getEmailDeals(): Promise<EmailDeal[]>;
+  getEmailDeal(id: string): Promise<EmailDeal | undefined>;
+  createEmailDeal(deal: Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
+  updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>): Promise<EmailDeal | undefined>;
+  deleteEmailDeal(id: string): Promise<boolean>;
+  
   // Comparison methods
   createComparison(propertyIds: string[], name?: string): Promise<PropertyComparison | null>;
   getComparison(id: string): Promise<PropertyComparison | undefined>;
@@ -24,11 +31,13 @@ export class MemStorage implements IStorage {
   private properties: Map<string, Property>;
   private dealAnalyses: Map<string, DealAnalysis>;
   private comparisons: Map<string, PropertyComparison>;
+  private emailDeals: Map<string, EmailDeal>;
 
   constructor() {
     this.properties = new Map();
     this.dealAnalyses = new Map();
     this.comparisons = new Map();
+    this.emailDeals = new Map();
   }
 
   async getProperty(id: string): Promise<Property | undefined> {
@@ -119,6 +128,50 @@ export class MemStorage implements IStorage {
 
   async deleteComparison(id: string): Promise<boolean> {
     return this.comparisons.delete(id);
+  }
+
+  // Email deal methods implementation
+  async getEmailDeals(): Promise<EmailDeal[]> {
+    return Array.from(this.emailDeals.values())
+      .sort((a, b) => b.receivedDate.getTime() - a.receivedDate.getTime());
+  }
+
+  async getEmailDeal(id: string): Promise<EmailDeal | undefined> {
+    return this.emailDeals.get(id);
+  }
+
+  async createEmailDeal(deal: Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal> {
+    const id = randomUUID();
+    const now = new Date();
+    const emailDeal: EmailDeal = {
+      ...deal,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.emailDeals.set(id, emailDeal);
+    return emailDeal;
+  }
+
+  async updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>): Promise<EmailDeal | undefined> {
+    const existingDeal = this.emailDeals.get(id);
+    if (!existingDeal) {
+      return undefined;
+    }
+
+    const updatedDeal: EmailDeal = {
+      ...existingDeal,
+      ...updates,
+      id: existingDeal.id, // Keep the same ID
+      createdAt: existingDeal.createdAt, // Keep original creation time
+      updatedAt: new Date(), // Update the timestamp
+    };
+    this.emailDeals.set(id, updatedDeal);
+    return updatedDeal;
+  }
+
+  async deleteEmailDeal(id: string): Promise<boolean> {
+    return this.emailDeals.delete(id);
   }
 }
 

@@ -7,13 +7,15 @@ import {
   updateCriteriaRequestSchema,
   type AnalyzePropertyResponse,
   type CriteriaResponse,
-  type ConfigurableCriteria
+  type ConfigurableCriteria,
+  type EmailMonitoringResponse
 } from "@shared/schema";
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
 import { generateReport, type ReportOptions, type ReportData } from "./report-generator";
 import { aiAnalysisService } from "./ai-service";
+import { emailMonitoringService } from "./email-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -86,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (property.address) {
         const existingAnalysis = await storage.findAnalysisByPropertyAddress(property.address as string);
         
-        if (existingAnalysis) {
+        if (existingAnalysis?.id) {
           // Update existing analysis to maintain the same ID for report generation
           storedAnalysis = await storage.updateDealAnalysis(existingAnalysis.id, analysisWithAI);
         } else {
@@ -410,6 +412,218 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to generate report"
+      });
+    }
+  });
+
+  // Gmail OAuth URL endpoint
+  app.get("/api/gmail-auth-url", async (req, res) => {
+    try {
+      const authUrl = emailMonitoringService.getAuthUrl();
+      res.json({
+        success: true,
+        authUrl
+      });
+    } catch (error) {
+      console.error("Error getting Gmail auth URL:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get Gmail authorization URL"
+      });
+    }
+  });
+
+  // Gmail OAuth callback endpoint
+  app.get("/api/gmail-callback", async (req, res) => {
+    try {
+      const { code } = req.query;
+      if (!code || typeof code !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: "Authorization code is required"
+        });
+        return;
+      }
+
+      const tokens = await emailMonitoringService.getTokens(code);
+      
+      // Store tokens in session (in production, store securely)
+      (req.session as any).gmailTokens = tokens;
+      
+      // Redirect to deals page
+      res.redirect('/deals');
+    } catch (error) {
+      console.error("Error in Gmail callback:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to complete Gmail authorization"
+      });
+    }
+  });
+
+  // Sync emails endpoint
+  app.post("/api/sync-emails", async (req, res) => {
+    try {
+      // Check if user has Gmail tokens
+      if (!(req.session as any).gmailTokens) {
+        res.status(401).json({
+          success: false,
+          error: "Gmail not connected. Please connect your Gmail account first."
+        });
+        return;
+      }
+
+      // Set credentials for email service
+      await emailMonitoringService.setCredentials(
+        (req.session as any).gmailTokens.access_token,
+        (req.session as any).gmailTokens.refresh_token
+      );
+
+      // Search for real estate emails
+      const emailDeals = await emailMonitoringService.searchRealEstateEmails();
+      
+      // Store new deals in storage
+      const storedDeals = [];
+      for (const deal of emailDeals) {
+        // Check if deal already exists
+        const existingDeal = await storage.getEmailDeal(deal.id);
+        if (!existingDeal) {
+          const storedDeal = await storage.createEmailDeal(deal);
+          storedDeals.push(storedDeal);
+        }
+      }
+
+      const response: EmailMonitoringResponse = {
+        success: true,
+        data: storedDeals
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error syncing emails:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to sync emails"
+      });
+    }
+  });
+
+  // Get email deals endpoint
+  app.get("/api/email-deals", async (req, res) => {
+    try {
+      const emailDeals = await storage.getEmailDeals();
+      res.json(emailDeals);
+    } catch (error) {
+      console.error("Error getting email deals:", error);
+      res.status(500).json({ error: "Failed to get email deals" });
+    }
+  });
+
+  // Update email deal status
+  app.put("/api/email-deals/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!status || !['new', 'reviewed', 'analyzed', 'archived'].includes(status)) {
+        res.status(400).json({
+          success: false,
+          error: "Valid status is required (new, reviewed, analyzed, archived)"
+        });
+        return;
+      }
+
+      const updatedDeal = await storage.updateEmailDeal(id, { status });
+      
+      if (!updatedDeal) {
+        res.status(404).json({
+          success: false,
+          error: "Email deal not found"
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: updatedDeal
+      });
+    } catch (error) {
+      console.error("Error updating email deal status:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update deal status"
+      });
+    }
+  });
+
+  // Analyze email deal endpoint
+  app.post("/api/analyze-email-deal", async (req, res) => {
+    try {
+      const { dealId, emailContent } = req.body;
+      
+      if (!dealId || !emailContent) {
+        res.status(400).json({
+          success: false,
+          error: "Deal ID and email content are required"
+        });
+        return;
+      }
+
+      // Get the email deal
+      const emailDeal = await storage.getEmailDeal(dealId);
+      if (!emailDeal) {
+        res.status(404).json({
+          success: false,
+          error: "Email deal not found"
+        });
+        return;
+      }
+
+      // Run Python analysis on the email content
+      const analysisResult = await runPythonAnalysis(emailContent);
+      
+      if (!analysisResult.success) {
+        res.status(400).json({
+          success: false,
+          error: analysisResult.error || "Analysis failed"
+        });
+        return;
+      }
+
+      // Run AI analysis if available
+      let analysisWithAI = analysisResult.data!;
+      try {
+        if (process.env.OPENAI_API_KEY) {
+          const aiAnalysis = await aiAnalysisService.analyzeProperty(analysisResult.data!.property);
+          analysisWithAI = {
+            ...analysisResult.data!,
+            aiAnalysis
+          };
+        }
+      } catch (error) {
+        console.warn("AI analysis failed, continuing without AI insights:", error);
+      }
+
+      // Store the analysis
+      const storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
+
+      // Update the email deal with the analysis
+      await storage.updateEmailDeal(dealId, { 
+        analysis: storedAnalysis,
+        status: 'analyzed'
+      });
+
+      const response: AnalyzePropertyResponse = {
+        success: true,
+        data: storedAnalysis
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error analyzing email deal:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to analyze email deal"
       });
     }
   });

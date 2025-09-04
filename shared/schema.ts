@@ -192,6 +192,36 @@ export const comparisonResponseSchema = z.object({
   error: z.string().optional(),
 });
 
+// Email Deal schemas
+export const emailDealStatus = z.enum(['new', 'reviewed', 'analyzed', 'archived']);
+
+export const emailDealSchema = z.object({
+  id: z.string(),
+  subject: z.string(),
+  sender: z.string(),
+  receivedDate: z.date(),
+  emailContent: z.string(),
+  extractedProperty: z.object({
+    address: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    price: z.number().optional(),
+    bedrooms: z.number().optional(),
+    bathrooms: z.number().optional(),
+    sqft: z.number().optional(),
+  }).optional(),
+  status: emailDealStatus,
+  analysis: dealAnalysisSchema.optional(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export const emailMonitoringResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.array(emailDealSchema).optional(),
+  error: z.string().optional(),
+});
+
 // Export types
 export type Property = z.infer<typeof propertySchema>;
 export type AIAnalysis = z.infer<typeof aiAnalysisSchema>;
@@ -204,6 +234,8 @@ export type UpdateCriteriaRequest = z.infer<typeof updateCriteriaRequestSchema>;
 export type PropertyComparison = z.infer<typeof propertyComparisonSchema>;
 export type CreateComparisonRequest = z.infer<typeof createComparisonRequestSchema>;
 export type ComparisonResponse = z.infer<typeof comparisonResponseSchema>;
+export type EmailDeal = z.infer<typeof emailDealSchema>;
+export type EmailMonitoringResponse = z.infer<typeof emailMonitoringResponseSchema>;
 
 // Insert schemas
 export const insertPropertySchema = propertySchema.omit({ id: true });
