@@ -3,6 +3,7 @@ import { createObjectCsvWriter } from 'csv-writer';
 import path from 'path';
 import fs from 'fs';
 import type { DealAnalysis, PropertyComparison } from '@shared/schema';
+import { aiAnalysisService } from './ai-service';
 
 export interface ReportOptions {
   format: 'pdf' | 'csv';
@@ -36,7 +37,7 @@ async function generatePDFReport(data: ReportData, options: ReportOptions, baseF
   }
 
   // Generate HTML content for PDF
-  const htmlContent = generateHTMLReport(data, options);
+  const htmlContent = await generateHTMLReport(data, options);
   
   // Launch puppeteer and generate PDF
   const browser = await puppeteer.launch({

@@ -34,6 +34,36 @@ export const propertySchema = z.object({
   }).optional(),
 });
 
+// AI Analysis schema
+export const aiAnalysisSchema = z.object({
+  propertyAssessment: z.object({
+    overallScore: z.number().min(1).max(10), // 1-10 rating
+    strengths: z.array(z.string()),
+    redFlags: z.array(z.string()),
+    description: z.string(),
+    marketPosition: z.string(),
+  }),
+  marketIntelligence: z.object({
+    sentimentScore: z.number().min(-1).max(1), // -1 to 1
+    riskLevel: z.enum(['low', 'medium', 'high']),
+    marketTrends: z.array(z.string()),
+    competitiveAnalysis: z.string(),
+  }),
+  investmentRecommendation: z.object({
+    recommendation: z.enum(['strong_buy', 'buy', 'hold', 'avoid']),
+    confidence: z.number().min(0).max(1), // 0-1
+    reasoning: z.array(z.string()),
+    suggestedStrategy: z.string(),
+    timeHorizon: z.string(),
+  }),
+  predictiveAnalysis: z.object({
+    appreciationForecast: z.number(), // annual %
+    rentGrowthForecast: z.number(), // annual %
+    exitStrategy: z.string(),
+    keyRisks: z.array(z.string()),
+  }),
+});
+
 // Deal analysis result schema
 export const dealAnalysisSchema = z.object({
   id: z.string().optional(),
@@ -60,6 +90,8 @@ export const dealAnalysisSchema = z.object({
   strNetIncome: z.number().optional(), // STR-specific net income
   strMeetsCriteria: z.boolean().optional(),
   meetsCriteria: z.boolean(),
+  // AI Analysis
+  aiAnalysis: aiAnalysisSchema.optional(),
   analysisDate: z.date().optional(),
 });
 
@@ -162,6 +194,7 @@ export const comparisonResponseSchema = z.object({
 
 // Export types
 export type Property = z.infer<typeof propertySchema>;
+export type AIAnalysis = z.infer<typeof aiAnalysisSchema>;
 export type DealAnalysis = z.infer<typeof dealAnalysisSchema>;
 export type AnalyzePropertyRequest = z.infer<typeof analyzePropertyRequestSchema>;
 export type AnalyzePropertyResponse = z.infer<typeof analyzePropertyResponseSchema>;

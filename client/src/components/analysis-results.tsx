@@ -2,6 +2,7 @@ import { PropertyOverview } from "./property-overview";
 import { FinancialBreakdown } from "./financial-breakdown";
 import { STRMetrics } from "./str-metrics";
 import { CriteriaAssessment } from "./criteria-assessment";
+import { AIInsights } from "./ai-insights";
 import { ConfettiCelebration } from "./confetti-celebration";
 import { Button } from "@/components/ui/button";
 import type { DealAnalysis, CriteriaResponse } from "@shared/schema";
@@ -40,6 +41,7 @@ export function AnalysisResults({ analysis, criteria, onAnalysisUpdate, onAddToC
       <PropertyOverview analysis={analysis} onAnalysisUpdate={onAnalysisUpdate} />
       <FinancialBreakdown analysis={analysis} />
       <STRMetrics analysis={analysis} criteria={criteria} onAnalysisUpdate={onAnalysisUpdate} />
+      {analysis.aiAnalysis && <AIInsights aiAnalysis={analysis.aiAnalysis} />}
       <CriteriaAssessment analysis={analysis} criteria={criteria} />
     </div>
   );

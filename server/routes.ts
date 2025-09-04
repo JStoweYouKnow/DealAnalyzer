@@ -13,6 +13,7 @@ import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
 import { generateReport, type ReportOptions, type ReportData } from "./report-generator";
+import { aiAnalysisService } from "./ai-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -166,8 +167,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
+      // Run AI analysis if available
+      let analysisWithAI = analysisResult.data!;
+      try {
+        if (process.env.OPENAI_API_KEY) {
+          const aiAnalysis = await aiAnalysisService.analyzeProperty(analysisResult.data!.property);
+          analysisWithAI = {
+            ...analysisResult.data!,
+            aiAnalysis
+          };
+        }
+      } catch (error) {
+        console.warn("AI analysis failed, continuing without AI insights:", error);
+      }
+
       // Store the analysis in memory
-      const storedAnalysis = await storage.createDealAnalysis(analysisResult.data!);
+      const storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
 
       const response: AnalyzePropertyResponse = {
         success: true,
@@ -253,8 +268,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
+      // Run AI analysis if available
+      let analysisWithAI = analysisResult.data!;
+      try {
+        if (process.env.OPENAI_API_KEY) {
+          const aiAnalysis = await aiAnalysisService.analyzeProperty(analysisResult.data!.property);
+          analysisWithAI = {
+            ...analysisResult.data!,
+            aiAnalysis
+          };
+        }
+      } catch (error) {
+        console.warn("AI analysis failed, continuing without AI insights:", error);
+      }
+
       // Store the analysis in memory
-      const storedAnalysis = await storage.createDealAnalysis(analysisResult.data!);
+      const storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
 
       const response: AnalyzePropertyResponse = {
         success: true,
