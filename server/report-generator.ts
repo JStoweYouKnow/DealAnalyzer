@@ -42,7 +42,14 @@ async function generatePDFReport(data: ReportData, options: ReportOptions, baseF
   // Launch puppeteer and generate PDF
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    args: [
+      '--no-sandbox', 
+      '--disable-setuid-sandbox', 
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-web-security',
+      '--disable-extensions'
+    ]
   });
   
   try {

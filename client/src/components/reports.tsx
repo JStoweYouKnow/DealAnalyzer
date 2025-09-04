@@ -228,8 +228,8 @@ export function Reports({ analyses, comparisonList }: ReportsProps) {
           </div>
           
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {allAnalyses.map((analysis) => {
-              const analysisId = analysis.id || `temp-${Date.now()}-${Math.random()}`;
+            {allAnalyses.map((analysis, index) => {
+              const analysisId = analysis.id || `temp-${analysis.property.address}-${index}`;
               return (
                 <div
                   key={analysisId}
