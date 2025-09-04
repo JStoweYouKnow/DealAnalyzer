@@ -162,6 +162,9 @@ export default function Home() {
           />
         </div>
 
+        {/* Section Divider */}
+        <div className="section-divider"></div>
+
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
           {/* Left Panel - Email Input */}
           <div className="xl:col-span-2">
@@ -201,28 +204,35 @@ export default function Home() {
 
         {/* Recent Analyses */}
         {recentAnalyses.length > 0 && (
-          <div className="mt-8">
-            <RecentAnalyses 
-              analyses={recentAnalyses}
-              onAddToComparison={addToComparison}
-              isInComparison={isInComparison}
-            />
-          </div>
+          <>
+            <div className="section-divider"></div>
+            <div className="mt-8">
+              <RecentAnalyses 
+                analyses={recentAnalyses}
+                onAddToComparison={addToComparison}
+                isInComparison={isInComparison}
+              />
+            </div>
+          </>
         )}
 
         {/* Quick Compare Dashboard */}
         {comparisonList.length > 0 && (
-          <div className="mt-8">
-            <QuickCompare 
-              analyses={comparisonList}
-              criteria={criteria}
-              onRemoveProperty={removeFromComparison}
-              onClearAll={clearComparison}
-            />
-          </div>
+          <>
+            <div className="section-divider"></div>
+            <div className="mt-8">
+              <QuickCompare 
+                analyses={comparisonList}
+                criteria={criteria}
+                onRemoveProperty={removeFromComparison}
+                onClearAll={clearComparison}
+              />
+            </div>
+          </>
         )}
 
         {/* Reports Section */}
+        <div className="section-divider"></div>
         <div className="mt-8">
           <Reports 
             analyses={analysisResult ? [analysisResult, ...recentAnalyses.filter(a => a.propertyId !== analysisResult.propertyId)] : recentAnalyses}
