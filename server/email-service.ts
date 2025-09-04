@@ -181,7 +181,7 @@ export class EmailMonitoringService {
     
     let address = '';
     for (const pattern of addressPatterns) {
-      const matches = [...combined.matchAll(pattern)];
+      const matches = Array.from(combined.matchAll(pattern));
       console.log(`Pattern ${pattern} found matches:`, matches.map(m => m[1] || m[0]));
       
       if (matches.length > 0) {
@@ -233,7 +233,7 @@ export class EmailMonitoringService {
 
     // City and state extraction - simplified and more reliable
     const cityStatePattern = /([A-Za-z\s]+),\s*([A-Z]{2})\b/g;
-    const cityStateMatches = [...combined.matchAll(cityStatePattern)];
+    const cityStateMatches = Array.from(combined.matchAll(cityStatePattern));
     console.log('City/State matches:', cityStateMatches.map(m => `${m[1]}, ${m[2]}`));
     
     let city = '';
