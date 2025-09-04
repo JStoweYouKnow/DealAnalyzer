@@ -137,18 +137,6 @@ export default function Home() {
             </div>
             
             <div className="flex items-center space-x-4">
-              
-              <nav className="hidden md:flex space-x-6">
-                <a href="#analyzer" className="text-muted-foreground hover:text-primary transition-colors font-medium">
-                  <i className="fas fa-calculator mr-2"></i>Analyzer
-                </a>
-                <a href="#criteria" className="text-muted-foreground hover:text-primary transition-colors font-medium">
-                  <i className="fas fa-cog mr-2"></i>Criteria
-                </a>
-                <a href="#reports" className="text-muted-foreground hover:text-primary transition-colors font-medium">
-                  <i className="fas fa-chart-line mr-2"></i>Reports
-                </a>
-              </nav>
             </div>
           </div>
         </div>
