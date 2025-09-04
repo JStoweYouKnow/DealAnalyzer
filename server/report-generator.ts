@@ -48,7 +48,11 @@ async function generatePDFReport(data: ReportData, options: ReportOptions, baseF
       '--disable-dev-shm-usage',
       '--disable-gpu',
       '--disable-web-security',
-      '--disable-extensions'
+      '--disable-extensions',
+      '--disable-features=VizDisplayCompositor',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding'
     ]
   });
   
