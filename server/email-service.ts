@@ -81,8 +81,8 @@ export class EmailMonitoringService {
   // Search for real estate related emails
   async searchRealEstateEmails(maxResults: number = 50): Promise<EmailDeal[]> {
     try {
-      // Search query specifically for trusted real estate platforms
-      const query = 'from:(zillow.com OR redfin.com OR realtor.com OR mls.com OR homes.com OR trulia.com OR hotpads.com OR apartments.com OR rent.com OR loopnet.com OR crexi.com OR rocketmortgage.com OR quickenloans.com OR compass.com OR coldwellbanker.com OR remax.com OR kw.com OR century21.com OR sothebysrealty.com OR bhhsnymetro.com OR "MLS" OR "Multiple Listing Service")';
+      // Search query specifically for trusted real estate platforms, excluding meetups
+      const query = 'from:(zillow.com OR redfin.com OR realtor.com OR mls.com OR homes.com OR trulia.com OR hotpads.com OR apartments.com OR rent.com OR loopnet.com OR crexi.com OR rocketmortgage.com OR quickenloans.com OR compass.com OR coldwellbanker.com OR remax.com OR kw.com OR century21.com OR sothebysrealty.com OR bhhsnymetro.com OR "MLS" OR "Multiple Listing Service") -from:(meetup.com OR eventbrite.com) -subject:(meetup OR "meet up" OR networking OR event OR "real estate meetup" OR "investor meetup")';
       
       const response = await this.gmail.users.messages.list({
         userId: 'me',
@@ -241,7 +241,29 @@ export class EmailMonitoringService {
       'century21.com', 'sothebysrealty.com', 'rocketmortgage.com', 'quickenloans.com'
     ];
 
+    // Exclude meetup and event-related emails
+    const meetupExclusions = [
+      'meetup', 'meet up', 'networking', 'event', 'webinar', 'workshop', 
+      'seminar', 'conference', 'gathering', 'rsvp', 'attending', 'join us',
+      'real estate meetup', 'investor meetup', 'rei meetup', 'investment club'
+    ];
+
+    const combined = `${subject} ${content}`.toLowerCase();
     const senderLower = sender.toLowerCase();
+    
+    // Exclude meetup platforms and content
+    if (senderLower.includes('meetup.com') || senderLower.includes('eventbrite.com')) {
+      return false;
+    }
+    
+    // Exclude emails with meetup keywords
+    const hasMeetupContent = meetupExclusions.some(keyword => 
+      combined.includes(keyword) || senderLower.includes(keyword)
+    );
+    if (hasMeetupContent) {
+      return false;
+    }
+
     const isDomainTrusted = trustedDomains.some(domain => senderLower.includes(domain));
     
     // If from trusted domain, check for real estate content
@@ -251,7 +273,6 @@ export class EmailMonitoringService {
         'bathroom', 'sqft', 'square feet', 'home', 'house', 'condo', 'townhome'
       ];
       
-      const combined = `${subject} ${content}`.toLowerCase();
       return realEstateKeywords.some(keyword => combined.includes(keyword));
     }
     
