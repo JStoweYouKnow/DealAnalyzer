@@ -152,7 +152,7 @@ export default function Home() {
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-foreground mb-2">Find Your Perfect Investment Property</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Paste your real estate listing email below to instantly analyze investment potential and find your comfort zone
+            Upload your property data files to instantly analyze investment potential and find your comfort zone
           </p>
         </div>
 
@@ -171,7 +171,7 @@ export default function Home() {
         <div className="section-divider"></div>
 
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
-          {/* Left Panel - Email Input */}
+          {/* Left Panel - File Upload */}
           <div className="xl:col-span-2">
             <AnalyzerForm 
               onAnalyze={handleAnalyze}
@@ -201,7 +201,7 @@ export default function Home() {
                   <i className="fas fa-chart-line text-2xl text-muted-foreground"></i>
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Ready to Analyze</h3>
-                <p className="text-muted-foreground">Paste your property email content and click analyze to get started</p>
+                <p className="text-muted-foreground">Upload your property file and click analyze to get started</p>
               </div>
             )}
           </div>

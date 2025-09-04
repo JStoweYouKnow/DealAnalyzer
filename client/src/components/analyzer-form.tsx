@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,34 +22,24 @@ interface MonthlyExpenses {
 }
 
 interface AnalyzerFormProps {
-  onAnalyze: (data: { emailContent?: string; file?: File; strMetrics?: STRMetrics; monthlyExpenses?: MonthlyExpenses }) => void;
+  onAnalyze: (data: { file?: File; strMetrics?: STRMetrics; monthlyExpenses?: MonthlyExpenses }) => void;
   isLoading: boolean;
 }
 
 export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
-  const [emailContent, setEmailContent] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [inputMode, setInputMode] = useState<'text' | 'file'>('text');
   const [strMetrics, setSTRMetrics] = useState<STRMetrics>({});
   const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpenses>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputMode === 'text' && !emailContent.trim()) {
-      alert("Please paste email content first");
-      return;
-    }
-    if (inputMode === 'file' && !selectedFile) {
+    if (!selectedFile) {
       alert("Please select a file first");
       return;
     }
     
-    if (inputMode === 'file' && selectedFile) {
-      onAnalyze({ file: selectedFile, strMetrics, monthlyExpenses });
-    } else {
-      onAnalyze({ emailContent, strMetrics, monthlyExpenses });
-    }
+    onAnalyze({ file: selectedFile, strMetrics, monthlyExpenses });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,33 +63,6 @@ export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
     }
   };
 
-  const loadExample = () => {
-    const exampleContent = `Subject: New Investment Opportunity - 123 Main Street
-
-Dear Investor,
-
-We found a great property that matches your criteria:
-
-Property: 123 Main St, Anytown, CA 90210
-Type: Single Family Home  
-Listing Price: $250,000
-Estimated Monthly Rent: $2,500
-Bedrooms: 3
-Bathrooms: 2.5
-Square Footage: 1500 sq ft
-Year Built: 1985
-
-This charming 3-bedroom, 2.5-bathroom home is located in a desirable neighborhood. The property features a spacious living area, modern kitchen, and large backyard. It's currently tenant-occupied with market-rate rent.
-
-View listing: https://example.com/listing/123mainst
-
-Let me know if you'd like to schedule a showing!
-
-Best regards,
-Your Real Estate Team`;
-    
-    setEmailContent(exampleContent);
-  };
 
   return (
     <div className="space-y-6">
@@ -127,102 +89,46 @@ Your Real Estate Team`;
               </TabsList>
               
               <TabsContent value="input" className="space-y-4">
-                {/* Input Mode Selection */}
-                <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      id="text-mode"
-                      name="inputMode"
-                      checked={inputMode === 'text'}
-                      onChange={() => setInputMode('text')}
-                      className="w-4 h-4 text-primary focus:ring-primary"
-                    />
-                    <Label htmlFor="text-mode" className="text-sm font-medium leading-none cursor-pointer">
-                      Paste Text/Email
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      id="file-mode"
-                      name="inputMode"
-                      checked={inputMode === 'file'}
-                      onChange={() => setInputMode('file')}
-                      className="w-4 h-4 text-primary focus:ring-primary"
-                    />
-                    <Label htmlFor="file-mode" className="text-sm font-medium leading-none cursor-pointer">
-                      Upload File
-                    </Label>
-                  </div>
-                </div>
-
-                {inputMode === 'text' ? (
                 <div>
-                  <Label htmlFor="email-content">Property Listing Email</Label>
-                    <Textarea
-                      id="email-content"
-                      value={emailContent}
-                      onChange={(e) => setEmailContent(e.target.value)}
-                      className="h-64 sm:h-80 resize-none mt-2"
-                      placeholder="Paste your real estate email content here..."
-                      data-testid="input-email-content"
+                  <Label htmlFor="file-upload">Upload Property Data File</Label>
+                  <div className="mt-2 space-y-4">
+                    <Input
+                      ref={fileInputRef}
+                      id="file-upload"
+                      type="file"
+                      accept=".pdf,.csv,.txt,.xlsx,.xls"
+                      onChange={handleFileChange}
+                      className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                      data-testid="input-file-upload"
                     />
-                    <div className="mt-2 text-xs text-muted-foreground hidden sm:block">
-                      <div className="bg-muted/50 rounded-lg p-3">
-                        <div className="font-medium mb-1">Supported email formats:</div>
-                        <div className="text-xs space-y-1">
-                          <div>• Property address and location</div>
-                          <div>• Purchase/listing price and monthly rent</div>
-                          <div>• Bedrooms, bathrooms, square footage</div>
-                          <div>• Property type and year built</div>
-                          <div>• Works with MLS, Zillow, Realtor.com, and other services</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <Label htmlFor="file-upload">Upload Property Data File</Label>
-                    <div className="mt-2 space-y-4">
-                      <Input
-                        ref={fileInputRef}
-                        id="file-upload"
-                        type="file"
-                        accept=".pdf,.csv,.txt,.xlsx,.xls"
-                        onChange={handleFileChange}
-                        className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                        data-testid="input-file-upload"
-                      />
-                      
-                      {selectedFile && (
-                        <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                          <div className="flex items-center space-x-2">
-                            <i className="fas fa-file text-green-600"></i>
-                            <div>
-                              <div className="font-medium text-green-800 dark:text-green-200">
-                                {selectedFile.name}
-                              </div>
-                              <div className="text-sm text-green-600 dark:text-green-400">
-                                {(selectedFile.size / 1024).toFixed(1)} KB • {selectedFile.type || 'Unknown type'}
-                              </div>
+                    
+                    {selectedFile && (
+                      <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                        <div className="flex items-center space-x-2">
+                          <i className="fas fa-file text-green-600"></i>
+                          <div>
+                            <div className="font-medium text-green-800 dark:text-green-200">
+                              {selectedFile.name}
+                            </div>
+                            <div className="text-sm text-green-600 dark:text-green-400">
+                              {(selectedFile.size / 1024).toFixed(1)} KB • {selectedFile.type || 'Unknown type'}
                             </div>
                           </div>
                         </div>
-                      )}
-                      
-                      <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4">
-                        <h4 className="font-medium mb-2">Supported file formats:</h4>
-                        <ul className="space-y-1 text-xs">
-                          <li><strong>PDF:</strong> Property listings, flyers, investment summaries</li>
-                          <li><strong>CSV:</strong> Property data exports, rental comps, market data</li>
-                          <li><strong>Excel:</strong> Investment spreadsheets, property lists</li>
-                          <li><strong>TXT:</strong> Plain text property descriptions, emails</li>
-                        </ul>
                       </div>
+                    )}
+                    
+                    <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4">
+                      <h4 className="font-medium mb-2">Supported file formats:</h4>
+                      <ul className="space-y-1 text-xs">
+                        <li><strong>PDF:</strong> Property listings, flyers, investment summaries</li>
+                        <li><strong>CSV:</strong> Property data exports, rental comps, market data</li>
+                        <li><strong>Excel:</strong> Investment spreadsheets, property lists</li>
+                        <li><strong>TXT:</strong> Plain text property descriptions, emails</li>
+                      </ul>
                     </div>
                   </div>
-                )}
+                </div>
               </TabsContent>
               
               <TabsContent value="str" className="space-y-4">
@@ -382,22 +288,7 @@ Your Real Estate Team`;
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Button 
-          variant="secondary" 
-          className="p-4 h-auto text-left justify-start"
-          onClick={loadExample}
-          data-testid="button-load-example"
-        >
-          <div className="flex items-center space-x-3">
-            <i className="fas fa-file-upload text-primary"></i>
-            <div>
-              <div className="font-medium">Load Example</div>
-              <div className="text-xs text-muted-foreground">Try sample data</div>
-            </div>
-          </div>
-        </Button>
-        
+      <div className="grid grid-cols-1 gap-4">
         <Button 
           variant="secondary" 
           className="p-4 h-auto text-left justify-start"
