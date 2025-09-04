@@ -167,31 +167,34 @@ export class EmailMonitoringService {
   // Enhanced property information parsing
   private parsePropertyInfo(content: string, subject: string): EmailDeal['extractedProperty'] {
     const combined = `${subject} ${content}`;
+    console.log('Parsing property info from:', combined.substring(0, 500));
     
-    // Address extraction (enhanced patterns for real estate emails)
+    // Address extraction (simplified and more targeted patterns)
     const addressPatterns = [
-      // Direct address patterns with street types
-      /(\d+\s+[A-Za-z\s.'-]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Way|Circle|Cir|Court|Ct|Boulevard|Blvd|Place|Pl|Terrace|Ter|Trail|Trl|Parkway|Pkwy|Square|Sq)(?:\s+[A-Za-z0-9]*)?)/gi,
-      // Address with "located at" or similar
-      /(?:address|located at|property at|listing at)[:\s]*([^,\n]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Way|Circle|Cir|Court|Ct|Boulevard|Blvd|Place|Pl|Terrace|Ter|Trail|Trl|Parkway|Pkwy)[^,\n]*)/i,
-      // For emails that have address on its own line
-      /^(\d+\s+[A-Za-z\s.'-]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Way|Circle|Cir|Court|Ct|Boulevard|Blvd|Place|Pl|Terrace|Ter|Trail|Trl|Parkway|Pkwy))/m,
-      // Address patterns common in Zillow/Redfin emails
-      /(\d+\s+[A-Za-z\s.'-]+(?:St|Ave|Rd|Dr|Ln|Way|Cir|Ct|Blvd|Pl|Ter|Trl|Pkwy))\s*[,\n]/i,
+      // Match "2627 Azelda St" type patterns - most common in emails
+      /(\d+\s+[A-Za-z\s.'-]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Way|Circle|Cir|Court|Ct|Boulevard|Blvd|Place|Pl|Terrace|Ter|Trail|Trl|Parkway|Pkwy|Square|Sq))/gi,
+      // Simplified street abbreviations that are very common
+      /(\d+\s+[A-Za-z\s.'-]+\s+(?:St|Ave|Rd|Dr|Ln|Way|Cir|Ct|Blvd|Pl))/gi,
+      // Even simpler - just number + words + common endings
+      /(\d+\s+[A-Za-z\s]+\s+St\b)/gi,
     ];
     
     let address = '';
     for (const pattern of addressPatterns) {
-      const matches = combined.match(pattern);
-      if (matches) {
-        // Get the captured group or the first match
-        address = (matches[1] || matches[0])?.trim();
-        if (address && address.length > 5 && address.length < 100) {
-          // Clean up the address
-          address = address.replace(/^\s*-+\s*|\s*-+\s*$/g, ''); // Remove leading/trailing dashes
-          address = address.replace(/[,\n].*$/, ''); // Remove everything after comma or newline
-          break;
+      const matches = [...combined.matchAll(pattern)];
+      console.log(`Pattern ${pattern} found matches:`, matches.map(m => m[1] || m[0]));
+      
+      if (matches.length > 0) {
+        // Take the first valid match
+        for (const match of matches) {
+          const candidate = (match[1] || match[0])?.trim();
+          if (candidate && candidate.length > 8 && candidate.length < 80) {
+            address = candidate;
+            console.log('Selected address:', address);
+            break;
+          }
         }
+        if (address) break;
       }
     }
 
@@ -228,31 +231,30 @@ export class EmailMonitoringService {
     const sqftMatch = combined.match(/(\d{1,5})\s*(?:sq\.?\s*ft|square\s*feet|sqft)/i);
     const sqft = sqftMatch ? parseInt(sqftMatch[1]) : undefined;
 
-    // City and state extraction (enhanced patterns)
-    const cityStatePatterns = [
-      // Standard format: City, ST
-      /([A-Za-z\s]+),\s*([A-Z]{2})(?:\s|$)/,
-      // Sometimes in emails: Address, City, ST ZIP
-      /,\s*([A-Za-z\s]+),\s*([A-Z]{2})\s*\d{5}/,
-      // After address line
-      /(?:^|\n)([A-Za-z\s]+),\s*([A-Z]{2})(?:\s*\d{5})?/m,
-    ];
+    // City and state extraction - simplified and more reliable
+    const cityStatePattern = /([A-Za-z\s]+),\s*([A-Z]{2})\b/g;
+    const cityStateMatches = [...combined.matchAll(cityStatePattern)];
+    console.log('City/State matches:', cityStateMatches.map(m => `${m[1]}, ${m[2]}`));
     
     let city = '';
     let state = '';
-    for (const pattern of cityStatePatterns) {
-      const match = combined.match(pattern);
-      if (match && match[1] && match[2]) {
-        city = match[1].trim();
-        state = match[2].trim();
-        // Validate that city doesn't contain numbers or weird characters
-        if (!/\d/.test(city) && city.length > 2 && city.length < 30) {
+    if (cityStateMatches.length > 0) {
+      // Take the first reasonable match
+      for (const match of cityStateMatches) {
+        const candidateCity = match[1]?.trim();
+        const candidateState = match[2]?.trim();
+        if (candidateCity && candidateState && 
+            candidateCity.length > 2 && candidateCity.length < 30 && 
+            !/\d/.test(candidateCity)) {
+          city = candidateCity;
+          state = candidateState;
+          console.log('Selected city/state:', city, state);
           break;
         }
       }
     }
 
-    return {
+    const result = {
       address: address || undefined,
       city: city || undefined,
       state: state || undefined,
@@ -261,6 +263,9 @@ export class EmailMonitoringService {
       bathrooms,
       sqft,
     };
+    
+    console.log('Final parsed property:', result);
+    return result;
   }
 
   // Filter emails that likely contain property listings from trusted sources
