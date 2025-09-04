@@ -358,7 +358,7 @@ export default function DealsPage() {
                                 <Input
                                   type="number"
                                   placeholder="Enter purchase price"
-                                  value={editValues[deal.id]?.price ?? deal.extractedProperty.price ?? ''}
+                                  value={editValues[deal.id]?.price ?? deal.analysis?.property?.purchasePrice ?? deal.extractedProperty.price ?? ''}
                                   onChange={(e) => setEditValues(prev => ({
                                     ...prev,
                                     [deal.id]: {
@@ -371,8 +371,8 @@ export default function DealsPage() {
                                 />
                               ) : (
                                 <p className="font-medium text-lg mt-1">
-                                  {deal.extractedProperty.price
-                                    ? formatCurrency(deal.extractedProperty.price)
+                                  {(deal.analysis?.property?.purchasePrice || deal.extractedProperty.price)
+                                    ? formatCurrency(deal.analysis?.property?.purchasePrice || deal.extractedProperty.price || 0)
                                     : 'Not specified'}
                                 </p>
                               )}
@@ -384,7 +384,7 @@ export default function DealsPage() {
                                 <Input
                                   type="number"
                                   placeholder="Enter monthly rent"
-                                  value={editValues[deal.id]?.rent ?? deal.extractedProperty.monthlyRent ?? ''}
+                                  value={editValues[deal.id]?.rent ?? deal.analysis?.property?.monthlyRent ?? deal.extractedProperty.monthlyRent ?? ''}
                                   onChange={(e) => setEditValues(prev => ({
                                     ...prev,
                                     [deal.id]: {
@@ -397,8 +397,8 @@ export default function DealsPage() {
                                 />
                               ) : (
                                 <p className="font-medium text-lg mt-1">
-                                  {deal.extractedProperty.monthlyRent
-                                    ? formatCurrency(deal.extractedProperty.monthlyRent)
+                                  {(deal.analysis?.property?.monthlyRent || deal.extractedProperty.monthlyRent)
+                                    ? formatCurrency(deal.analysis?.property?.monthlyRent || deal.extractedProperty.monthlyRent || 0)
                                     : 'Not specified'}
                                 </p>
                               )}
@@ -445,8 +445,8 @@ export default function DealsPage() {
                                 setEditValues(prev => ({
                                   ...prev,
                                   [deal.id]: {
-                                    price: deal.extractedProperty?.price,
-                                    rent: deal.extractedProperty?.monthlyRent
+                                    price: deal.analysis?.property?.purchasePrice || deal.extractedProperty?.price,
+                                    rent: deal.analysis?.property?.monthlyRent || deal.extractedProperty?.monthlyRent
                                   }
                                 }));
                               }}
