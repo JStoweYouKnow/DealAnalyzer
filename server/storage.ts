@@ -9,6 +9,8 @@ export interface IStorage {
   // Deal analysis methods
   getDealAnalysis(id: string): Promise<DealAnalysis | undefined>;
   createDealAnalysis(analysis: InsertDealAnalysis): Promise<DealAnalysis>;
+  updateDealAnalysis(id: string, analysis: InsertDealAnalysis): Promise<DealAnalysis | undefined>;
+  findAnalysisByPropertyAddress(address: string): Promise<DealAnalysis | undefined>;
   getAnalysisHistory(): Promise<DealAnalysis[]>;
   
   // Comparison methods
@@ -53,6 +55,26 @@ export class MemStorage implements IStorage {
     };
     this.dealAnalyses.set(id, analysis);
     return analysis;
+  }
+
+  async updateDealAnalysis(id: string, insertAnalysis: InsertDealAnalysis): Promise<DealAnalysis | undefined> {
+    const existingAnalysis = this.dealAnalyses.get(id);
+    if (!existingAnalysis) {
+      return undefined;
+    }
+    
+    const updatedAnalysis: DealAnalysis = { 
+      ...insertAnalysis, 
+      id: existingAnalysis.id, // Keep the same ID
+      analysisDate: new Date() // Update the timestamp
+    };
+    this.dealAnalyses.set(id, updatedAnalysis);
+    return updatedAnalysis;
+  }
+
+  async findAnalysisByPropertyAddress(address: string): Promise<DealAnalysis | undefined> {
+    const analyses = Array.from(this.dealAnalyses.values());
+    return analyses.find(analysis => analysis.property.address === address);
   }
 
   async getAnalysisHistory(): Promise<DealAnalysis[]> {

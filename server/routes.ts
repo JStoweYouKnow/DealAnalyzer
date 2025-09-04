@@ -66,8 +66,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Store the updated analysis
-      const storedAnalysis = await storage.createDealAnalysis(analysisResult.data!);
+      // Run AI analysis if available for updated property
+      let analysisWithAI = analysisResult.data!;
+      try {
+        if (process.env.OPENAI_API_KEY) {
+          const aiAnalysis = await aiAnalysisService.analyzeProperty(analysisResult.data!.property);
+          analysisWithAI = {
+            ...analysisResult.data!,
+            aiAnalysis
+          };
+        }
+      } catch (error) {
+        console.warn("AI analysis failed for updated property, continuing without AI insights:", error);
+      }
+
+      // Try to find existing analysis by property address and update it
+      let storedAnalysis: any;
+      
+      if (property.address) {
+        const existingAnalysis = await storage.findAnalysisByPropertyAddress(property.address as string);
+        
+        if (existingAnalysis) {
+          // Update existing analysis to maintain the same ID for report generation
+          storedAnalysis = await storage.updateDealAnalysis(existingAnalysis.id, analysisWithAI);
+        } else {
+          // Create new analysis if none exists
+          storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
+        }
+      } else {
+        // Create new analysis if no address
+        storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
+      }
 
       const response: AnalyzePropertyResponse = {
         success: true,
