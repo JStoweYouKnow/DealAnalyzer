@@ -657,22 +657,22 @@ async function runPythonPropertyUpdate(
     // Write property data to JSON file for Python to process
     const propertyData = {
       property: {
-        address: property.address,
-        city: property.city,
-        state: property.state,
-        zip_code: property.zipCode,
-        property_type: property.propertyType,
-        purchase_price: property.purchasePrice,
-        monthly_rent: property.monthlyRent, // This is the updated value
-        adr: property.adr, // Average Daily Rate for STR
-        occupancy_rate: property.occupancyRate, // Occupancy rate for STR
-        bedrooms: property.bedrooms,
-        bathrooms: property.bathrooms,
-        square_footage: property.squareFootage,
-        lot_size: property.lotSize,
-        year_built: property.yearBuilt,
-        description: property.description,
-        listing_url: property.listingUrl
+        address: property.address || "",
+        city: property.city || "",
+        state: property.state || "",
+        zip_code: property.zipCode || "00000", // Default zip code if not provided
+        property_type: property.propertyType || "single-family",
+        purchase_price: property.purchasePrice || property.price || 0,
+        monthly_rent: property.monthlyRent || 0, // This is the updated value
+        adr: property.adr || 0, // Average Daily Rate for STR
+        occupancy_rate: property.occupancyRate || 0, // Occupancy rate for STR
+        bedrooms: property.bedrooms || 0,
+        bathrooms: property.bathrooms || 0,
+        square_footage: property.squareFootage || property.sqft || 0,
+        lot_size: property.lotSize || 0,
+        year_built: property.yearBuilt || 0,
+        description: property.description || "",
+        listing_url: property.listingUrl || ""
       }
     };
     fs.writeFileSync(tempDataFile, JSON.stringify(propertyData));
