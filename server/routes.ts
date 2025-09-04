@@ -450,7 +450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tokens = await emailMonitoringService.getTokens(code);
       
       // Store tokens in session (in production, store securely)
-      (req.session as any).gmailTokens = tokens;
+      req.session.gmailTokens = tokens;
       
       // Redirect to deals page
       res.redirect('/deals');
@@ -467,7 +467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/sync-emails", async (req, res) => {
     try {
       // Check if user has Gmail tokens
-      if (!(req.session as any).gmailTokens) {
+      if (!req.session.gmailTokens) {
         res.status(401).json({
           success: false,
           error: "Gmail not connected. Please connect your Gmail account first."
@@ -477,8 +477,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Set credentials for email service
       await emailMonitoringService.setCredentials(
-        (req.session as any).gmailTokens.access_token,
-        (req.session as any).gmailTokens.refresh_token
+        req.session.gmailTokens.access_token,
+        req.session.gmailTokens.refresh_token
       );
 
       // Search for real estate emails
