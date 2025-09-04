@@ -29,20 +29,20 @@ def main():
             # Convert from frontend format to Property object
             from real_estate_data import Property
             property_data = Property(
-                address=property_info["address"],
-                city=property_info["city"],
-                state=property_info["state"],
-                zip_code=property_info["zip_code"],
-                property_type=property_info["property_type"],
-                purchase_price=property_info["purchase_price"],
-                monthly_rent=property_info["monthly_rent"],
-                bedrooms=property_info["bedrooms"],
-                bathrooms=property_info["bathrooms"],
-                square_footage=property_info["square_footage"],
+                address=property_info.get("address", ""),
+                city=property_info.get("city", "Unknown"),
+                state=property_info.get("state", "Unknown"),
+                zip_code=property_info.get("zip_code", "00000"),
+                property_type=property_info.get("property_type", "single-family"),
+                purchase_price=property_info.get("purchase_price", 0),
+                monthly_rent=property_info.get("monthly_rent", 0),
+                bedrooms=property_info.get("bedrooms", 0),
+                bathrooms=property_info.get("bathrooms", 0),
+                square_footage=property_info.get("square_footage", 0),
                 lot_size=property_info.get("lot_size"),
-                year_built=property_info["year_built"],
-                description=property_info["description"],
-                listing_url=property_info["listing_url"]
+                year_built=property_info.get("year_built", 0),
+                description=property_info.get("description", ""),
+                listing_url=property_info.get("listing_url", "")
             )
         else:
             # Handle regular email parsing mode
