@@ -124,7 +124,10 @@ export default function DealsPage() {
         monthlyRent: rent
       };
       
-      const response = await apiRequest('POST', '/api/update-property', { property: updatedProperty });
+      const response = await apiRequest('POST', '/api/update-property', { 
+        property: updatedProperty,
+        dealId: dealId
+      });
       return response.json();
     },
     onSuccess: (data, variables) => {
@@ -411,14 +414,14 @@ export default function DealsPage() {
                               <Button
                                 size="sm"
                                 onClick={() => {
-                                  const price = editValues[deal.id]?.price ?? deal.extractedProperty.price;
-                                  const rent = editValues[deal.id]?.rent ?? deal.extractedProperty.monthlyRent;
+                                  const price = editValues[deal.id]?.price ?? deal.analysis?.property?.purchasePrice ?? deal.extractedProperty?.price;
+                                  const rent = editValues[deal.id]?.rent ?? deal.analysis?.property?.monthlyRent ?? deal.extractedProperty?.monthlyRent;
                                   if (price && rent) {
                                     updatePropertyMutation.mutate({ dealId: deal.id, price, rent });
                                   }
                                 }}
                                 disabled={updatePropertyMutation.isPending || 
-                                  !editValues[deal.id]?.price || !editValues[deal.id]?.rent}
+                                  (!editValues[deal.id]?.price && !editValues[deal.id]?.rent)}
                                 data-testid={`button-save-${deal.id}`}
                               >
                                 <i className="fas fa-save mr-2"></i>
@@ -487,16 +490,28 @@ export default function DealsPage() {
                           <Badge variant={deal.analysis.meetsCriteria ? "default" : "destructive"}>
                             {deal.analysis.meetsCriteria ? 'Meets Criteria' : 'Does Not Meet'}
                           </Badge>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => generateReportMutation.mutate({ analysisId: deal.analysis!.id })}
-                            disabled={generateReportMutation.isPending}
-                            data-testid={`button-report-${deal.id}`}
-                          >
-                            <i className="fas fa-file-pdf mr-2"></i>
-                            {generateReportMutation.isPending ? 'Generating...' : 'Generate Report'}
-                          </Button>
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => generateReportMutation.mutate({ analysisId: deal.analysis!.id, format: 'pdf' })}
+                              disabled={generateReportMutation.isPending}
+                              data-testid={`button-report-pdf-${deal.id}`}
+                            >
+                              <i className="fas fa-file-pdf mr-2"></i>
+                              {generateReportMutation.isPending ? 'Generating...' : 'PDF Report'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => generateReportMutation.mutate({ analysisId: deal.analysis!.id, format: 'csv' })}
+                              disabled={generateReportMutation.isPending}
+                              data-testid={`button-report-csv-${deal.id}`}
+                            >
+                              <i className="fas fa-table mr-2"></i>
+                              {generateReportMutation.isPending ? 'Generating...' : 'CSV Report'}
+                            </Button>
+                          </div>
                         </div>
                       )}
 

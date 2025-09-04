@@ -206,6 +206,7 @@ export const emailDealSchema = z.object({
     city: z.string().optional(),
     state: z.string().optional(),
     price: z.number().optional(),
+    monthlyRent: z.number().optional(),
     bedrooms: z.number().optional(),
     bathrooms: z.number().optional(),
     sqft: z.number().optional(),

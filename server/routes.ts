@@ -45,9 +45,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update property data and re-analyze
   app.post("/api/update-property", async (req, res) => {
     try {
-      const { property } = req.body;
+      const { property, dealId } = req.body;
       
-      if (!property || property.monthlyRent < 0 || (property.adr && property.adr < 0)) {
+      if (!property || (property.monthlyRent && property.monthlyRent < 0) || (property.adr && property.adr < 0)) {
         res.status(400).json({
           success: false,
           error: "Invalid property data"
@@ -98,6 +98,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Create new analysis if no address
         storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
+      }
+
+      // If dealId is provided, update the email deal with the new analysis
+      if (dealId) {
+        const emailDeal = await storage.getEmailDeal(dealId);
+        if (emailDeal) {
+          await storage.updateEmailDeal(dealId, {
+            analysis: storedAnalysis,
+            status: 'analyzed'
+          });
+        }
       }
 
       const response: AnalyzePropertyResponse = {
