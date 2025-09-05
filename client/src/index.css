@@ -55,11 +55,11 @@
 .dark {
   /* Vibrant Dark Earth Tones */
   --background: linear-gradient(135deg, hsl(20, 30%, 6%) 0%, hsl(15, 25%, 8%) 100%);
-  --foreground: hsl(45, 40%, 88%);  /* Warm cream text */
+  --foreground: hsl(35, 50%, 75%);  /* Warm golden brown text */
   --card: linear-gradient(145deg, hsl(20, 35%, 10%) 0%, hsl(25, 30%, 12%) 100%);
-  --card-foreground: hsl(45, 40%, 88%);
+  --card-foreground: hsl(35, 50%, 75%);
   --popover: hsl(20, 35%, 10%);
-  --popover-foreground: hsl(45, 40%, 88%);
+  --popover-foreground: hsl(35, 50%, 75%);
   --primary: hsl(110, 50%, 45%);    /* Bright forest green */
   --primary-foreground: hsl(20, 35%, 8%);
   --secondary: hsl(45, 70%, 55%);   /* Bright golden yellow */
@@ -69,7 +69,7 @@
   --accent: hsl(25, 75%, 60%);      /* Bright burnt orange */
   --accent-foreground: hsl(20, 35%, 8%);
   --destructive: hsl(10, 70%, 60%); /* Bright tomato */
-  --destructive-foreground: hsl(45, 40%, 88%);
+  --destructive-foreground: hsl(50, 70%, 96%);
   --border: hsl(25, 25%, 25%);      /* Warm brown border */
   --input: hsl(25, 25%, 18%);       /* Rich brown input */
   --ring: hsl(110, 50%, 45%);       /* Bright green focus */
