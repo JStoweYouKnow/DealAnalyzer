@@ -268,17 +268,18 @@ export class EmailMonitoringService {
 
     // Square footage extraction
     const sqftPatterns = [
-      /(\d{1,5})\s*(?:sq\.?\s*ft|square\s*feet|sqft)/gi,
-      /square feet[:\s]*(\d{1,5})/gi,
-      /(\d{1,5})\s*sq\.\s*ft/gi,
-      /size[:\s]*(\d{1,5})\s*sq/gi,
+      /([\d,]+)\s*sqft/gi,
+      /([\d,]+)\s*sq\.?\s*ft/gi,  
+      /([\d,]+)\s*square\s*feet/gi,
+      /square feet[:\s]*([\d,]+)/gi,
+      /size[:\s]*([\d,]+)/gi,
     ];
     
     let sqft: number | undefined;
     for (const pattern of sqftPatterns) {
       const matches = Array.from(combined.matchAll(pattern));
       if (matches.length > 0) {
-        const sqftValue = parseInt(matches[0][1]);
+        const sqftValue = parseInt(matches[0][1].replace(/,/g, ''));
         if (sqftValue > 100 && sqftValue < 50000) { // Reasonable sqft range
           sqft = sqftValue;
           break;
