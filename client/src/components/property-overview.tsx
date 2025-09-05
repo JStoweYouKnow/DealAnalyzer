@@ -442,26 +442,32 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
                 </div>
               </div>
               
-              {isEditingStr && (
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Occupancy Rate:</span>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      type="number"
-                      value={editableOccupancyRate}
-                      onChange={(e) => setEditableOccupancyRate(Number(e.target.value))}
-                      onBlur={handleStrUpdate}
-                      onKeyDown={(e) => e.key === 'Enter' && handleStrUpdate()}
-                      className="w-16 h-6 text-right text-sm"
-                      data-testid="input-occupancy"
-                      min="0"
-                      max="100"
-                      placeholder="0"
-                    />
-                    <span className="text-xs text-muted-foreground">%</span>
-                  </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Occupancy Rate:</span>
+                <div className="flex items-center space-x-2">
+                  {isEditingStr ? (
+                    <div className="flex items-center space-x-1">
+                      <Input
+                        type="number"
+                        value={editableOccupancyRate}
+                        onChange={(e) => setEditableOccupancyRate(Number(e.target.value))}
+                        onBlur={handleStrUpdate}
+                        onKeyDown={(e) => e.key === 'Enter' && handleStrUpdate()}
+                        className="w-16 h-6 text-right text-sm"
+                        data-testid="input-occupancy"
+                        min="0"
+                        max="100"
+                        placeholder="0"
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                  ) : (
+                    <span className="font-medium" data-testid="text-occupancy-rate">
+                      {editableOccupancyRate > 0 ? `${editableOccupancyRate}%` : 'Not specified'}
+                    </span>
+                  )}
                 </div>
-              )}
+              </div>
               {property.lotSize && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Lot Size:</span>
