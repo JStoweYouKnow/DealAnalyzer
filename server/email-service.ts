@@ -459,7 +459,7 @@ export class EmailMonitoringService {
         // Score links and images in parallel
         const [linkScores, imgScores] = await Promise.all([
           limitedSourceLinks.length > 0 ? aiQualityScoringService.scoreLinks(limitedSourceLinks) : Promise.resolve([]),
-          imageUrls.length > 0 ? aiQualityScoringService.scoreImages(imageUrls.slice(0, 2), propertyContext) : Promise.resolve([])
+          imageUrls.length > 0 ? aiQualityScoringService.scoreImages(imageUrls.slice(0, 1), propertyContext) : Promise.resolve([])
         ]);
 
         // Add AI scores to source links
@@ -471,7 +471,7 @@ export class EmailMonitoringService {
         }));
 
         // Create image scores array
-        imageScores = imageUrls.slice(0, 2).map((url, index) => ({
+        imageScores = imageUrls.slice(0, 1).map((url, index) => ({
           url,
           aiScore: imgScores[index]?.score,
           aiCategory: imgScores[index]?.category,
@@ -496,7 +496,7 @@ export class EmailMonitoringService {
       bedrooms,
       bathrooms,
       sqft,
-      imageUrls: imageUrls.length > 0 ? imageUrls.slice(0, 2) : undefined, // Limit to 2 images
+      imageUrls: imageUrls.length > 0 ? imageUrls.slice(0, 1) : undefined, // Limit to 1 image
       sourceLinks: scoredSourceLinks.length > 0 ? scoredSourceLinks : undefined,
       imageScores: imageScores.length > 0 ? imageScores : undefined,
     };

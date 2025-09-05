@@ -29,7 +29,7 @@ export class AIQualityScoringService {
     
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4", // the newest OpenAI model is "gpt-4" which was released August 7, 2025. do not change this unless explicitly requested by the user
+        model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released August 7, 2025. do not change this unless explicitly requested by the user
         messages: [
           {
             role: "system",
@@ -93,7 +93,7 @@ Provide quality scores focusing on property investment value.`
 
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4", // the newest OpenAI model is "gpt-4" which was released August 7, 2025. do not change this unless explicitly requested by the user
+        model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released August 7, 2025. do not change this unless explicitly requested by the user
         messages: [
           {
             role: "system",
