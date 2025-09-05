@@ -21,6 +21,30 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   const [isEditingBeds, setIsEditingBeds] = useState(false);
   const { toast } = useToast();
 
+  // Fetch rental comps mutation
+  const fetchRentalCompsMutation = useMutation({
+    mutationFn: async (property: { address: string; bedrooms: number; bathrooms: number; squareFootage?: number }) => {
+      const response = await apiRequest('POST', '/api/rental-comps', property);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setEditableRent(data.data.averageRent);
+        toast({
+          title: "Rental Comps Found",
+          description: `Average rent: ${formatCurrency(data.data.averageRent)} (${data.data.properties.length} comps, ${data.data.confidence} confidence)`,
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Rental Comps Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   // Mutation for updating rent and re-analyzing
   const updateRentMutation = useMutation({
     mutationFn: async (newRent: number) => {
@@ -173,15 +197,41 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
                 <span className="text-muted-foreground">Monthly Rent:</span>
                 <div className="flex items-center space-x-2">
                   {isEditingRent ? (
-                    <Input
-                      type="number"
-                      value={editableRent}
-                      onChange={(e) => setEditableRent(Number(e.target.value))}
-                      onBlur={handleRentUpdate}
-                      onKeyDown={(e) => e.key === 'Enter' && handleRentUpdate()}
-                      className="w-24 h-6 text-right text-sm"
-                      data-testid="input-monthly-rent"
-                    />
+                    <div className="space-y-2">
+                      <Input
+                        type="number"
+                        value={editableRent}
+                        onChange={(e) => setEditableRent(Number(e.target.value))}
+                        onBlur={handleRentUpdate}
+                        onKeyDown={(e) => e.key === 'Enter' && handleRentUpdate()}
+                        className="w-24 h-6 text-right text-sm"
+                        data-testid="input-monthly-rent"
+                      />
+                      <button
+                        onClick={() => {
+                          if (property.address && editableBedrooms && editableBathrooms) {
+                            fetchRentalCompsMutation.mutate({
+                              address: property.address,
+                              bedrooms: editableBedrooms,
+                              bathrooms: editableBathrooms,
+                              squareFootage: property.squareFootage
+                            });
+                          } else {
+                            toast({
+                              title: "Missing Information",
+                              description: "Need address, bedrooms, and bathrooms to fetch rental comps",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        disabled={fetchRentalCompsMutation.isPending}
+                        className="text-xs px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded border border-blue-200 hover:border-blue-300 transition-colors"
+                        data-testid="button-rental-comps"
+                      >
+                        <i className="fas fa-search mr-1"></i>
+                        {fetchRentalCompsMutation.isPending ? 'Searching...' : 'Get Rental Comps'}
+                      </button>
+                    </div>
                   ) : (
                     <span 
                       className="font-medium text-green-600 cursor-pointer hover:bg-green-50 px-1 rounded" 
