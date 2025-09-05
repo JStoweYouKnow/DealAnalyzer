@@ -494,8 +494,8 @@ export default function DealsPage() {
                           {deal.extractedProperty?.imageUrls && deal.extractedProperty.imageUrls.length > 0 && (
                             <div className="mt-4">
                               <span className="text-sm text-muted-foreground">Property Images:</span>
-                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2">
-                                {deal.extractedProperty.imageUrls.slice(0, 8).map((imageUrl, index) => (
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                                {deal.extractedProperty.imageUrls.slice(0, 3).map((imageUrl, index) => (
                                   <div key={index} className="relative aspect-square">
                                     <img
                                       src={imageUrl}
@@ -510,9 +510,9 @@ export default function DealsPage() {
                                   </div>
                                 ))}
                               </div>
-                              {deal.extractedProperty.imageUrls.length > 8 && (
+                              {deal.extractedProperty.imageUrls.length > 3 && (
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  +{deal.extractedProperty.imageUrls.length - 8} more images
+                                  +{deal.extractedProperty.imageUrls.length - 3} more images
                                 </p>
                               )}
                             </div>
@@ -523,7 +523,7 @@ export default function DealsPage() {
                             <div className="mt-4">
                               <span className="text-sm text-muted-foreground">Source Links:</span>
                               <div className="space-y-1 mt-2">
-                                {deal.extractedProperty.sourceLinks.slice(0, 5).map((link, index) => (
+                                {deal.extractedProperty.sourceLinks.slice(0, 2).map((link, index) => (
                                   <div key={index} className="flex items-center space-x-2">
                                     <div className="flex-shrink-0 w-4">
                                       {link.type === 'listing' && <span className="text-blue-500">🏠</span>}
@@ -543,9 +543,9 @@ export default function DealsPage() {
                                     </a>
                                   </div>
                                 ))}
-                                {deal.extractedProperty.sourceLinks.length > 5 && (
+                                {deal.extractedProperty.sourceLinks.length > 2 && (
                                   <p className="text-xs text-muted-foreground">
-                                    +{deal.extractedProperty.sourceLinks.length - 5} more links
+                                    +{deal.extractedProperty.sourceLinks.length - 2} more links
                                   </p>
                                 )}
                               </div>
