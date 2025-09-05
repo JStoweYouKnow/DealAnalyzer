@@ -100,15 +100,16 @@ def parse_pdf_content(text_content: str) -> Property:
     ]
     
     bedroom_patterns = [
-        r'(?:Bedrooms?|Beds?)[:=]?\s*(\d+)',
-        r'(\d+)\s*(?:bed|bedroom|br)s?',
-        r'(\d+)\s*BR',
+        r'(?:Bedrooms?|Beds?)[:=]?\s*([1-9]\d?)',  # Must be 1-99, not start with 0
+        r'(?<!\d)([1-9]\d?)\s*(?:bed|bedroom|br)s?(?!\d)',  # 1-99, not part of larger number
+        r'(?<!\d)([1-9]\d?)\s*BR(?!\d)',  # 1-99, not part of larger number
+        r'(\d+)\s*(?:bed|bedroom)s?\s*(?:room)?(?!\d)',  # More specific context
     ]
     
     bathroom_patterns = [
-        r'(?:Bathrooms?|Baths?)[:=]?\s*([\d.]+)',
-        r'([\d.]+)\s*(?:bath|bathroom|ba)s?',
-        r'([\d.]+)\s*BA',
+        r'(?:Bathrooms?|Baths?)[:=]?\s*([0-9]+\.?[0-9]*)',  # More specific decimal pattern
+        r'(?<!\d)([0-9]+\.?[0-9]*)\s*(?:bath|bathroom|ba)s?(?!\d)',  # Not part of larger number
+        r'(?<!\d)([0-9]+\.?[0-9]*)\s*BA(?!\d)',  # Not part of larger number
     ]
     
     sqft_patterns = [
@@ -177,6 +178,12 @@ def parse_pdf_content(text_content: str) -> Property:
     
     bedrooms = extract_number(bedroom_patterns, text_content, 0)
     bathrooms = extract_number(bathroom_patterns, text_content, 0.0, is_float=True)
+    
+    # Validate bedroom and bathroom counts to avoid ZIP codes being parsed as bedrooms
+    if bedrooms > 20 or bedrooms < 0:  # Reasonable bedroom range: 0-20
+        bedrooms = 0  # Reset to 0 if unrealistic
+    if bathrooms > 20 or bathrooms < 0:  # Reasonable bathroom range: 0-20
+        bathrooms = 0.0  # Reset to 0 if unrealistic
     
     # Square footage with header fallback
     square_footage = extract_number(sqft_patterns, text_content, 0)
