@@ -228,6 +228,25 @@ export class EmailMonitoringService {
       }
     }
 
+    // Bedrooms extraction
+    const bedroomPatterns = [
+      /(\d+)\s*(?:bed|bedroom|bd|br)(?:room)?s?/gi,
+      /bedrooms?[:\s]*(\d+)/gi,
+      /(\d+)\s*bed/gi,
+    ];
+    
+    let bedrooms: number | undefined;
+    for (const pattern of bedroomPatterns) {
+      const matches = Array.from(combined.matchAll(pattern));
+      if (matches.length > 0) {
+        const bedroomCount = parseInt(matches[0][1]);
+        if (bedroomCount > 0 && bedroomCount <= 20) { // Reasonable bedroom range
+          bedrooms = bedroomCount;
+          break;
+        }
+      }
+    }
+
     // Bathrooms extraction  
     const bathroomPatterns = [
       /(\d+(?:\.\d+)?)\s*(?:bath|bathroom|ba)(?:room)?s?/gi,
