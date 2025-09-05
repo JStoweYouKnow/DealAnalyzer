@@ -123,20 +123,18 @@ export default function Home() {
     <div className="min-h-screen bg-background text-foreground">
       {/* Top Navigation */}
       <header 
-        className="border-b border-border sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/60 relative"
+        className="border-b border-border sticky top-0 z-50 relative"
         style={{
-          backgroundImage: `url(${comfortFinderLogo})`,
-          backgroundSize: 'auto 80%',
-          backgroundPosition: 'left center',
-          backgroundRepeat: 'no-repeat',
-          backgroundBlendMode: 'soft-light',
+          backgroundImage: `linear-gradient(rgba(255, 248, 231, 0.85), rgba(255, 248, 231, 0.85)), url(${comfortFinderLogo})`,
+          backgroundSize: 'auto 70%, cover',
+          backgroundPosition: '20px center, center',
+          backgroundRepeat: 'no-repeat, no-repeat',
         }}
       >
-        <div className="absolute inset-0 bg-card/70 backdrop-blur-sm"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-2 ml-12">
-              <h1 className="text-xl font-bold gradient-text drop-shadow-sm">The Comfort Finder</h1>
+            <div className="flex items-center space-x-2 ml-16">
+              <h1 className="text-xl font-bold gradient-text">The Comfort Finder</h1>
             </div>
             
             <nav className="flex items-center space-x-6">
