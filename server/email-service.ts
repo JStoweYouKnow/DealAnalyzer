@@ -320,92 +320,123 @@ export class EmailMonitoringService {
       }
     }
 
-    // Image URL extraction
+    // Image URL extraction - more selective to avoid tracking pixels and unwanted images
     const imagePatterns = [
-      /https?:\/\/[^\s]*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s]*)?/gi,
-      /https?:\/\/[^\s]*images?[^\s]*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s]*)?/gi,
-      /https?:\/\/[^\s]*photo[^\s]*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s]*)?/gi,
-      /https?:\/\/[^\s]*image[^\s]*/gi,
-      /src=["']([^"']*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^"']*)?)['"]/gi,
+      // Only high-quality property images, not tracking pixels or small images
+      /https?:\/\/[^\s]*\.(?:jpg|jpeg|png|webp)(?:\?[^\s]*)?/gi,
     ];
 
     const imageUrls: string[] = [];
+    const unwantedImageKeywords = [
+      'pixel', 'track', '1x1', 'beacon', 'analytics', 'utm_', 'click', 
+      'logo', 'banner', 'header', 'footer', 'icon', 'button', 'email',
+      'signature', 'social', 'facebook', 'twitter', 'instagram', 'linkedin',
+      '16x16', '32x32', '64x64', '100x100', 'tiny', 'small'
+    ];
+
     for (const pattern of imagePatterns) {
       const matches = Array.from(combined.matchAll(pattern));
       for (const match of matches) {
-        const url = match[0] || match[1];
+        const url = match[0];
         if (url && url.startsWith('http') && !imageUrls.includes(url)) {
-          imageUrls.push(url);
+          // Skip unwanted images
+          const urlLower = url.toLowerCase();
+          const isUnwanted = unwantedImageKeywords.some(keyword => urlLower.includes(keyword));
+          
+          // Also skip very small images (likely tracking pixels)
+          const hasSmallDimensions = /\d+x\d+/.test(urlLower) && 
+            (/[12]?\d{1,2}x[12]?\d{1,2}/.test(urlLower) || /\b(?:16|32|64|100)x(?:16|32|64|100)\b/.test(urlLower));
+          
+          if (!isUnwanted && !hasSmallDimensions) {
+            imageUrls.push(url);
+          }
         }
       }
     }
 
-    // Source links extraction
+    // Source links extraction - more precise filtering for actual property listings
     const linkPatterns = [
-      /https?:\/\/[^\s]+/gi,
+      /https?:\/\/[^\s<>"']+/gi,
     ];
 
     const sourceLinks: Array<{url: string, type: 'listing' | 'company' | 'external' | 'other', description?: string}> = [];
     const foundUrls = new Set<string>();
 
-    // Define unwanted keywords to filter out
+    // More comprehensive unwanted keywords
     const unwantedKeywords = [
       'unsubscribe', 'preferences', 'privacy', 'feedback', 'nmlsconsumer',
       'terms', 'policy', 'manage', 'notification', 'email', 'optout', 
       'unsub', 'settings', 'track', 'click', 'pixel', 'analytics',
-      'campaign', 'utm_', 'redirect', 'mail.', 'token=', 'rtoken='
+      'campaign', 'utm_', 'redirect', 'mail.', 'token=', 'rtoken=',
+      'mlsid', 'gclid', 'fbclid', 'source=', 'medium=', 'content=',
+      'trk_', 'cid=', 'sid=', '_ga=', 'ref=', 'from=email'
+    ];
+
+    // Property listing indicators - more specific patterns
+    const listingIndicators = [
+      '/homedetails/', '/property-overview/', '/homes/', '/listing/',
+      '/details/', '/property/', '/home/', '/house/', '/condo/',
+      'mls', 'mlsid', 'listingid', 'propertyid'
     ];
 
     for (const pattern of linkPatterns) {
       const matches = Array.from(combined.matchAll(pattern));
       for (const match of matches) {
-        const url = match[0];
+        let url = match[0];
         if (url && url.startsWith('http') && !foundUrls.has(url)) {
           foundUrls.add(url);
           
+          const urlLower = url.toLowerCase();
+          
           // Skip unwanted links
-          if (unwantedKeywords.some(keyword => url.toLowerCase().includes(keyword))) {
+          if (unwantedKeywords.some(keyword => urlLower.includes(keyword))) {
             continue;
           }
           
-          // Categorize link type
+          // Clean up URL by removing trailing punctuation
+          url = url.replace(/[.,;!?)]+$/, '');
+          
           let linkType: 'listing' | 'company' | 'external' | 'other' = 'other';
           let description: string | undefined;
           
-          if (['zillow', 'realtor', 'redfin', 'mls'].some(domain => url.toLowerCase().includes(domain))) {
-            // Only include if it looks like a property listing, not tracking
-            if (!['click', 'track', 'email', 'campaign'].some(track => url.toLowerCase().includes(track))) {
+          // Check for actual property listing URLs
+          if (['zillow.com', 'redfin.com', 'realtor.com'].some(domain => urlLower.includes(domain))) {
+            // Look for specific listing URL patterns
+            if (listingIndicators.some(indicator => urlLower.includes(indicator))) {
               linkType = 'listing';
               description = 'Property listing';
             } else {
-              continue; // Skip tracking links
+              continue; // Skip non-listing pages from these domains
             }
-          } else if (['trulia', 'homes.com', 'movoto'].some(domain => url.toLowerCase().includes(domain))) {
-            if (!['click', 'track', 'email', 'campaign'].some(track => url.toLowerCase().includes(track))) {
+          } else if (['trulia.com', 'homes.com', 'movoto.com', 'rent.com'].some(domain => urlLower.includes(domain))) {
+            if (listingIndicators.some(indicator => urlLower.includes(indicator))) {
               linkType = 'listing';
               description = 'Property listing';
             } else {
               continue;
             }
-          } else if (['company', 'agent', 'broker', 'realty'].some(keyword => url.toLowerCase().includes(keyword))) {
-            linkType = 'company';
-            description = 'Real estate company';
+          } else if (['mls.com', 'mlslistings.com'].some(domain => urlLower.includes(domain))) {
+            linkType = 'listing';
+            description = 'MLS listing';
           } else {
-            // Only include external links if they seem property-related
-            if (['property', 'home', 'house', 'listing'].some(keyword => url.toLowerCase().includes(keyword))) {
-              linkType = 'external';
-            } else {
-              continue; // Skip other external links
-            }
+            // Skip other domains unless they clearly contain property listings
+            continue;
           }
           
           sourceLinks.push({ url, type: linkType, description });
+          
+          // Only keep the first 2 actual listing links
+          if (sourceLinks.filter(link => link.type === 'listing').length >= 2) {
+            break;
+          }
         }
       }
     }
 
-    // Limit to most relevant links (top 3)
-    const limitedSourceLinks = sourceLinks.slice(0, 3);
+    // Prioritize listing links and limit total
+    const listingLinks = sourceLinks.filter(link => link.type === 'listing');
+    const otherLinks = sourceLinks.filter(link => link.type !== 'listing');
+    const limitedSourceLinks = [...listingLinks.slice(0, 2), ...otherLinks.slice(0, 1)];
 
     const result = {
       address: address || undefined,
@@ -415,7 +446,7 @@ export class EmailMonitoringService {
       bedrooms,
       bathrooms,
       sqft,
-      imageUrls: imageUrls.length > 0 ? imageUrls.slice(0, 3) : undefined,
+      imageUrls: imageUrls.length > 0 ? imageUrls.slice(0, 2) : undefined, // Limit to 2 images
       sourceLinks: limitedSourceLinks.length > 0 ? limitedSourceLinks : undefined,
     };
     
