@@ -15,7 +15,10 @@ interface PropertyOverviewProps {
 export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOverviewProps) {
   const { property } = analysis;
   const [editableRent, setEditableRent] = useState(property.monthlyRent);
-  const [isEditing, setIsEditing] = useState(false);
+  const [editableBedrooms, setEditableBedrooms] = useState(property.bedrooms);
+  const [editableBathrooms, setEditableBathrooms] = useState(property.bathrooms);
+  const [isEditingRent, setIsEditingRent] = useState(false);
+  const [isEditingBeds, setIsEditingBeds] = useState(false);
   const { toast } = useToast();
 
   // Mutation for updating rent and re-analyzing
@@ -30,7 +33,7 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     onSuccess: (data) => {
       if (data.success && data.data && onAnalysisUpdate) {
         onAnalysisUpdate(data.data);
-        setIsEditing(false);
+        setIsEditingRent(false);
         toast({
           title: "Rent Updated",
           description: "Analysis and criteria assessment refreshed with new rent data.",
@@ -52,12 +55,57 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     },
   });
 
+  // Mutation for updating bedrooms/bathrooms and re-analyzing
+  const updateBedsAndBathsMutation = useMutation({
+    mutationFn: async ({ bedrooms, bathrooms }: { bedrooms: number; bathrooms: number }) => {
+      const updatedProperty = { ...property, bedrooms, bathrooms };
+      const response = await apiRequest("POST", "/api/update-property", {
+        property: updatedProperty,
+      });
+      return response.json() as Promise<AnalyzePropertyResponse>;
+    },
+    onSuccess: (data) => {
+      if (data.success && data.data && onAnalysisUpdate) {
+        onAnalysisUpdate(data.data);
+        setIsEditingBeds(false);
+        toast({
+          title: "Beds/Baths Updated",
+          description: "Analysis and criteria assessment refreshed with new bedroom/bathroom data.",
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: data.error || "Failed to update beds/baths",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleRentUpdate = async () => {
     if (editableRent !== property.monthlyRent && editableRent >= 0) {
       updateRentMutation.mutate(editableRent);
     } else {
-      setIsEditing(false);
+      setIsEditingRent(false);
       setEditableRent(property.monthlyRent); // Reset to original value
+    }
+  };
+
+  const handleBedsAndBathsUpdate = async () => {
+    if ((editableBedrooms !== property.bedrooms || editableBathrooms !== property.bathrooms) && 
+        editableBedrooms >= 0 && editableBathrooms >= 0) {
+      updateBedsAndBathsMutation.mutate({ bedrooms: editableBedrooms, bathrooms: editableBathrooms });
+    } else {
+      setIsEditingBeds(false);
+      setEditableBedrooms(property.bedrooms); // Reset to original values
+      setEditableBathrooms(property.bathrooms);
     }
   };
 
@@ -124,7 +172,7 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Monthly Rent:</span>
                 <div className="flex items-center space-x-2">
-                  {isEditing ? (
+                  {isEditingRent ? (
                     <Input
                       type="number"
                       value={editableRent}
@@ -138,29 +186,72 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
                     <span 
                       className="font-medium text-green-600 cursor-pointer hover:bg-green-50 px-1 rounded" 
                       data-testid="text-monthly-rent"
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => setIsEditingRent(true)}
                       title="Click to edit monthly rent"
                     >
                       {formatCurrency(editableRent)}
                     </span>
                   )}
                   <button
-                    onClick={() => setIsEditing(!isEditing)}
+                    onClick={() => setIsEditingRent(!isEditingRent)}
                     className="text-xs text-muted-foreground hover:text-primary"
-                    title={isEditing ? "Cancel" : "Edit rent"}
+                    title={isEditingRent ? "Cancel" : "Edit rent"}
                   >
-                    <i className={`fas ${isEditing ? 'fa-times' : 'fa-edit'}`}></i>
+                    <i className={`fas ${isEditingRent ? 'fa-times' : 'fa-edit'}`}></i>
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Beds/Baths:</span>
+                <div className="flex items-center space-x-2">
+                  {isEditingBeds ? (
+                    <div className="flex items-center space-x-1">
+                      <Input
+                        type="number"
+                        value={editableBedrooms}
+                        onChange={(e) => setEditableBedrooms(Number(e.target.value))}
+                        onBlur={handleBedsAndBathsUpdate}
+                        onKeyDown={(e) => e.key === 'Enter' && handleBedsAndBathsUpdate()}
+                        className="w-16 h-6 text-right text-sm"
+                        data-testid="input-bedrooms"
+                        min="0"
+                        max="20"
+                      />
+                      <span className="text-xs text-muted-foreground">/</span>
+                      <Input
+                        type="number"
+                        value={editableBathrooms}
+                        onChange={(e) => setEditableBathrooms(Number(e.target.value))}
+                        onBlur={handleBedsAndBathsUpdate}
+                        onKeyDown={(e) => e.key === 'Enter' && handleBedsAndBathsUpdate()}
+                        className="w-16 h-6 text-right text-sm"
+                        data-testid="input-bathrooms"
+                        min="0"
+                        max="20"
+                        step="0.5"
+                      />
+                    </div>
+                  ) : (
+                    <span 
+                      className="font-medium cursor-pointer hover:bg-blue-50 px-1 rounded" 
+                      data-testid="text-beds-baths"
+                      onClick={() => setIsEditingBeds(true)}
+                      title="Click to edit beds/baths"
+                    >
+                      {editableBedrooms}/{editableBathrooms}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setIsEditingBeds(!isEditingBeds)}
+                    className="text-xs text-muted-foreground hover:text-primary"
+                    title={isEditingBeds ? "Cancel" : "Edit beds/baths"}
+                  >
+                    <i className={`fas ${isEditingBeds ? 'fa-times' : 'fa-edit'}`}></i>
                   </button>
                 </div>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Beds/Baths:</span>
-                <span className="font-medium" data-testid="text-beds-baths">
-                  {property.bedrooms}/{property.bathrooms}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Square Feet:</span>
+                <span className="text-muted-foreground">Total Square Feet:</span>
                 <span className="font-medium" data-testid="text-square-footage">
                   {property.squareFootage.toLocaleString()}
                 </span>
@@ -173,12 +264,6 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
                   </span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Year Built:</span>
-                <span className="font-medium" data-testid="text-year-built">
-                  {property.yearBuilt}
-                </span>
-              </div>
             </div>
           </div>
 
