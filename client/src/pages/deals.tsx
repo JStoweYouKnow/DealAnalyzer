@@ -305,18 +305,18 @@ export default function DealsPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Top Navigation */}
-      <header 
-        className="border-b border-border sticky top-0 z-50 relative"
-        style={{
-          backgroundImage: `linear-gradient(rgba(255, 248, 231, 0.95), rgba(255, 248, 231, 0.95)), url(${comfortFinderLogo})`,
-          backgroundSize: 'auto 25%, cover',
-          backgroundPosition: '10px center, center',
-          backgroundRepeat: 'no-repeat, no-repeat',
-        }}
-      >
+      <header className="bg-card border-b border-border sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/90">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-2 ml-8">
+            <div className="flex items-center space-x-2">
+              <img 
+                src={comfortFinderLogo} 
+                alt="The Comfort Finder Logo" 
+                className="w-8 h-8 object-contain"
+              />
+            </div>
+
+            <div className="absolute left-1/2 transform -translate-x-1/2">
               <h1 className="text-xl font-bold gradient-text">The Comfort Finder</h1>
             </div>
             
