@@ -269,7 +269,7 @@ export class EmailMonitoringService {
     // Square footage extraction
     const sqftPatterns = [
       /([\d,]+)\s*sqft/gi,
-      /([\d,]+)\s*sq\.?\s*ft/gi,  
+      /([\d,]+)\s*sq\.?\s*ft\.?\b/gi,  
       /([\d,]+)\s*square\s*feet/gi,
       /square feet[:\s]*([\d,]+)/gi,
       /size[:\s]*([\d,]+)/gi,

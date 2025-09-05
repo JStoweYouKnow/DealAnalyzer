@@ -679,7 +679,7 @@ async function runPythonPropertyUpdate(
         occupancy_rate: property.occupancyRate || 0, // Occupancy rate for STR
         bedrooms: property.bedrooms || 0,
         bathrooms: property.bathrooms || 0,
-        square_footage: property.squareFootage || property.sqft || 0,
+        square_footage: property.sqft || property.squareFootage || 0,
         lot_size: property.lotSize || 0,
         year_built: property.yearBuilt || 0,
         description: property.description || "",
