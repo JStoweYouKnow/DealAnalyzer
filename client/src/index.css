@@ -6,40 +6,40 @@
 @tailwind utilities;
 
 :root {
-  /* Custom Color Palette - Matching Logo */
-  --color-primary: #1a1a1a;       /* Deep Black (logo text) */
-  --color-secondary: #f5f1e8;     /* Cream/Beige (logo background) */
-  --color-neutral-dark: #1a1a1a;  /* Deep Black */
-  --color-neutral-light: #f8f6f0; /* Light Cream */
-  --color-accent: #2d2d2d;        /* Charcoal Grey */
-  --color-success: #4a5c3a;       /* Muted Green */
-  --color-alert: #8b4513;         /* Warm Brown */
+  /* Earth Tone Color Palette - Natural & Warm */
+  --color-primary: #2d5a27;       /* Deep Forest Green */
+  --color-secondary: #d2b48c;     /* Tan */
+  --color-neutral-dark: #3c2414;  /* Dark Brown */
+  --color-neutral-light: #f5f1e8; /* Light Cream */
+  --color-accent: #8b4513;        /* Red-Brown */
+  --color-success: #228b22;       /* Forest Green */
+  --color-alert: #a0522d;         /* Sienna Brown */
 
-  /* Shadcn Theme Variables - Logo Inspired */
-  --background: hsl(45, 25%, 96%);
-  --foreground: hsl(0, 0%, 10%);
-  --card: hsl(45, 30%, 98%);
-  --card-foreground: hsl(0, 0%, 10%);
-  --popover: hsl(45, 30%, 98%);
-  --popover-foreground: hsl(0, 0%, 10%);
-  --primary: hsl(0, 0%, 10%);
-  --primary-foreground: hsl(45, 30%, 98%);
-  --secondary: hsl(45, 25%, 92%);
-  --secondary-foreground: hsl(0, 0%, 15%);
-  --muted: hsl(45, 20%, 94%);
-  --muted-foreground: hsl(0, 0%, 40%);
-  --accent: hsl(0, 0%, 18%);
-  --accent-foreground: hsl(45, 30%, 98%);
-  --destructive: hsl(25, 50%, 45%);
-  --destructive-foreground: hsl(45, 30%, 98%);
-  --border: hsl(45, 20%, 90%);
-  --input: hsl(45, 20%, 90%);
-  --ring: hsl(0, 0%, 10%);
-  --chart-1: hsl(12, 47%, 56%);
-  --chart-2: hsl(103, 20%, 56%);
-  --chart-3: hsl(206, 31%, 21%);
-  --chart-4: hsl(43, 37%, 65%);
-  --chart-5: hsl(100, 16%, 47%);
+  /* Shadcn Theme Variables - Earth Tone Inspired */
+  --background: hsl(35, 30%, 95%); /* Warm cream background */
+  --foreground: hsl(25, 40%, 15%); /* Rich brown text */
+  --card: hsl(40, 35%, 97%);       /* Light warm card */
+  --card-foreground: hsl(25, 40%, 15%);
+  --popover: hsl(40, 35%, 97%);
+  --popover-foreground: hsl(25, 40%, 15%);
+  --primary: hsl(100, 35%, 30%);   /* Forest green primary */
+  --primary-foreground: hsl(40, 35%, 97%);
+  --secondary: hsl(30, 35%, 75%);  /* Warm tan secondary */
+  --secondary-foreground: hsl(25, 40%, 15%);
+  --muted: hsl(35, 25%, 88%);      /* Light tan muted */
+  --muted-foreground: hsl(25, 25%, 45%);
+  --accent: hsl(15, 55%, 45%);     /* Terracotta accent */
+  --accent-foreground: hsl(40, 35%, 97%);
+  --destructive: hsl(5, 65%, 50%); /* Red-brown destructive */
+  --destructive-foreground: hsl(40, 35%, 97%);
+  --border: hsl(35, 20%, 85%);     /* Soft tan border */
+  --input: hsl(35, 25%, 90%);      /* Light tan input */
+  --ring: hsl(100, 35%, 30%);      /* Forest green focus ring */
+  --chart-1: hsl(100, 35%, 45%);   /* Forest green */
+  --chart-2: hsl(30, 45%, 65%);    /* Warm tan */
+  --chart-3: hsl(15, 55%, 45%);    /* Terracotta */
+  --chart-4: hsl(5, 55%, 50%);     /* Red-brown */
+  --chart-5: hsl(80, 30%, 50%);    /* Olive green */
   --font-sans: "Inter", system-ui, sans-serif;
   --font-heading: "Poppins", "Inter", system-ui, sans-serif;
   --font-accent: "Playfair Display", Georgia, serif;
@@ -49,25 +49,26 @@
 }
 
 .dark {
-  --background: hsl(0, 0%, 12%);
-  --foreground: hsl(45, 25%, 95%);
-  --card: hsl(0, 0%, 15%);
-  --card-foreground: hsl(45, 25%, 95%);
-  --popover: hsl(0, 0%, 15%);
-  --popover-foreground: hsl(45, 25%, 95%);
-  --primary: hsl(45, 25%, 95%);
-  --primary-foreground: hsl(0, 0%, 10%);
-  --secondary: hsl(0, 0%, 20%);
-  --secondary-foreground: hsl(45, 25%, 95%);
-  --muted: hsl(0, 0%, 18%);
-  --muted-foreground: hsl(45, 10%, 60%);
-  --accent: hsl(45, 20%, 85%);
-  --accent-foreground: hsl(0, 0%, 10%);
-  --destructive: hsl(25, 60%, 55%);
-  --destructive-foreground: hsl(45, 25%, 95%);
-  --border: hsl(0, 0%, 22%);
-  --input: hsl(0, 0%, 22%);
-  --ring: hsl(45, 25%, 85%);
+  /* Dark Earth Tones */
+  --background: hsl(25, 15%, 8%);   /* Dark brown background */
+  --foreground: hsl(35, 20%, 90%);  /* Light cream text */
+  --card: hsl(25, 20%, 12%);        /* Dark brown card */
+  --card-foreground: hsl(35, 20%, 90%);
+  --popover: hsl(25, 20%, 12%);
+  --popover-foreground: hsl(35, 20%, 90%);
+  --primary: hsl(100, 25%, 55%);    /* Muted forest green */
+  --primary-foreground: hsl(25, 20%, 8%);
+  --secondary: hsl(30, 20%, 25%);   /* Dark tan */
+  --secondary-foreground: hsl(35, 20%, 90%);
+  --muted: hsl(25, 15%, 18%);       /* Dark muted brown */
+  --muted-foreground: hsl(35, 15%, 60%);
+  --accent: hsl(15, 45%, 55%);      /* Warm terracotta */
+  --accent-foreground: hsl(25, 20%, 8%);
+  --destructive: hsl(5, 55%, 55%);  /* Red-brown */
+  --destructive-foreground: hsl(35, 20%, 90%);
+  --border: hsl(25, 15%, 22%);      /* Dark brown border */
+  --input: hsl(25, 15%, 20%);       /* Dark brown input */
+  --ring: hsl(100, 25%, 55%);       /* Muted green focus */
 }
 
 @layer base {
@@ -150,14 +151,14 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   }
 
-  /* Enhanced Card Styles with Texture */
+  /* Enhanced Card Styles with Earth Tone Texture */
   .analysis-card {
-    background: linear-gradient(145deg, hsl(45, 30%, 98%), hsl(45, 25%, 96%));
-    border: 1px solid hsl(45, 20%, 88%);
+    background: linear-gradient(145deg, hsl(35, 25%, 96%), hsl(30, 20%, 93%));
+    border: 1px solid hsl(30, 25%, 82%);
     box-shadow: 
-      0 4px 6px -1px rgba(0, 0, 0, 0.05),
-      0 2px 4px -1px rgba(0, 0, 0, 0.03),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      0 4px 6px -1px rgba(139, 69, 19, 0.08),
+      0 2px 4px -1px rgba(45, 90, 39, 0.05),
+      inset 0 1px 0 rgba(255, 248, 240, 0.3);
     backdrop-filter: blur(8px);
     position: relative;
   }
@@ -170,8 +171,8 @@
     right: 0;
     bottom: 0;
     background: 
-      radial-gradient(circle at 25% 25%, rgba(0, 0, 0, 0.02) 0%, transparent 50%),
-      radial-gradient(circle at 75% 75%, rgba(0, 0, 0, 0.01) 0%, transparent 50%);
+      radial-gradient(circle at 25% 25%, rgba(45, 90, 39, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, rgba(139, 69, 19, 0.02) 0%, transparent 50%);
     border-radius: inherit;
     pointer-events: none;
   }
