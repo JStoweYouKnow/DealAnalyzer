@@ -204,36 +204,68 @@ export class EmailMonitoringService {
 
     // Price extraction (enhanced)
     const pricePatterns = [
-      /\$[\d,]+/g,
-      /price[:\s]*\$?[\d,]+/gi,
-      /listed at[:\s]*\$?[\d,]+/gi,
-      /asking[:\s]*\$?[\d,]+/gi,
+      /\$\s*([\d,]+)/g,
+      /price[:\s]*\$?([\d,]+)/gi,
+      /listed at[:\s]*\$?([\d,]+)/gi,
+      /asking[:\s]*\$?([\d,]+)/gi,
+      /purchase price[:\s]*\$?([\d,]+)/gi,
+      /list price[:\s]*\$?([\d,]+)/gi,
     ];
     
     let price = 0;
     for (const pattern of pricePatterns) {
-      const matches = combined.match(pattern);
-      if (matches) {
-        const priceStr = matches[0].replace(/[^\d]/g, '');
-        const parsedPrice = parseInt(priceStr);
-        if (parsedPrice > 10000) { // Reasonable house price minimum
-          price = parsedPrice;
+      const matches = Array.from(combined.matchAll(pattern));
+      if (matches.length > 0) {
+        for (const match of matches) {
+          const priceStr = (match[1] || match[0]).replace(/[^\d]/g, '');
+          const parsedPrice = parseInt(priceStr);
+          if (parsedPrice > 10000) { // Reasonable house price minimum
+            price = parsedPrice;
+            break;
+          }
+        }
+        if (price > 0) break;
+      }
+    }
+
+    // Bathrooms extraction  
+    const bathroomPatterns = [
+      /(\d+(?:\.\d+)?)\s*(?:bath|bathroom|ba)(?:room)?s?/gi,
+      /bathrooms?[:\s]*(\d+(?:\.\d+)?)/gi,
+      /(\d+(?:\.\d+)?)\s*ba\b/gi,
+    ];
+    
+    let bathrooms: number | undefined;
+    for (const pattern of bathroomPatterns) {
+      const matches = Array.from(combined.matchAll(pattern));
+      if (matches.length > 0) {
+        const bathroomCount = parseFloat(matches[0][1]);
+        if (bathroomCount > 0 && bathroomCount <= 20) { // Reasonable bathroom range
+          bathrooms = bathroomCount;
           break;
         }
       }
     }
 
-    // Bedrooms extraction
-    const bedroomMatch = combined.match(/(\d+)\s*(?:bed|bedroom|br)/i);
-    const bedrooms = bedroomMatch ? parseInt(bedroomMatch[1]) : undefined;
-
-    // Bathrooms extraction
-    const bathroomMatch = combined.match(/(\d+(?:\.\d+)?)\s*(?:bath|bathroom|ba)/i);
-    const bathrooms = bathroomMatch ? parseFloat(bathroomMatch[1]) : undefined;
-
     // Square footage extraction
-    const sqftMatch = combined.match(/(\d{1,5})\s*(?:sq\.?\s*ft|square\s*feet|sqft)/i);
-    const sqft = sqftMatch ? parseInt(sqftMatch[1]) : undefined;
+    const sqftPatterns = [
+      /(\d{1,5})\s*(?:sq\.?\s*ft|square\s*feet|sqft)/gi,
+      /square feet[:\s]*(\d{1,5})/gi,
+      /(\d{1,5})\s*sq\.\s*ft/gi,
+      /size[:\s]*(\d{1,5})\s*sq/gi,
+    ];
+    
+    let sqft: number | undefined;
+    for (const pattern of sqftPatterns) {
+      const matches = Array.from(combined.matchAll(pattern));
+      if (matches.length > 0) {
+        const sqftValue = parseInt(matches[0][1]);
+        if (sqftValue > 100 && sqftValue < 50000) { // Reasonable sqft range
+          sqft = sqftValue;
+          break;
+        }
+      }
+    }
 
     // City and state extraction - simplified and more reliable
     const cityStatePattern = /([A-Za-z\s]+),\s*([A-Z]{2})\b/g;
