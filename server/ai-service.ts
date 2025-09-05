@@ -34,7 +34,7 @@ export class AIAnalysisService {
       return this.validateAndNormalizeAnalysis(analysisResult);
     } catch (error) {
       console.error("AI Analysis Error:", error);
-      return this.getFallbackAnalysis();
+      return this.getFallbackAnalysis(property);
     }
   }
 
@@ -145,12 +145,58 @@ Consider factors like:
     };
   }
 
-  private getFallbackAnalysis(): AIAnalysis {
+  private generateBasicRedFlags(property: Property): string[] {
+    const redFlags: string[] = [];
+    
+    // Check for basic red flags based on financial metrics
+    const purchasePrice = property.purchasePrice;
+    const monthlyRent = property.monthlyRent;
+    const rentToPrice = monthlyRent / purchasePrice;
+    
+    // 1% rule check
+    if (rentToPrice < 0.01) {
+      redFlags.push(`Fails 1% rule - rent (${(rentToPrice * 100).toFixed(2)}%) below 1% of purchase price`);
+    }
+    
+    // Very low rent ratio
+    if (rentToPrice < 0.005) {
+      redFlags.push(`Extremely low rent-to-price ratio may indicate poor cash flow potential`);
+    }
+    
+    // High price point
+    if (purchasePrice > 500000) {
+      redFlags.push(`High purchase price may limit cash flow and increase carrying costs`);
+    }
+    
+    // Very low rent
+    if (monthlyRent < 800) {
+      redFlags.push(`Low monthly rent may indicate challenging tenant demographics or area`);
+    }
+    
+    // Price per square foot concerns
+    if (property.squareFootage && property.squareFootage > 0) {
+      const pricePerSqft = purchasePrice / property.squareFootage;
+      if (pricePerSqft > 200) {
+        redFlags.push(`High price per square foot ($${pricePerSqft.toFixed(0)}) may limit appreciation potential`);
+      }
+    }
+    
+    // If no red flags found, that's actually good news
+    if (redFlags.length === 0) {
+      return [`Property passes basic financial screening - detailed analysis recommended`];
+    }
+    
+    return redFlags;
+  }
+
+  private getFallbackAnalysis(property: Property): AIAnalysis {
+    const basicRedFlags = this.generateBasicRedFlags(property);
+    
     return {
       propertyAssessment: {
         overallScore: 6,
         strengths: ["Property details analyzed", "Investment potential assessed"],
-        redFlags: ["AI analysis temporarily unavailable"],
+        redFlags: basicRedFlags,
         description: "Property analysis completed with standard metrics.",
         marketPosition: "Competitive analysis completed.",
       },

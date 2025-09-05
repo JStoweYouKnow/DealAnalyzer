@@ -4,7 +4,7 @@
 
 **Location:** California
 
-**Max Purchase Price:** $300,000
+**Max Purchase Price:** $400,000
 
 **Financials:**
 *   **Downpayment:** Anticipate 20-25% for a rental property
