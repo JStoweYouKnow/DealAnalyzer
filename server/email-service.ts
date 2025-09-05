@@ -12,9 +12,19 @@ export interface EmailDeal {
     city?: string;
     state?: string;
     price?: number;
+    monthlyRent?: number;
     bedrooms?: number;
     bathrooms?: number;
     sqft?: number;
+    // Short-term rental metrics
+    adr?: number; // Average Daily Rate
+    occupancyRate?: number; // As decimal (0.75 = 75%)
+    imageUrls?: string[];
+    sourceLinks?: Array<{
+      url: string;
+      type: 'listing' | 'company' | 'external' | 'other';
+      description?: string;
+    }>;
   };
   status: 'new' | 'reviewed' | 'analyzed' | 'archived';
   analysis?: DealAnalysis;

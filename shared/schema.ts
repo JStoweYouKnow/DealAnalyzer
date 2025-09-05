@@ -216,6 +216,9 @@ export const emailDealSchema = z.object({
     bedrooms: z.number().optional(),
     bathrooms: z.number().optional(),
     sqft: z.number().optional(),
+    // Short-term rental metrics
+    adr: z.number().optional(), // Average Daily Rate
+    occupancyRate: z.number().optional(), // As decimal (0.75 = 75%)
     imageUrls: z.array(z.string()).optional(),
     sourceLinks: z.array(z.object({
       url: z.string(),
