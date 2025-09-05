@@ -111,6 +111,39 @@ export default function DealsPage() {
     }
   });
 
+  // Fetch rental comps mutation
+  const fetchRentalCompsMutation = useMutation({
+    mutationFn: async (property: { address: string; bedrooms: number; bathrooms: number; squareFootage?: number }) => {
+      const response = await apiRequest('POST', '/api/rental-comps', property);
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      if (data.success) {
+        const dealId = Object.keys(editValues).find(id => editingDeal === id) || editingDeal;
+        if (dealId) {
+          setEditValues(prev => ({
+            ...prev,
+            [dealId]: {
+              ...prev[dealId],
+              rent: data.data.averageRent
+            }
+          }));
+        }
+        toast({
+          title: "Rental Comps Found",
+          description: `Average rent: ${formatCurrency(data.data.averageRent)} (${data.data.properties.length} comps, ${data.data.confidence} confidence)`,
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Rental Comps Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   // Update property mutation
   const updatePropertyMutation = useMutation({
     mutationFn: async ({ dealId, price, rent }: { dealId: string; price: number; rent: number }) => {
@@ -414,20 +447,53 @@ export default function DealsPage() {
                             <div>
                               <span className="text-sm text-muted-foreground">Monthly Rent:</span>
                               {editingDeal === deal.id ? (
-                                <Input
-                                  type="number"
-                                  placeholder="Enter monthly rent"
-                                  value={editValues[deal.id]?.rent ?? deal.analysis?.property?.monthlyRent ?? deal.extractedProperty.monthlyRent ?? ''}
-                                  onChange={(e) => setEditValues(prev => ({
-                                    ...prev,
-                                    [deal.id]: {
-                                      ...prev[deal.id],
-                                      rent: e.target.value ? Number(e.target.value) : undefined
-                                    }
-                                  }))}
-                                  className="mt-1"
-                                  data-testid={`input-rent-${deal.id}`}
-                                />
+                                <div className="space-y-2">
+                                  <Input
+                                    type="number"
+                                    placeholder="Enter monthly rent"
+                                    value={editValues[deal.id]?.rent ?? deal.analysis?.property?.monthlyRent ?? deal.extractedProperty.monthlyRent ?? ''}
+                                    onChange={(e) => setEditValues(prev => ({
+                                      ...prev,
+                                      [deal.id]: {
+                                        ...prev[deal.id],
+                                        rent: e.target.value ? Number(e.target.value) : undefined
+                                      }
+                                    }))}
+                                    className="mt-1"
+                                    data-testid={`input-rent-${deal.id}`}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const address = deal.extractedProperty.address || deal.analysis?.property?.address;
+                                      const bedrooms = deal.extractedProperty.bedrooms || deal.analysis?.property?.bedrooms;
+                                      const bathrooms = deal.extractedProperty.bathrooms || deal.analysis?.property?.bathrooms;
+                                      const squareFootage = deal.extractedProperty.squareFootage || deal.analysis?.property?.squareFootage;
+                                      
+                                      if (address && bedrooms && bathrooms) {
+                                        fetchRentalCompsMutation.mutate({
+                                          address,
+                                          bedrooms,
+                                          bathrooms,
+                                          squareFootage
+                                        });
+                                      } else {
+                                        toast({
+                                          title: "Missing Information",
+                                          description: "Need address, bedrooms, and bathrooms to fetch rental comps",
+                                          variant: "destructive",
+                                        });
+                                      }
+                                    }}
+                                    disabled={fetchRentalCompsMutation.isPending}
+                                    className="text-xs"
+                                    data-testid={`button-rental-comps-${deal.id}`}
+                                  >
+                                    <i className="fas fa-search mr-1"></i>
+                                    {fetchRentalCompsMutation.isPending ? 'Searching...' : 'Get Rental Comps'}
+                                  </Button>
+                                </div>
                               ) : (
                                 <p className="font-medium text-lg mt-1">
                                   {(deal.analysis?.property?.monthlyRent || deal.extractedProperty.monthlyRent)

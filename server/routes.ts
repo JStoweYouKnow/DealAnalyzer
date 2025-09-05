@@ -16,6 +16,7 @@ import fs from "fs";
 import { generateReport, type ReportOptions, type ReportData } from "./report-generator";
 import { aiAnalysisService } from "./ai-service";
 import { emailMonitoringService } from "./email-service";
+import { rentalCompsService } from "./rental-comps-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -649,6 +650,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to analyze email deal"
+      });
+    }
+  });
+
+  // Get rental comparables for a property
+  app.post("/api/rental-comps", async (req, res) => {
+    try {
+      const { address, bedrooms, bathrooms, squareFootage } = req.body;
+      
+      if (!address || !bedrooms || !bathrooms) {
+        res.status(400).json({
+          success: false,
+          error: "Address, bedrooms, and bathrooms are required"
+        });
+        return;
+      }
+      
+      console.log(`Searching rental comps for: ${address}, ${bedrooms}BR/${bathrooms}BA`);
+      
+      const compsResult = await rentalCompsService.searchRentalComps(
+        address,
+        bedrooms,
+        bathrooms,
+        squareFootage
+      );
+      
+      res.json({
+        success: true,
+        data: compsResult
+      });
+      
+    } catch (error) {
+      console.error("Error fetching rental comps:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch rental comparables"
       });
     }
   });
