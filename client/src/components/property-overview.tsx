@@ -17,8 +17,11 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   const [editableRent, setEditableRent] = useState(property.monthlyRent);
   const [editableBedrooms, setEditableBedrooms] = useState(property.bedrooms);
   const [editableBathrooms, setEditableBathrooms] = useState(property.bathrooms);
+  const [editableAdr, setEditableAdr] = useState(property.adr || 0);
+  const [editableOccupancyRate, setEditableOccupancyRate] = useState(property.occupancyRate ? Math.round(property.occupancyRate * 100) : 0);
   const [isEditingRent, setIsEditingRent] = useState(false);
   const [isEditingBeds, setIsEditingBeds] = useState(false);
+  const [isEditingStr, setIsEditingStr] = useState(false);
   const { toast } = useToast();
 
   // Fetch rental comps mutation
@@ -39,6 +42,31 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     onError: (error) => {
       toast({
         title: "Rental Comps Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Fetch Airbnb data mutation
+  const fetchAirbnbDataMutation = useMutation({
+    mutationFn: async (property: { address: string; bedrooms: number; bathrooms: number; squareFootage?: number }) => {
+      const response = await apiRequest('POST', '/api/airbnb-data', property);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setEditableAdr(data.data.averageDailyRate);
+        setEditableOccupancyRate(Math.round(data.data.occupancyRate * 100)); // Convert to percentage
+        toast({
+          title: "Airbnb Data Found",
+          description: `ADR: $${data.data.averageDailyRate}, Occupancy: ${Math.round(data.data.occupancyRate * 100)}% (${data.data.properties.length} comps, ${data.data.confidence} confidence)`,
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Airbnb Data Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -113,6 +141,40 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     },
   });
 
+  // Mutation for updating ADR/occupancy and re-analyzing
+  const updateStrMutation = useMutation({
+    mutationFn: async ({ adr, occupancyRate }: { adr: number; occupancyRate: number }) => {
+      const updatedProperty = { ...property, adr, occupancyRate: occupancyRate / 100 }; // Convert percentage to decimal
+      const response = await apiRequest("POST", "/api/update-property", {
+        property: updatedProperty,
+      });
+      return response.json() as Promise<AnalyzePropertyResponse>;
+    },
+    onSuccess: (data) => {
+      if (data.success && data.data && onAnalysisUpdate) {
+        onAnalysisUpdate(data.data);
+        setIsEditingStr(false);
+        toast({
+          title: "STR Data Updated",
+          description: "Analysis and criteria assessment refreshed with new short-term rental data.",
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: data.error || "Failed to update STR data",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleRentUpdate = async () => {
     if (editableRent !== property.monthlyRent && editableRent >= 0) {
       updateRentMutation.mutate(editableRent);
@@ -130,6 +192,17 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
       setIsEditingBeds(false);
       setEditableBedrooms(property.bedrooms); // Reset to original values
       setEditableBathrooms(property.bathrooms);
+    }
+  };
+
+  const handleStrUpdate = async () => {
+    if ((editableAdr !== (property.adr || 0) || editableOccupancyRate !== (property.occupancyRate ? Math.round(property.occupancyRate * 100) : 0)) && 
+        editableAdr >= 0 && editableOccupancyRate >= 0 && editableOccupancyRate <= 100) {
+      updateStrMutation.mutate({ adr: editableAdr, occupancyRate: editableOccupancyRate });
+    } else {
+      setIsEditingStr(false);
+      setEditableAdr(property.adr || 0); // Reset to original values
+      setEditableOccupancyRate(property.occupancyRate ? Math.round(property.occupancyRate * 100) : 0);
     }
   };
 
@@ -306,6 +379,89 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
                   {property.squareFootage.toLocaleString()}
                 </span>
               </div>
+              
+              {/* Short-Term Rental Fields */}
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">ADR (Daily Rate):</span>
+                <div className="flex items-center space-x-2">
+                  {isEditingStr ? (
+                    <div className="space-y-2">
+                      <Input
+                        type="number"
+                        value={editableAdr}
+                        onChange={(e) => setEditableAdr(Number(e.target.value))}
+                        onBlur={handleStrUpdate}
+                        onKeyDown={(e) => e.key === 'Enter' && handleStrUpdate()}
+                        className="w-20 h-6 text-right text-sm"
+                        data-testid="input-adr"
+                        min="0"
+                        placeholder="0"
+                      />
+                      <button
+                        onClick={() => {
+                          if (property.address && editableBedrooms && editableBathrooms) {
+                            fetchAirbnbDataMutation.mutate({
+                              address: property.address,
+                              bedrooms: editableBedrooms,
+                              bathrooms: editableBathrooms,
+                              squareFootage: property.squareFootage
+                            });
+                          } else {
+                            toast({
+                              title: "Missing Information",
+                              description: "Need address, bedrooms, and bathrooms to fetch Airbnb data",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        disabled={fetchAirbnbDataMutation.isPending}
+                        className="text-xs px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded border border-orange-200 hover:border-orange-300 transition-colors"
+                        data-testid="button-airbnb-data"
+                      >
+                        <i className="fas fa-home mr-1"></i>
+                        {fetchAirbnbDataMutation.isPending ? 'Searching...' : 'Get Airbnb Data'}
+                      </button>
+                    </div>
+                  ) : (
+                    <span 
+                      className="font-medium cursor-pointer hover:bg-orange-50 px-1 rounded" 
+                      data-testid="text-adr"
+                      onClick={() => setIsEditingStr(true)}
+                      title="Click to edit ADR"
+                    >
+                      {editableAdr > 0 ? `$${editableAdr}` : 'Not specified'}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setIsEditingStr(!isEditingStr)}
+                    className="text-xs text-muted-foreground hover:text-primary"
+                    title={isEditingStr ? "Cancel" : "Edit STR data"}
+                  >
+                    <i className={`fas ${isEditingStr ? 'fa-times' : 'fa-edit'}`}></i>
+                  </button>
+                </div>
+              </div>
+              
+              {isEditingStr && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Occupancy Rate:</span>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      type="number"
+                      value={editableOccupancyRate}
+                      onChange={(e) => setEditableOccupancyRate(Number(e.target.value))}
+                      onBlur={handleStrUpdate}
+                      onKeyDown={(e) => e.key === 'Enter' && handleStrUpdate()}
+                      className="w-16 h-6 text-right text-sm"
+                      data-testid="input-occupancy"
+                      min="0"
+                      max="100"
+                      placeholder="0"
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                  </div>
+                </div>
+              )}
               {property.lotSize && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Lot Size:</span>
