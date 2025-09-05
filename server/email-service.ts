@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import type { DealAnalysis } from '@shared/schema';
+import { aiQualityScoringService } from './ai-scoring-service';
 
 export interface EmailDeal {
   id: string;
@@ -24,6 +25,15 @@ export interface EmailDeal {
       url: string;
       type: 'listing' | 'company' | 'external' | 'other';
       description?: string;
+      aiScore?: number;
+      aiCategory?: 'excellent' | 'good' | 'fair' | 'poor';
+      aiReasoning?: string;
+    }>;
+    imageScores?: Array<{
+      url: string;
+      aiScore?: number;
+      aiCategory?: 'excellent' | 'good' | 'fair' | 'poor';
+      aiReasoning?: string;
     }>;
   };
   status: 'new' | 'reviewed' | 'analyzed' | 'archived';
@@ -157,7 +167,7 @@ export class EmailMonitoringService {
       }
 
       // Parse property information from email content
-      const extractedProperty = this.parsePropertyInfo(emailContent, subject);
+      const extractedProperty = await this.parsePropertyInfo(emailContent, subject);
 
       return {
         id: messageId,
@@ -175,7 +185,7 @@ export class EmailMonitoringService {
   }
 
   // Enhanced property information parsing
-  private parsePropertyInfo(content: string, subject: string): EmailDeal['extractedProperty'] {
+  private async parsePropertyInfo(content: string, subject: string): Promise<EmailDeal['extractedProperty']> {
     const combined = `${subject} ${content}`;
     console.log('Parsing property info from:', combined.substring(0, 500));
     
@@ -438,6 +448,46 @@ export class EmailMonitoringService {
     const otherLinks = sourceLinks.filter(link => link.type !== 'listing');
     const limitedSourceLinks = [...listingLinks.slice(0, 2), ...otherLinks.slice(0, 1)];
 
+    // Apply AI scoring to links and images
+    let scoredSourceLinks = limitedSourceLinks;
+    let imageScores: Array<{url: string, aiScore?: number, aiCategory?: 'excellent' | 'good' | 'fair' | 'poor', aiReasoning?: string}> = [];
+
+    if (limitedSourceLinks.length > 0 || imageUrls.length > 0) {
+      try {
+        const propertyContext = `${address || ''} ${city || ''} ${state || ''} - ${bedrooms || '?'}BR/${bathrooms || '?'}BA`.trim();
+        
+        // Score links and images in parallel
+        const [linkScores, imgScores] = await Promise.all([
+          limitedSourceLinks.length > 0 ? aiQualityScoringService.scoreLinks(limitedSourceLinks) : Promise.resolve([]),
+          imageUrls.length > 0 ? aiQualityScoringService.scoreImages(imageUrls.slice(0, 2), propertyContext) : Promise.resolve([])
+        ]);
+
+        // Add AI scores to source links
+        scoredSourceLinks = limitedSourceLinks.map((link, index) => ({
+          ...link,
+          aiScore: linkScores[index]?.score,
+          aiCategory: linkScores[index]?.category,
+          aiReasoning: linkScores[index]?.reasoning
+        }));
+
+        // Create image scores array
+        imageScores = imageUrls.slice(0, 2).map((url, index) => ({
+          url,
+          aiScore: imgScores[index]?.score,
+          aiCategory: imgScores[index]?.category,
+          aiReasoning: imgScores[index]?.reasoning
+        }));
+
+        console.log('AI Scoring completed:', {
+          linkScores: linkScores.map(s => ({ score: s.score, category: s.category })),
+          imageScores: imgScores.map(s => ({ score: s.score, category: s.category }))
+        });
+
+      } catch (error) {
+        console.error('AI scoring failed, proceeding without scores:', error);
+      }
+    }
+
     const result = {
       address: address || undefined,
       city: city || undefined,
@@ -447,10 +497,11 @@ export class EmailMonitoringService {
       bathrooms,
       sqft,
       imageUrls: imageUrls.length > 0 ? imageUrls.slice(0, 2) : undefined, // Limit to 2 images
-      sourceLinks: limitedSourceLinks.length > 0 ? limitedSourceLinks : undefined,
+      sourceLinks: scoredSourceLinks.length > 0 ? scoredSourceLinks : undefined,
+      imageScores: imageScores.length > 0 ? imageScores : undefined,
     };
     
-    console.log('Final parsed property with images/links:', result);
+    console.log('Final parsed property with AI scores:', result);
     return result;
   }
 

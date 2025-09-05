@@ -701,20 +701,34 @@ export default function DealsPage() {
                             <div className="mt-4">
                               <span className="text-sm text-muted-foreground">Property Images:</span>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                                {deal.extractedProperty.imageUrls.slice(0, 3).map((imageUrl, index) => (
-                                  <div key={index} className="relative aspect-square">
-                                    <img
-                                      src={imageUrl}
-                                      alt={`Property image ${index + 1}`}
-                                      className="w-full h-full object-cover rounded-md border border-border hover:opacity-80 transition-opacity cursor-pointer"
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                      }}
-                                      onClick={() => window.open(imageUrl, '_blank')}
-                                      data-testid={`image-property-${deal.id}-${index}`}
-                                    />
-                                  </div>
-                                ))}
+                                {deal.extractedProperty.imageUrls.slice(0, 3).map((imageUrl, index) => {
+                                  const imageScore = deal.extractedProperty?.imageScores?.find(img => img.url === imageUrl);
+                                  return (
+                                    <div key={index} className="relative aspect-square">
+                                      <img
+                                        src={imageUrl}
+                                        alt={`Property image ${index + 1}`}
+                                        className="w-full h-full object-cover rounded-md border border-border hover:opacity-80 transition-opacity cursor-pointer"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                        onClick={() => window.open(imageUrl, '_blank')}
+                                        data-testid={`image-property-${deal.id}-${index}`}
+                                        title={imageScore?.aiReasoning || `Property image ${index + 1}`}
+                                      />
+                                      {imageScore?.aiScore && (
+                                        <div className={`absolute top-1 right-1 text-xs font-bold px-1.5 py-0.5 rounded text-white shadow-sm ${
+                                          imageScore.aiCategory === 'excellent' ? 'bg-green-500' :
+                                          imageScore.aiCategory === 'good' ? 'bg-blue-500' :
+                                          imageScore.aiCategory === 'fair' ? 'bg-yellow-500' :
+                                          'bg-red-500'
+                                        }`}>
+                                          {imageScore.aiScore.toFixed(1)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                               {deal.extractedProperty.imageUrls.length > 3 && (
                                 <p className="text-xs text-muted-foreground mt-1">
@@ -742,11 +756,21 @@ export default function DealsPage() {
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="text-sm text-primary hover:underline truncate flex-1"
-                                      title={link.url}
+                                      title={link.aiReasoning || link.url}
                                       data-testid={`link-source-${deal.id}-${index}`}
                                     >
                                       {link.description || new URL(link.url).hostname}
                                     </a>
+                                    {link.aiScore && (
+                                      <div className={`text-xs font-bold px-2 py-0.5 rounded text-white shadow-sm ${
+                                        link.aiCategory === 'excellent' ? 'bg-green-500' :
+                                        link.aiCategory === 'good' ? 'bg-blue-500' :
+                                        link.aiCategory === 'fair' ? 'bg-yellow-500' :
+                                        'bg-red-500'
+                                      }`}>
+                                        {link.aiScore.toFixed(1)}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                                 {deal.extractedProperty.sourceLinks.length > 2 && (

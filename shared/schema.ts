@@ -224,6 +224,15 @@ export const emailDealSchema = z.object({
       url: z.string(),
       type: z.enum(['listing', 'company', 'external', 'other']),
       description: z.string().optional(),
+      aiScore: z.number().optional(), // 0-10 AI quality score
+      aiCategory: z.enum(['excellent', 'good', 'fair', 'poor']).optional(),
+      aiReasoning: z.string().optional(),
+    })).optional(),
+    imageScores: z.array(z.object({
+      url: z.string(),
+      aiScore: z.number().optional(), // 0-10 AI quality score
+      aiCategory: z.enum(['excellent', 'good', 'fair', 'poor']).optional(),
+      aiReasoning: z.string().optional(),
     })).optional(),
   }).optional(),
   status: emailDealStatus,
