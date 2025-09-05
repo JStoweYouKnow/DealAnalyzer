@@ -6,40 +6,44 @@
 @tailwind utilities;
 
 :root {
-  /* Earth Tone Color Palette - Natural & Warm */
-  --color-primary: #2d5a27;       /* Deep Forest Green */
-  --color-secondary: #d2b48c;     /* Tan */
-  --color-neutral-dark: #3c2414;  /* Dark Brown */
-  --color-neutral-light: #f5f1e8; /* Light Cream */
-  --color-accent: #8b4513;        /* Red-Brown */
-  --color-success: #228b22;       /* Forest Green */
-  --color-alert: #a0522d;         /* Sienna Brown */
+  /* Vibrant Earth Tone Color Palette - Rich & Colorful */
+  --color-primary: #1e7b1a;       /* Vibrant Forest Green */
+  --color-secondary: #e6b800;     /* Golden Yellow */
+  --color-neutral-dark: #5d3e1a;  /* Rich Chocolate Brown */
+  --color-neutral-light: #fff8e7; /* Warm Ivory */
+  --color-accent: #d2691e;        /* Burnt Orange */
+  --color-success: #32cd32;       /* Lime Green */
+  --color-alert: #ff6347;         /* Vibrant Tomato Red */
+  --color-sage: #9caf88;          /* Sage Green */
+  --color-rust: #b7410e;          /* Rust Red */
+  --color-gold: #daa520;          /* Goldenrod */
+  --color-moss: #8fbc8f;          /* Dark Sea Green */
 
-  /* Shadcn Theme Variables - Earth Tone Inspired */
-  --background: hsl(35, 30%, 95%); /* Warm cream background */
-  --foreground: hsl(25, 40%, 15%); /* Rich brown text */
-  --card: hsl(40, 35%, 97%);       /* Light warm card */
-  --card-foreground: hsl(25, 40%, 15%);
-  --popover: hsl(40, 35%, 97%);
-  --popover-foreground: hsl(25, 40%, 15%);
-  --primary: hsl(100, 35%, 30%);   /* Forest green primary */
-  --primary-foreground: hsl(40, 35%, 97%);
-  --secondary: hsl(30, 35%, 75%);  /* Warm tan secondary */
-  --secondary-foreground: hsl(25, 40%, 15%);
-  --muted: hsl(35, 25%, 88%);      /* Light tan muted */
-  --muted-foreground: hsl(25, 25%, 45%);
-  --accent: hsl(15, 55%, 45%);     /* Terracotta accent */
-  --accent-foreground: hsl(40, 35%, 97%);
-  --destructive: hsl(5, 65%, 50%); /* Red-brown destructive */
-  --destructive-foreground: hsl(40, 35%, 97%);
-  --border: hsl(35, 20%, 85%);     /* Soft tan border */
-  --input: hsl(35, 25%, 90%);      /* Light tan input */
-  --ring: hsl(100, 35%, 30%);      /* Forest green focus ring */
-  --chart-1: hsl(100, 35%, 45%);   /* Forest green */
-  --chart-2: hsl(30, 45%, 65%);    /* Warm tan */
-  --chart-3: hsl(15, 55%, 45%);    /* Terracotta */
-  --chart-4: hsl(5, 55%, 50%);     /* Red-brown */
-  --chart-5: hsl(80, 30%, 50%);    /* Olive green */
+  /* Shadcn Theme Variables - Vibrant Earth Tones */
+  --background: linear-gradient(135deg, hsl(45, 60%, 92%) 0%, hsl(35, 50%, 88%) 100%);
+  --foreground: hsl(20, 60%, 20%); /* Rich chocolate text */
+  --card: linear-gradient(145deg, hsl(50, 70%, 95%) 0%, hsl(40, 60%, 92%) 100%);
+  --card-foreground: hsl(20, 60%, 20%);
+  --popover: hsl(50, 70%, 96%);
+  --popover-foreground: hsl(20, 60%, 20%);
+  --primary: hsl(110, 70%, 35%);   /* Vibrant forest green */
+  --primary-foreground: hsl(50, 70%, 96%);
+  --secondary: hsl(45, 85%, 60%);  /* Bright golden yellow */
+  --secondary-foreground: hsl(20, 60%, 20%);
+  --muted: hsl(40, 45%, 82%);      /* Warm beige */
+  --muted-foreground: hsl(25, 40%, 35%);
+  --accent: hsl(25, 80%, 55%);     /* Vibrant burnt orange */
+  --accent-foreground: hsl(50, 70%, 96%);
+  --destructive: hsl(10, 85%, 55%); /* Bright tomato red */
+  --destructive-foreground: hsl(50, 70%, 96%);
+  --border: hsl(35, 35%, 75%);     /* Warm tan border */
+  --input: hsl(45, 50%, 85%);      /* Light golden input */
+  --ring: hsl(110, 70%, 35%);      /* Vibrant green focus */
+  --chart-1: hsl(110, 65%, 40%);   /* Vibrant forest green */
+  --chart-2: hsl(45, 90%, 50%);    /* Bright golden yellow */
+  --chart-3: hsl(25, 85%, 50%);    /* Burnt orange */
+  --chart-4: hsl(10, 80%, 55%);    /* Tomato red */
+  --chart-5: hsl(85, 45%, 55%);    /* Sage green */
   --font-sans: "Inter", system-ui, sans-serif;
   --font-heading: "Poppins", "Inter", system-ui, sans-serif;
   --font-accent: "Playfair Display", Georgia, serif;
@@ -49,26 +53,26 @@
 }
 
 .dark {
-  /* Dark Earth Tones */
-  --background: hsl(25, 15%, 8%);   /* Dark brown background */
-  --foreground: hsl(35, 20%, 90%);  /* Light cream text */
-  --card: hsl(25, 20%, 12%);        /* Dark brown card */
-  --card-foreground: hsl(35, 20%, 90%);
-  --popover: hsl(25, 20%, 12%);
-  --popover-foreground: hsl(35, 20%, 90%);
-  --primary: hsl(100, 25%, 55%);    /* Muted forest green */
-  --primary-foreground: hsl(25, 20%, 8%);
-  --secondary: hsl(30, 20%, 25%);   /* Dark tan */
-  --secondary-foreground: hsl(35, 20%, 90%);
-  --muted: hsl(25, 15%, 18%);       /* Dark muted brown */
-  --muted-foreground: hsl(35, 15%, 60%);
-  --accent: hsl(15, 45%, 55%);      /* Warm terracotta */
-  --accent-foreground: hsl(25, 20%, 8%);
-  --destructive: hsl(5, 55%, 55%);  /* Red-brown */
-  --destructive-foreground: hsl(35, 20%, 90%);
-  --border: hsl(25, 15%, 22%);      /* Dark brown border */
-  --input: hsl(25, 15%, 20%);       /* Dark brown input */
-  --ring: hsl(100, 25%, 55%);       /* Muted green focus */
+  /* Vibrant Dark Earth Tones */
+  --background: linear-gradient(135deg, hsl(20, 30%, 6%) 0%, hsl(15, 25%, 8%) 100%);
+  --foreground: hsl(45, 40%, 88%);  /* Warm cream text */
+  --card: linear-gradient(145deg, hsl(20, 35%, 10%) 0%, hsl(25, 30%, 12%) 100%);
+  --card-foreground: hsl(45, 40%, 88%);
+  --popover: hsl(20, 35%, 10%);
+  --popover-foreground: hsl(45, 40%, 88%);
+  --primary: hsl(110, 50%, 45%);    /* Bright forest green */
+  --primary-foreground: hsl(20, 35%, 8%);
+  --secondary: hsl(45, 70%, 55%);   /* Bright golden yellow */
+  --secondary-foreground: hsl(20, 35%, 8%);
+  --muted: hsl(25, 25%, 15%);       /* Rich dark brown */
+  --muted-foreground: hsl(35, 30%, 65%);
+  --accent: hsl(25, 75%, 60%);      /* Bright burnt orange */
+  --accent-foreground: hsl(20, 35%, 8%);
+  --destructive: hsl(10, 70%, 60%); /* Bright tomato */
+  --destructive-foreground: hsl(45, 40%, 88%);
+  --border: hsl(25, 25%, 25%);      /* Warm brown border */
+  --input: hsl(25, 25%, 18%);       /* Rich brown input */
+  --ring: hsl(110, 50%, 45%);       /* Bright green focus */
 }
 
 @layer base {
@@ -151,16 +155,27 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   }
 
-  /* Enhanced Card Styles with Earth Tone Texture */
+  /* Enhanced Card Styles with Vibrant Earth Tone Texture */
   .analysis-card {
-    background: linear-gradient(145deg, hsl(35, 25%, 96%), hsl(30, 20%, 93%));
-    border: 1px solid hsl(30, 25%, 82%);
+    background: linear-gradient(145deg, 
+      hsl(50, 60%, 92%) 0%, 
+      hsl(40, 50%, 88%) 25%, 
+      hsl(45, 55%, 90%) 75%, 
+      hsl(35, 45%, 85%) 100%);
+    border: 2px solid;
+    border-image: linear-gradient(45deg, 
+      hsl(110, 60%, 45%) 0%, 
+      hsl(45, 70%, 60%) 25%, 
+      hsl(25, 65%, 55%) 50%, 
+      hsl(85, 50%, 50%) 100%) 1;
     box-shadow: 
-      0 4px 6px -1px rgba(139, 69, 19, 0.08),
-      0 2px 4px -1px rgba(45, 90, 39, 0.05),
-      inset 0 1px 0 rgba(255, 248, 240, 0.3);
-    backdrop-filter: blur(8px);
+      0 8px 15px -3px rgba(210, 105, 30, 0.15),
+      0 4px 8px -2px rgba(30, 123, 26, 0.12),
+      0 2px 4px -1px rgba(218, 165, 32, 0.08),
+      inset 0 2px 0 rgba(255, 248, 231, 0.5);
+    backdrop-filter: blur(12px);
     position: relative;
+    overflow: hidden;
   }
 
   .analysis-card::before {
@@ -171,18 +186,26 @@
     right: 0;
     bottom: 0;
     background: 
-      radial-gradient(circle at 25% 25%, rgba(45, 90, 39, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 75% 75%, rgba(139, 69, 19, 0.02) 0%, transparent 50%);
+      radial-gradient(circle at 20% 20%, rgba(30, 123, 26, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 80% 30%, rgba(210, 105, 30, 0.06) 0%, transparent 40%),
+      radial-gradient(circle at 40% 80%, rgba(218, 165, 32, 0.05) 0%, transparent 40%),
+      radial-gradient(circle at 70% 70%, rgba(156, 175, 136, 0.04) 0%, transparent 40%);
     border-radius: inherit;
     pointer-events: none;
   }
 
   .analysis-card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-5px) scale(1.02);
     box-shadow: 
-      0 8px 25px -5px rgba(0, 0, 0, 0.08),
-      0 5px 10px -3px rgba(0, 0, 0, 0.04),
-      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      0 15px 35px -5px rgba(210, 105, 30, 0.25),
+      0 10px 20px -5px rgba(30, 123, 26, 0.18),
+      0 5px 15px -3px rgba(218, 165, 32, 0.12),
+      inset 0 3px 0 rgba(255, 248, 231, 0.7);
+    border-image: linear-gradient(45deg, 
+      hsl(110, 70%, 50%) 0%, 
+      hsl(45, 85%, 65%) 25%, 
+      hsl(25, 75%, 60%) 50%, 
+      hsl(85, 60%, 55%) 100%) 1;
   }
 
   .btn {
@@ -259,12 +282,19 @@
   animation: pulse 2s infinite;
 }
 
-/* Main Page Background Texture */
+/* Vibrant Main Page Background */
 body {
   background: 
-    linear-gradient(135deg, hsl(45, 25%, 96%) 0%, hsl(45, 20%, 94%) 100%),
-    radial-gradient(circle at 25% 25%, rgba(0, 0, 0, 0.01) 0%, transparent 50%),
-    radial-gradient(circle at 75% 75%, rgba(0, 0, 0, 0.008) 0%, transparent 50%);
+    linear-gradient(135deg, 
+      hsl(50, 70%, 88%) 0%, 
+      hsl(40, 60%, 85%) 25%, 
+      hsl(45, 65%, 90%) 50%, 
+      hsl(35, 55%, 82%) 75%, 
+      hsl(42, 58%, 86%) 100%),
+    radial-gradient(circle at 20% 30%, rgba(30, 123, 26, 0.05) 0%, transparent 60%),
+    radial-gradient(circle at 80% 20%, rgba(210, 105, 30, 0.04) 0%, transparent 60%),
+    radial-gradient(circle at 60% 80%, rgba(218, 165, 32, 0.03) 0%, transparent 60%),
+    radial-gradient(circle at 30% 70%, rgba(156, 175, 136, 0.02) 0%, transparent 60%);
   background-attachment: fixed;
 }
 
