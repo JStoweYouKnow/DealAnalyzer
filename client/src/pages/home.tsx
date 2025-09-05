@@ -121,35 +121,40 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Header */}
+      {/* Top Navigation */}
       <header className="bg-card border-b border-border sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/90">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <img 
-                  src={comfortFinderLogo} 
-                  alt="The Comfort Finder Logo" 
-                  className="w-8 h-8 object-contain"
-                />
-                <h1 className="text-xl font-bold gradient-text">The Comfort Finder</h1>
-              </div>
+            <div className="flex items-center space-x-2">
+              <img 
+                src={comfortFinderLogo} 
+                alt="The Comfort Finder Logo" 
+                className="w-8 h-8 object-contain"
+              />
+              <h1 className="text-xl font-bold gradient-text">The Comfort Finder</h1>
             </div>
             
-            <div className="flex items-center space-x-4">
-              {/* Navigation removed to clean up header */}
-            </div>
-          </div>
-          
-          {/* Main Hero Section */}
-          <div className="text-center py-8 border-t border-border/50">
-            <h2 className="text-3xl font-bold text-foreground mb-2">Find Your Perfect Investment Property</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Upload your property data files to instantly analyze investment potential and find your comfort zone
-            </p>
+            <nav className="flex items-center space-x-6">
+              <a href="/" className="text-primary font-medium flex items-center">
+                <i className="fas fa-home mr-2"></i>Home
+              </a>
+              <a href="/deals" className="text-muted-foreground hover:text-primary transition-colors font-medium flex items-center">
+                <i className="fas fa-inbox mr-2"></i>Deal Pipeline
+              </a>
+            </nav>
           </div>
         </div>
       </header>
+
+      {/* Hero Section */}
+      <section className="bg-gradient-to-b from-muted/50 to-background py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl font-bold text-foreground mb-2">Find Your Perfect Investment Property</h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Upload your property data files to instantly analyze investment potential and find your comfort zone
+          </p>
+        </div>
+      </section>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

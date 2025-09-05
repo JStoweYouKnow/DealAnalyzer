@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
 import type { EmailDeal, EmailMonitoringResponse, AnalyzePropertyResponse } from "@shared/schema";
 
 export default function DealsPage() {
@@ -216,7 +217,34 @@ export default function DealsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Top Navigation */}
+      <header className="bg-card border-b border-border sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/90">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-2">
+              <img 
+                src={comfortFinderLogo} 
+                alt="The Comfort Finder Logo" 
+                className="w-8 h-8 object-contain"
+              />
+              <h1 className="text-xl font-bold gradient-text">The Comfort Finder</h1>
+            </div>
+            
+            <nav className="flex items-center space-x-6">
+              <a href="/" className="text-muted-foreground hover:text-primary transition-colors font-medium flex items-center">
+                <i className="fas fa-home mr-2"></i>Home
+              </a>
+              <a href="/deals" className="text-primary font-medium flex items-center">
+                <i className="fas fa-inbox mr-2"></i>Deal Pipeline
+              </a>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-6">
       {/* Combined Header and Dashboard */}
       <Card className="analysis-card">
         <CardHeader>
@@ -496,7 +524,7 @@ export default function DealsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => generateReportMutation.mutate({ analysisId: deal.analysis!.id, format: 'pdf' })}
+                              onClick={() => generateReportMutation.mutate({ analysisId: deal.analysis?.id || '', format: 'pdf' })}
                               disabled={generateReportMutation.isPending}
                               data-testid={`button-report-pdf-${deal.id}`}
                             >
@@ -506,7 +534,7 @@ export default function DealsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => generateReportMutation.mutate({ analysisId: deal.analysis!.id, format: 'csv' })}
+                              onClick={() => generateReportMutation.mutate({ analysisId: deal.analysis?.id || '', format: 'csv' })}
                               disabled={generateReportMutation.isPending}
                               data-testid={`button-report-csv-${deal.id}`}
                             >
@@ -535,6 +563,8 @@ export default function DealsPage() {
             ))
           )}
         </div>
+        </div>
+      </main>
     </div>
   );
 }
