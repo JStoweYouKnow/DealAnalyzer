@@ -144,17 +144,19 @@ export default function Home() {
               </nav>
             </div>
           </div>
+          
+          {/* Main Hero Section */}
+          <div className="text-center py-8 border-t border-border/50">
+            <h2 className="text-3xl font-bold text-foreground mb-2">Find Your Perfect Investment Property</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Upload your property data files to instantly analyze investment potential and find your comfort zone
+            </p>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-foreground mb-2">Find Your Perfect Investment Property</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Upload your property data files to instantly analyze investment potential and find your comfort zone
-          </p>
-        </div>
 
         {/* Criteria Configuration */}
         <div className="mb-8">
