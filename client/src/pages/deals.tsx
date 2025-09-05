@@ -489,6 +489,68 @@ export default function DealsPage() {
                               Edit Price & Rent
                             </Button>
                           )}
+
+                          {/* Property Images */}
+                          {deal.extractedProperty?.imageUrls && deal.extractedProperty.imageUrls.length > 0 && (
+                            <div className="mt-4">
+                              <span className="text-sm text-muted-foreground">Property Images:</span>
+                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2">
+                                {deal.extractedProperty.imageUrls.slice(0, 8).map((imageUrl, index) => (
+                                  <div key={index} className="relative aspect-square">
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Property image ${index + 1}`}
+                                      className="w-full h-full object-cover rounded-md border border-border hover:opacity-80 transition-opacity cursor-pointer"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                      onClick={() => window.open(imageUrl, '_blank')}
+                                      data-testid={`image-property-${deal.id}-${index}`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                              {deal.extractedProperty.imageUrls.length > 8 && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  +{deal.extractedProperty.imageUrls.length - 8} more images
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Source Links */}
+                          {deal.extractedProperty?.sourceLinks && deal.extractedProperty.sourceLinks.length > 0 && (
+                            <div className="mt-4">
+                              <span className="text-sm text-muted-foreground">Source Links:</span>
+                              <div className="space-y-1 mt-2">
+                                {deal.extractedProperty.sourceLinks.slice(0, 5).map((link, index) => (
+                                  <div key={index} className="flex items-center space-x-2">
+                                    <div className="flex-shrink-0 w-4">
+                                      {link.type === 'listing' && <span className="text-blue-500">🏠</span>}
+                                      {link.type === 'company' && <span className="text-green-500">🏢</span>}
+                                      {link.type === 'external' && <span className="text-gray-500">🔗</span>}
+                                      {link.type === 'other' && <span className="text-gray-500">🔗</span>}
+                                    </div>
+                                    <a
+                                      href={link.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm text-primary hover:underline truncate flex-1"
+                                      title={link.url}
+                                      data-testid={`link-source-${deal.id}-${index}`}
+                                    >
+                                      {link.description || new URL(link.url).hostname}
+                                    </a>
+                                  </div>
+                                ))}
+                                {deal.extractedProperty.sourceLinks.length > 5 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    +{deal.extractedProperty.sourceLinks.length - 5} more links
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
