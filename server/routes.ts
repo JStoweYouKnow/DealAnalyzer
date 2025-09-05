@@ -582,6 +582,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update email deal with new extractedProperty data
+  app.put("/api/email-deals/:id", async (req, res) => {
+    try {
+      const dealId = req.params.id;
+      const { extractedProperty } = req.body;
+
+      if (!dealId) {
+        res.status(400).json({
+          success: false,
+          error: "Deal ID is required"
+        });
+        return;
+      }
+
+      const updatedDeal = await storage.updateEmailDeal(dealId, { extractedProperty });
+      
+      res.json({
+        success: true,
+        data: updatedDeal
+      });
+    } catch (error) {
+      console.error("Error updating email deal:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update email deal"
+      });
+    }
+  });
+
   // Analyze email deal endpoint
   app.post("/api/analyze-email-deal", async (req, res) => {
     try {
@@ -722,6 +751,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to fetch Airbnb data"
+      });
+    }
+  });
+
+  // Update email deal with Airbnb data
+  app.post("/api/update-email-deal-airbnb", async (req, res) => {
+    try {
+      const { dealId, averageDailyRate, occupancyRate } = req.body;
+      
+      if (!dealId) {
+        res.status(400).json({
+          success: false,
+          error: "Deal ID is required"
+        });
+        return;
+      }
+      
+      // Get the email deal
+      const emailDeal = await storage.getEmailDeal(dealId);
+      if (!emailDeal) {
+        res.status(404).json({
+          success: false,
+          error: "Email deal not found"
+        });
+        return;
+      }
+      
+      // Update the extractedProperty with Airbnb data
+      const updatedExtractedProperty = {
+        ...emailDeal.extractedProperty,
+        adr: averageDailyRate,
+        occupancyRate: occupancyRate
+      };
+      
+      // Update the email deal
+      await storage.updateEmailDeal(dealId, { 
+        extractedProperty: updatedExtractedProperty
+      });
+      
+      res.json({
+        success: true,
+        data: {
+          dealId,
+          adr: averageDailyRate,
+          occupancyRate: occupancyRate
+        }
+      });
+      
+    } catch (error) {
+      console.error("Error updating email deal with Airbnb data:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update email deal with Airbnb data"
       });
     }
   });

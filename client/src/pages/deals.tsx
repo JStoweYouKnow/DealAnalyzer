@@ -192,19 +192,30 @@ export default function DealsPage() {
         throw new Error('Deal or property not found');
       }
       
-      const updatedProperty = {
+      // First, update the extractedProperty with the new values
+      const updatedExtractedProperty = {
         ...deal.extractedProperty,
-        purchasePrice: price,
+        price: price,
         monthlyRent: rent,
-        adr: adr || deal.extractedProperty?.adr,
-        occupancyRate: occupancyRate || deal.extractedProperty?.occupancyRate
+        adr: adr !== undefined ? adr : deal.extractedProperty?.adr,
+        occupancyRate: occupancyRate !== undefined ? occupancyRate : deal.extractedProperty?.occupancyRate
       };
       
-      const response = await apiRequest('POST', '/api/update-property', { 
-        property: updatedProperty,
-        dealId: dealId
+      // Update the email deal's extractedProperty
+      const updateResponse = await apiRequest('PUT', `/api/email-deals/${dealId}`, { 
+        extractedProperty: updatedExtractedProperty
       });
-      return response.json();
+      
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update deal');
+      }
+      
+      // Then run analysis with the updated property data
+      const analysisResponse = await apiRequest('POST', '/api/analyze-email-deal', { 
+        dealId: dealId,
+        emailContent: deal.emailContent
+      });
+      return analysisResponse.json();
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/email-deals'] });
