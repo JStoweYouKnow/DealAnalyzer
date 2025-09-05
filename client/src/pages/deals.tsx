@@ -217,59 +217,60 @@ export default function DealsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Email Deal Pipeline</h1>
-          <p className="text-muted-foreground">Review and analyze your real estate email opportunities</p>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          <Button
-            onClick={() => connectGmailMutation.mutate()}
-            variant="outline"
-            size="sm"
-          >
-            <i className="fas fa-envelope mr-2"></i>
-            Connect Gmail
-          </Button>
-          <Button
-            onClick={() => syncEmailsMutation.mutate()}
-            disabled={syncEmailsMutation.isPending}
-            size="sm"
-          >
-            <i className="fas fa-sync mr-2"></i>
-            {syncEmailsMutation.isPending ? 'Syncing...' : 'Sync Emails'}
-          </Button>
-        </div>
-      </div>
-        
-        {/* Filters and Search */}
-        <Card className="analysis-card mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Email Deals Dashboard</h2>
-              <div className="flex items-center space-x-4">
-                <Input
-                  placeholder="Search deals..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-64"
-                />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="border rounded px-3 py-2"
-                >
-                  <option value="all">All Status</option>
-                  <option value="new">New</option>
-                  <option value="reviewed">Reviewed</option>
-                  <option value="analyzed">Analyzed</option>
-                  <option value="archived">Archived</option>
-                </select>
-              </div>
+      {/* Combined Header and Dashboard */}
+      <Card className="analysis-card">
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Email Deal Pipeline</h1>
+              <p className="text-muted-foreground">Review and analyze your real estate email opportunities</p>
             </div>
-          </CardHeader>
-        </Card>
+            
+            <div className="flex items-center space-x-4">
+              <Button
+                onClick={() => connectGmailMutation.mutate()}
+                variant="outline"
+                size="sm"
+              >
+                <i className="fas fa-envelope mr-2"></i>
+                Connect Gmail
+              </Button>
+              <Button
+                onClick={() => syncEmailsMutation.mutate()}
+                disabled={syncEmailsMutation.isPending}
+                size="sm"
+              >
+                <i className="fas fa-sync mr-2"></i>
+                {syncEmailsMutation.isPending ? 'Syncing...' : 'Sync Emails'}
+              </Button>
+            </div>
+          </div>
+          
+          {/* Filters and Search */}
+          <div className="flex items-center justify-between mt-6 pt-6 border-t border-border">
+            <h2 className="text-lg font-semibold">Dashboard Controls</h2>
+            <div className="flex items-center space-x-4">
+              <Input
+                placeholder="Search deals..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64"
+              />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="border rounded px-3 py-2"
+              >
+                <option value="all">All Status</option>
+                <option value="new">New</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="analyzed">Analyzed</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
