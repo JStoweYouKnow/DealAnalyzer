@@ -353,7 +353,7 @@ export class EmailMonitoringService {
       bedrooms,
       bathrooms,
       sqft,
-      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      imageUrls: imageUrls.length > 0 ? imageUrls.slice(0, 3) : undefined,
       sourceLinks: limitedSourceLinks.length > 0 ? limitedSourceLinks : undefined,
     };
     

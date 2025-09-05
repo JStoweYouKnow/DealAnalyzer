@@ -177,7 +177,8 @@ def parse_email_alert(email_content: str) -> Property:
             for match in matches:
                 if match and match.startswith('http'):
                     images.add(match)
-        return list(images)
+        # Limit to top 3 most relevant images
+        return list(images)[:3]
     
     def extract_all_links(patterns, content):
         """Extract all links with categorization"""
