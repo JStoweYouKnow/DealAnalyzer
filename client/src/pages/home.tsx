@@ -122,16 +122,21 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Top Navigation */}
-      <header className="bg-card border-b border-border sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/90">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header 
+        className="border-b border-border sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/60 relative"
+        style={{
+          backgroundImage: `url(${comfortFinderLogo})`,
+          backgroundSize: 'auto 80%',
+          backgroundPosition: 'left center',
+          backgroundRepeat: 'no-repeat',
+          backgroundBlendMode: 'soft-light',
+        }}
+      >
+        <div className="absolute inset-0 bg-card/70 backdrop-blur-sm"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-2">
-              <img 
-                src={comfortFinderLogo} 
-                alt="The Comfort Finder Logo" 
-                className="w-8 h-8 object-contain"
-              />
-              <h1 className="text-xl font-bold gradient-text">The Comfort Finder</h1>
+            <div className="flex items-center space-x-2 ml-12">
+              <h1 className="text-xl font-bold gradient-text drop-shadow-sm">The Comfort Finder</h1>
             </div>
             
             <nav className="flex items-center space-x-6">
