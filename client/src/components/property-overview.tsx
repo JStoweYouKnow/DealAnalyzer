@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,15 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   const [isEditingBeds, setIsEditingBeds] = useState(false);
   const [isEditingStr, setIsEditingStr] = useState(false);
   const { toast } = useToast();
+
+  // Sync local state with updated analysis data
+  useEffect(() => {
+    setEditableRent(property.monthlyRent);
+    setEditableBedrooms(property.bedrooms);
+    setEditableBathrooms(property.bathrooms);
+    setEditableAdr(property.adr || 0);
+    setEditableOccupancyRate(property.occupancyRate ? Math.round(property.occupancyRate * 100) : 0);
+  }, [property.monthlyRent, property.bedrooms, property.bathrooms, property.adr, property.occupancyRate]);
 
   // Fetch rental comps mutation
   const fetchRentalCompsMutation = useMutation({
