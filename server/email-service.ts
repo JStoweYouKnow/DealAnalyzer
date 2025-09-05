@@ -258,6 +258,66 @@ export class EmailMonitoringService {
       }
     }
 
+    // Image URL extraction
+    const imagePatterns = [
+      /https?:\/\/[^\s]*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s]*)?/gi,
+      /https?:\/\/[^\s]*images?[^\s]*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s]*)?/gi,
+      /https?:\/\/[^\s]*photo[^\s]*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s]*)?/gi,
+      /https?:\/\/[^\s]*image[^\s]*/gi,
+      /src=["']([^"']*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^"']*)?)['"]/gi,
+    ];
+
+    const imageUrls: string[] = [];
+    for (const pattern of imagePatterns) {
+      const matches = Array.from(combined.matchAll(pattern));
+      for (const match of matches) {
+        const url = match[0] || match[1];
+        if (url && url.startsWith('http') && !imageUrls.includes(url)) {
+          imageUrls.push(url);
+        }
+      }
+    }
+
+    // Source links extraction
+    const linkPatterns = [
+      /https?:\/\/[^\s]+/gi,
+    ];
+
+    const sourceLinks: Array<{url: string, type: 'listing' | 'company' | 'external' | 'other', description?: string}> = [];
+    const foundUrls = new Set<string>();
+
+    for (const pattern of linkPatterns) {
+      const matches = Array.from(combined.matchAll(pattern));
+      for (const match of matches) {
+        const url = match[0];
+        if (url && url.startsWith('http') && !foundUrls.has(url)) {
+          foundUrls.add(url);
+          
+          // Categorize link type
+          let linkType: 'listing' | 'company' | 'external' | 'other' = 'other';
+          let description: string | undefined;
+          
+          if (['zillow', 'realtor', 'redfin', 'mls'].some(domain => url.toLowerCase().includes(domain))) {
+            linkType = 'listing';
+            description = 'Property listing';
+          } else if (['trulia', 'homes.com', 'movoto'].some(domain => url.toLowerCase().includes(domain))) {
+            linkType = 'listing';
+            description = 'Property listing';
+          } else if (['company', 'agent', 'broker', 'realty'].some(keyword => url.toLowerCase().includes(keyword))) {
+            linkType = 'company';
+            description = 'Real estate company';
+          } else if (['unsubscribe', 'preferences', 'privacy'].some(keyword => url.toLowerCase().includes(keyword))) {
+            linkType = 'external';
+            description = 'Email management';
+          } else {
+            linkType = 'external';
+          }
+          
+          sourceLinks.push({ url, type: linkType, description });
+        }
+      }
+    }
+
     const result = {
       address: address || undefined,
       city: city || undefined,
@@ -266,9 +326,11 @@ export class EmailMonitoringService {
       bedrooms,
       bathrooms,
       sqft,
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      sourceLinks: sourceLinks.length > 0 ? sourceLinks : undefined,
     };
     
-    console.log('Final parsed property:', result);
+    console.log('Final parsed property with images/links:', result);
     return result;
   }
 

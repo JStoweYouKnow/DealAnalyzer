@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict, field
-from typing import Optional
+from typing import Optional, List, Dict
 import json
 
 @dataclass
@@ -20,6 +20,8 @@ class Property:
     listing_url: str
     # Optional fields (with defaults)
     lot_size: Optional[int] = None  # Lot size in square feet
+    image_urls: List[str] = field(default_factory=list)
+    source_links: List[Dict[str, str]] = field(default_factory=list)
     # Financials (calculated or estimated)
     downpayment_percentage: float = 0.20 # Default to 20%
     closing_costs_percentage: float = 0.05 # Default to 5%

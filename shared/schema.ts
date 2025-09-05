@@ -18,6 +18,12 @@ export const propertySchema = z.object({
   yearBuilt: z.number(),
   description: z.string(),
   listingUrl: z.string(),
+  imageUrls: z.array(z.string()).optional(),
+  sourceLinks: z.array(z.object({
+    url: z.string(),
+    type: z.enum(['listing', 'company', 'external', 'other']),
+    description: z.string().optional(),
+  })).optional(),
   // Short-term rental metrics
   adr: z.number().optional(), // Average Daily Rate
   occupancyRate: z.number().optional(), // As decimal (0.75 = 75%)
@@ -210,6 +216,12 @@ export const emailDealSchema = z.object({
     bedrooms: z.number().optional(),
     bathrooms: z.number().optional(),
     sqft: z.number().optional(),
+    imageUrls: z.array(z.string()).optional(),
+    sourceLinks: z.array(z.object({
+      url: z.string(),
+      type: z.enum(['listing', 'company', 'external', 'other']),
+      description: z.string().optional(),
+    })).optional(),
   }).optional(),
   status: emailDealStatus,
   analysis: dealAnalysisSchema.optional(),

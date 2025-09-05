@@ -160,6 +160,63 @@ def parse_email_alert(email_content: str) -> Property:
         r"Link[:：]\s*([^\s]+)",
     ]
 
+    # Image URL patterns
+    image_patterns = [
+        r"(https?://[^\s]*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s]*)?)",
+        r"(https?://[^\s]*images?[^\s]*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s]*)?)",
+        r"(https?://[^\s]*photo[^\s]*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s]*)?)",
+        r"(https?://[^\s]*image[^\s]*)",
+        r"src=[\"']([^\"']*\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\"']*)?)[\"']",
+    ]
+
+    def extract_images(patterns, content):
+        """Extract all image URLs from content"""
+        images = set()  # Use set to avoid duplicates
+        for pattern in patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for match in matches:
+                if match and match.startswith('http'):
+                    images.add(match)
+        return list(images)
+    
+    def extract_all_links(patterns, content):
+        """Extract all links with categorization"""
+        links = []
+        found_urls = set()  # Track URLs to avoid duplicates
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for match in matches:
+                if match and match.startswith('http') and match not in found_urls:
+                    found_urls.add(match)
+                    
+                    # Categorize link type
+                    link_type = 'other'
+                    description = None
+                    
+                    if any(domain in match.lower() for domain in ['zillow', 'realtor', 'redfin', 'mls']):
+                        link_type = 'listing'
+                        description = 'Property listing'
+                    elif any(domain in match.lower() for domain in ['trulia', 'homes.com', 'movoto']):
+                        link_type = 'listing'
+                        description = 'Property listing'
+                    elif any(keyword in match.lower() for keyword in ['company', 'agent', 'broker', 'realty']):
+                        link_type = 'company'
+                        description = 'Real estate company'
+                    elif any(keyword in match.lower() for keyword in ['unsubscribe', 'preferences', 'privacy']):
+                        link_type = 'external'
+                        description = 'Email management'
+                    else:
+                        link_type = 'external'
+                    
+                    links.append({
+                        'url': match,
+                        'type': link_type,
+                        'description': description
+                    })
+        
+        return links
+
     # Extract all fields using patterns
     address = extract_field(address_patterns, email_content)
     property_type = extract_field(property_type_patterns, email_content)
@@ -171,6 +228,10 @@ def parse_email_alert(email_content: str) -> Property:
     lot_size = int(extract_number(lot_size_patterns, email_content)) if extract_number(lot_size_patterns, email_content) > 0 else None
     year_built = int(extract_number(year_patterns, email_content))
     listing_url = extract_field(url_patterns, email_content)
+    
+    # Extract images and all links
+    image_urls = extract_images(image_patterns, email_content)
+    source_links = extract_all_links(url_patterns, email_content)
     
     # Use lot size as square footage fallback if square footage is missing or zero
     if square_footage == 0 and lot_size and lot_size > 0:
@@ -243,7 +304,9 @@ def parse_email_alert(email_content: str) -> Property:
         lot_size=lot_size,
         year_built=year_built,
         description=description,
-        listing_url=listing_url
+        listing_url=listing_url,
+        image_urls=image_urls,
+        source_links=source_links
     )
 
 if __name__ == "__main__":
