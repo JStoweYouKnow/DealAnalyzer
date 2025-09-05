@@ -122,7 +122,10 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Top Navigation */}
-      <header className="bg-card border-b border-border sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/90">
+      <header 
+        className="border-b border-border sticky top-0 z-50"
+        style={{ backgroundColor: '#1e7b1a' }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-2">
@@ -134,14 +137,14 @@ export default function Home() {
             </div>
 
             <div className="absolute left-1/2 transform -translate-x-1/2">
-              <h1 className="text-xl font-bold gradient-text">The Comfort Finder</h1>
+              <h1 className="text-xl font-bold" style={{ color: '#fff8e7' }}>The Comfort Finder</h1>
             </div>
             
             <nav className="flex items-center space-x-6">
-              <a href="/" className="text-primary font-medium flex items-center">
+              <a href="/" className="font-medium flex items-center" style={{ color: '#fff8e7' }}>
                 <i className="fas fa-home mr-2"></i>Home
               </a>
-              <a href="/deals" className="text-muted-foreground hover:text-primary transition-colors font-medium flex items-center">
+              <a href="/deals" className="font-medium flex items-center transition-colors opacity-75 hover:opacity-100" style={{ color: '#fff8e7' }}>
                 <i className="fas fa-inbox mr-2"></i>Email Deal Pipeline
               </a>
             </nav>
