@@ -308,15 +308,15 @@ export default function DealsPage() {
       <header 
         className="border-b border-border sticky top-0 z-50 relative"
         style={{
-          backgroundImage: `linear-gradient(rgba(255, 248, 231, 0.85), rgba(255, 248, 231, 0.85)), url(${comfortFinderLogo})`,
-          backgroundSize: 'auto 70%, cover',
-          backgroundPosition: '20px center, center',
+          backgroundImage: `linear-gradient(rgba(255, 248, 231, 0.9), rgba(255, 248, 231, 0.9)), url(${comfortFinderLogo})`,
+          backgroundSize: 'auto 40%, cover',
+          backgroundPosition: '15px center, center',
           backgroundRepeat: 'no-repeat, no-repeat',
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-2 ml-16">
+            <div className="flex items-center space-x-2 ml-12">
               <h1 className="text-xl font-bold gradient-text">The Comfort Finder</h1>
             </div>
             
