@@ -14,7 +14,7 @@ export default function DealsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'reviewed' | 'analyzed' | 'archived'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingDeal, setEditingDeal] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{[key: string]: {price?: number, rent?: number, adr?: number, occupancyRate?: number}}>({});
+  const [editValues, setEditValues] = useState<{[key: string]: {price?: number, rent?: number, adr?: number, occupancyRate?: number, bedrooms?: number, bathrooms?: number}}>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -180,12 +180,14 @@ export default function DealsPage() {
 
   // Update property mutation
   const updatePropertyMutation = useMutation({
-    mutationFn: async ({ dealId, price, rent, adr, occupancyRate }: { 
+    mutationFn: async ({ dealId, price, rent, adr, occupancyRate, bedrooms, bathrooms }: { 
       dealId: string; 
       price: number; 
       rent: number;
       adr?: number;
       occupancyRate?: number;
+      bedrooms?: number;
+      bathrooms?: number;
     }) => {
       const deal = emailDeals.find(d => d.id === dealId);
       if (!deal || !deal.extractedProperty) {
@@ -198,7 +200,9 @@ export default function DealsPage() {
         price: price,
         monthlyRent: rent,
         adr: adr !== undefined ? adr : deal.extractedProperty?.adr,
-        occupancyRate: occupancyRate !== undefined ? occupancyRate : deal.extractedProperty?.occupancyRate
+        occupancyRate: occupancyRate !== undefined ? occupancyRate : deal.extractedProperty?.occupancyRate,
+        bedrooms: bedrooms !== undefined ? bedrooms : deal.extractedProperty?.bedrooms,
+        bathrooms: bathrooms !== undefined ? bathrooms : deal.extractedProperty?.bathrooms
       };
       
       // Update the email deal's extractedProperty
@@ -526,8 +530,8 @@ export default function DealsPage() {
                                     variant="outline"
                                     onClick={() => {
                                       const address = deal.extractedProperty?.address || deal.analysis?.property?.address;
-                                      const bedrooms = deal.extractedProperty?.bedrooms || deal.analysis?.property?.bedrooms;
-                                      const bathrooms = deal.extractedProperty?.bathrooms || deal.analysis?.property?.bathrooms;
+                                      const bedrooms = editValues[deal.id]?.bedrooms ?? deal.extractedProperty?.bedrooms ?? deal.analysis?.property?.bedrooms;
+                                      const bathrooms = editValues[deal.id]?.bathrooms ?? deal.extractedProperty?.bathrooms ?? deal.analysis?.property?.bathrooms;
                                       const squareFootage = deal.extractedProperty?.sqft || deal.analysis?.property?.squareFootage;
                                       
                                       if (address && bedrooms && bathrooms) {
@@ -586,8 +590,8 @@ export default function DealsPage() {
                                     variant="outline"
                                     onClick={() => {
                                       const address = deal.extractedProperty?.address || deal.analysis?.property?.address;
-                                      const bedrooms = deal.extractedProperty?.bedrooms || deal.analysis?.property?.bedrooms;
-                                      const bathrooms = deal.extractedProperty?.bathrooms || deal.analysis?.property?.bathrooms;
+                                      const bedrooms = editValues[deal.id]?.bedrooms ?? deal.extractedProperty?.bedrooms ?? deal.analysis?.property?.bedrooms;
+                                      const bathrooms = editValues[deal.id]?.bathrooms ?? deal.extractedProperty?.bathrooms ?? deal.analysis?.property?.bathrooms;
                                       const squareFootage = deal.extractedProperty?.sqft || deal.analysis?.property?.squareFootage;
                                       
                                       if (address && bedrooms && bathrooms) {
@@ -652,6 +656,59 @@ export default function DealsPage() {
                             </div>
                           </div>
                           
+                          {/* Editable Bedroom and Bathroom Section */}
+                          {editingDeal === deal.id && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                              <div>
+                                <span className="text-sm text-muted-foreground">Bedrooms:</span>
+                                <Input
+                                  type="number"
+                                  placeholder="Number of bedrooms"
+                                  min="0"
+                                  max="20"
+                                  value={editValues[deal.id]?.bedrooms ?? deal.analysis?.property?.bedrooms ?? deal.extractedProperty?.bedrooms ?? ''}
+                                  onChange={(e) => setEditValues(prev => ({
+                                    ...prev,
+                                    [deal.id]: {
+                                      ...prev[deal.id],
+                                      bedrooms: e.target.value ? Number(e.target.value) : undefined
+                                    }
+                                  }))}
+                                  className="mt-1"
+                                  data-testid={`input-bedrooms-${deal.id}`}
+                                />
+                              </div>
+                              
+                              <div>
+                                <span className="text-sm text-muted-foreground">Bathrooms:</span>
+                                <Input
+                                  type="number"
+                                  placeholder="Number of bathrooms"
+                                  min="0"
+                                  max="20"
+                                  step="0.5"
+                                  value={editValues[deal.id]?.bathrooms ?? deal.analysis?.property?.bathrooms ?? deal.extractedProperty?.bathrooms ?? ''}
+                                  onChange={(e) => setEditValues(prev => ({
+                                    ...prev,
+                                    [deal.id]: {
+                                      ...prev[deal.id],
+                                      bathrooms: e.target.value ? Number(e.target.value) : undefined
+                                    }
+                                  }))}
+                                  className="mt-1"
+                                  data-testid={`input-bathrooms-${deal.id}`}
+                                />
+                              </div>
+                              
+                              <div className="md:col-span-2">
+                                <span className="text-sm text-muted-foreground">Current Values:</span>
+                                <p className="font-medium mt-1">
+                                  {deal.extractedProperty?.bedrooms || deal.analysis?.property?.bedrooms || 0} bd | {deal.extractedProperty?.bathrooms || deal.analysis?.property?.bathrooms || 0} ba
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          
                           {/* Edit Controls */}
                           {editingDeal === deal.id ? (
                             <div className="flex space-x-2">
@@ -662,6 +719,8 @@ export default function DealsPage() {
                                   const rent = editValues[deal.id]?.rent ?? deal.analysis?.property?.monthlyRent ?? deal.extractedProperty?.monthlyRent;
                                   const adr = editValues[deal.id]?.adr ?? deal.analysis?.property?.adr;
                                   const occupancyRate = editValues[deal.id]?.occupancyRate ? editValues[deal.id].occupancyRate! / 100 : deal.analysis?.property?.occupancyRate;
+                                  const bedrooms = editValues[deal.id]?.bedrooms ?? deal.analysis?.property?.bedrooms ?? deal.extractedProperty?.bedrooms;
+                                  const bathrooms = editValues[deal.id]?.bathrooms ?? deal.analysis?.property?.bathrooms ?? deal.extractedProperty?.bathrooms;
                                   
                                   if (price && (rent || (adr && occupancyRate))) {
                                     updatePropertyMutation.mutate({ 
@@ -669,7 +728,9 @@ export default function DealsPage() {
                                       price, 
                                       rent: rent || 0,
                                       adr,
-                                      occupancyRate
+                                      occupancyRate,
+                                      bedrooms,
+                                      bathrooms
                                     });
                                   }
                                 }}
