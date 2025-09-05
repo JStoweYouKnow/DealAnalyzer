@@ -184,30 +184,50 @@ def parse_email_alert(email_content: str) -> Property:
         links = []
         found_urls = set()  # Track URLs to avoid duplicates
         
+        # Define unwanted keywords to filter out
+        unwanted_keywords = [
+            'unsubscribe', 'preferences', 'privacy', 'feedback', 'nmlsconsumer',
+            'terms', 'policy', 'manage', 'notification', 'email', 'optout', 
+            'unsub', 'settings', 'track', 'click', 'pixel', 'analytics',
+            'campaign', 'utm_', 'redirect', 'mail.', 'token=', 'rtoken='
+        ]
+        
         for pattern in patterns:
             matches = re.findall(pattern, content, re.IGNORECASE)
             for match in matches:
                 if match and match.startswith('http') and match not in found_urls:
                     found_urls.add(match)
                     
+                    # Skip unwanted links
+                    if any(keyword in match.lower() for keyword in unwanted_keywords):
+                        continue
+                    
                     # Categorize link type
                     link_type = 'other'
                     description = None
                     
                     if any(domain in match.lower() for domain in ['zillow', 'realtor', 'redfin', 'mls']):
-                        link_type = 'listing'
-                        description = 'Property listing'
+                        # Only include if it looks like a property listing, not tracking
+                        if not any(track in match.lower() for track in ['click', 'track', 'email', 'campaign']):
+                            link_type = 'listing'
+                            description = 'Property listing'
+                        else:
+                            continue  # Skip tracking links
                     elif any(domain in match.lower() for domain in ['trulia', 'homes.com', 'movoto']):
-                        link_type = 'listing'
-                        description = 'Property listing'
+                        if not any(track in match.lower() for track in ['click', 'track', 'email', 'campaign']):
+                            link_type = 'listing'
+                            description = 'Property listing'
+                        else:
+                            continue
                     elif any(keyword in match.lower() for keyword in ['company', 'agent', 'broker', 'realty']):
                         link_type = 'company'
                         description = 'Real estate company'
-                    elif any(keyword in match.lower() for keyword in ['unsubscribe', 'preferences', 'privacy']):
-                        link_type = 'external'
-                        description = 'Email management'
                     else:
-                        link_type = 'external'
+                        # Only include external links if they seem property-related
+                        if any(keyword in match.lower() for keyword in ['property', 'home', 'house', 'listing']):
+                            link_type = 'external'
+                        else:
+                            continue  # Skip other external links
                     
                     links.append({
                         'url': match,
@@ -215,7 +235,8 @@ def parse_email_alert(email_content: str) -> Property:
                         'description': description
                     })
         
-        return links
+        # Limit to most relevant links (top 3)
+        return links[:3]
 
     # Extract all fields using patterns
     address = extract_field(address_patterns, email_content)

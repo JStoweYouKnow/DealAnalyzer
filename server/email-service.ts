@@ -286,6 +286,14 @@ export class EmailMonitoringService {
     const sourceLinks: Array<{url: string, type: 'listing' | 'company' | 'external' | 'other', description?: string}> = [];
     const foundUrls = new Set<string>();
 
+    // Define unwanted keywords to filter out
+    const unwantedKeywords = [
+      'unsubscribe', 'preferences', 'privacy', 'feedback', 'nmlsconsumer',
+      'terms', 'policy', 'manage', 'notification', 'email', 'optout', 
+      'unsub', 'settings', 'track', 'click', 'pixel', 'analytics',
+      'campaign', 'utm_', 'redirect', 'mail.', 'token=', 'rtoken='
+    ];
+
     for (const pattern of linkPatterns) {
       const matches = Array.from(combined.matchAll(pattern));
       for (const match of matches) {
@@ -293,30 +301,49 @@ export class EmailMonitoringService {
         if (url && url.startsWith('http') && !foundUrls.has(url)) {
           foundUrls.add(url);
           
+          // Skip unwanted links
+          if (unwantedKeywords.some(keyword => url.toLowerCase().includes(keyword))) {
+            continue;
+          }
+          
           // Categorize link type
           let linkType: 'listing' | 'company' | 'external' | 'other' = 'other';
           let description: string | undefined;
           
           if (['zillow', 'realtor', 'redfin', 'mls'].some(domain => url.toLowerCase().includes(domain))) {
-            linkType = 'listing';
-            description = 'Property listing';
+            // Only include if it looks like a property listing, not tracking
+            if (!['click', 'track', 'email', 'campaign'].some(track => url.toLowerCase().includes(track))) {
+              linkType = 'listing';
+              description = 'Property listing';
+            } else {
+              continue; // Skip tracking links
+            }
           } else if (['trulia', 'homes.com', 'movoto'].some(domain => url.toLowerCase().includes(domain))) {
-            linkType = 'listing';
-            description = 'Property listing';
+            if (!['click', 'track', 'email', 'campaign'].some(track => url.toLowerCase().includes(track))) {
+              linkType = 'listing';
+              description = 'Property listing';
+            } else {
+              continue;
+            }
           } else if (['company', 'agent', 'broker', 'realty'].some(keyword => url.toLowerCase().includes(keyword))) {
             linkType = 'company';
             description = 'Real estate company';
-          } else if (['unsubscribe', 'preferences', 'privacy'].some(keyword => url.toLowerCase().includes(keyword))) {
-            linkType = 'external';
-            description = 'Email management';
           } else {
-            linkType = 'external';
+            // Only include external links if they seem property-related
+            if (['property', 'home', 'house', 'listing'].some(keyword => url.toLowerCase().includes(keyword))) {
+              linkType = 'external';
+            } else {
+              continue; // Skip other external links
+            }
           }
           
           sourceLinks.push({ url, type: linkType, description });
         }
       }
     }
+
+    // Limit to most relevant links (top 3)
+    const limitedSourceLinks = sourceLinks.slice(0, 3);
 
     const result = {
       address: address || undefined,
@@ -327,7 +354,7 @@ export class EmailMonitoringService {
       bathrooms,
       sqft,
       imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-      sourceLinks: sourceLinks.length > 0 ? sourceLinks : undefined,
+      sourceLinks: limitedSourceLinks.length > 0 ? limitedSourceLinks : undefined,
     };
     
     console.log('Final parsed property with images/links:', result);
