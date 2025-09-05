@@ -236,7 +236,7 @@ export default function DealsPage() {
                 <i className="fas fa-home mr-2"></i>Home
               </a>
               <a href="/deals" className="text-primary font-medium flex items-center">
-                <i className="fas fa-inbox mr-2"></i>Deal Pipeline
+                <i className="fas fa-inbox mr-2"></i>Email Deal Pipeline
               </a>
             </nav>
           </div>
