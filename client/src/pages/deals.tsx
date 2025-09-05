@@ -609,8 +609,8 @@ export default function DealsPage() {
                                 </div>
                               ) : (
                                 <p className="font-medium text-lg mt-1">
-                                  {deal.analysis?.property?.adr
-                                    ? `$${deal.analysis.property.adr}`
+                                  {(deal.analysis?.property?.adr || deal.extractedProperty?.adr)
+                                    ? `$${deal.analysis?.property?.adr || deal.extractedProperty?.adr}`
                                     : 'Not specified'}
                                 </p>
                               )}
@@ -638,8 +638,8 @@ export default function DealsPage() {
                                 />
                               ) : (
                                 <p className="font-medium text-lg mt-1">
-                                  {deal.analysis?.property?.occupancyRate
-                                    ? `${Math.round(deal.analysis.property.occupancyRate * 100)}%`
+                                  {(deal.analysis?.property?.occupancyRate || deal.extractedProperty?.occupancyRate)
+                                    ? `${Math.round((deal.analysis?.property?.occupancyRate || deal.extractedProperty?.occupancyRate || 0) * 100)}%`
                                     : 'Not specified'}
                                 </p>
                               )}
