@@ -320,14 +320,14 @@ export default function DealsPage() {
             </div>
 
             <div className="absolute left-1/2 transform -translate-x-1/2">
-              <h1 className="text-xl font-bold" style={{ color: '#fff8e7' }}>The Comfort Finder</h1>
+              <h1 className="text-xl font-bold text-foreground">The Comfort Finder</h1>
             </div>
             
             <nav className="flex items-center space-x-6">
-              <a href="/" className="font-medium flex items-center transition-colors opacity-75 hover:opacity-100" style={{ color: '#fff8e7' }}>
+              <a href="/" className="font-medium flex items-center transition-colors opacity-75 hover:opacity-100 text-foreground">
                 <i className="fas fa-home mr-2"></i>Home
               </a>
-              <a href="/deals" className="font-medium flex items-center" style={{ color: '#fff8e7' }}>
+              <a href="/deals" className="font-medium flex items-center text-foreground">
                 <i className="fas fa-inbox mr-2"></i>Email Deal Pipeline
               </a>
             </nav>
