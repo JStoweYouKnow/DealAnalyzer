@@ -9,6 +9,23 @@ interface RentalProperty {
   source: string;
 }
 
+interface AirbnbData {
+  averageDailyRate: number;
+  occupancyRate: number;
+  properties: AirbnbProperty[];
+  searchArea: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+interface AirbnbProperty {
+  title: string;
+  dailyRate: number;
+  occupancyRate?: number;
+  bedrooms: number;
+  bathrooms: number;
+  source: string;
+}
+
 interface RentalCompsResult {
   averageRent: number;
   properties: RentalProperty[];
@@ -17,6 +34,58 @@ interface RentalCompsResult {
 }
 
 export class RentalCompsService {
+  
+  async searchAirbnbData(
+    address: string,
+    bedrooms: number,
+    bathrooms: number,
+    squareFootage?: number
+  ): Promise<AirbnbData> {
+    try {
+      // Extract city and state from address for search
+      const cityState = this.extractCityState(address);
+      
+      // Build search queries for Airbnb properties
+      const queries = this.buildAirbnbSearchQueries(cityState, bedrooms, bathrooms, squareFootage);
+      
+      const allProperties: AirbnbProperty[] = [];
+      
+      // Search multiple sources - placeholder for web search integration
+      console.log(`Would search for Airbnb data with queries:`, queries);
+      
+      // For now, return mock data structure
+      // This will be replaced with actual web search calls
+      const mockProperties = this.generateMockAirbnbData(cityState, bedrooms, bathrooms, squareFootage);
+      allProperties.push(...mockProperties);
+      
+      // Filter and process Airbnb properties
+      const filteredProperties = this.filterAirbnbProperties(
+        allProperties, 
+        bedrooms, 
+        bathrooms, 
+        squareFootage
+      );
+      
+      // Calculate averages
+      const averageDailyRate = this.calculateAverageDailyRate(filteredProperties);
+      const occupancyRate = this.calculateAverageOccupancyRate(filteredProperties);
+      
+      // Determine confidence level
+      const confidence = this.assessConfidence(filteredProperties);
+      
+      return {
+        averageDailyRate,
+        occupancyRate,
+        properties: filteredProperties.slice(0, 10), // Return top 10 for reference
+        searchArea: cityState,
+        confidence
+      };
+      
+    } catch (error) {
+      console.error('Error searching Airbnb data:', error);
+      throw new Error('Failed to search Airbnb comparables');
+    }
+  }
   
   async searchRentalComps(
     address: string,
@@ -273,6 +342,140 @@ export class RentalCompsService {
     }
     
     return properties;
+  }
+  
+  private buildAirbnbSearchQueries(
+    cityState: string, 
+    bedrooms: number, 
+    bathrooms: number,
+    squareFootage?: number
+  ): string[] {
+    const queries = [
+      `Airbnb ${bedrooms} bedroom ${bathrooms} bathroom ${cityState} daily rate pricing`,
+      `short term rental ${bedrooms}BR ${bathrooms}BA ${cityState} Airbnb rates occupancy`,
+      `vacation rental comps ${bedrooms} bed ${cityState} daily rate analysis`,
+      `STR rental ${cityState} ${bedrooms} bedroom Airbnb revenue data`,
+    ];
+    
+    if (squareFootage && squareFootage > 0) {
+      queries.push(`${squareFootage} sqft Airbnb ${bedrooms} bedroom ${cityState} daily rate`);
+    }
+    
+    return queries;
+  }
+  
+  private generateMockAirbnbData(cityState: string, bedrooms: number, bathrooms: number, squareFootage?: number): AirbnbProperty[] {
+    // Generate realistic Airbnb data for testing
+    // This will be replaced with actual web search results
+    const baseRate = bedrooms * 45 + bathrooms * 25 + (squareFootage ? squareFootage * 0.08 : 0);
+    const variance = baseRate * 0.4;
+    
+    const properties: AirbnbProperty[] = [];
+    for (let i = 0; i < 8; i++) {
+      const dailyRate = Math.round(baseRate + (Math.random() - 0.5) * variance);
+      const occupancyRate = 0.65 + Math.random() * 0.25; // 65-90% occupancy
+      
+      properties.push({
+        title: `Airbnb Property ${i + 1} - ${cityState}`,
+        dailyRate,
+        occupancyRate,
+        bedrooms: bedrooms + (Math.random() > 0.7 ? (Math.random() > 0.5 ? 1 : -1) : 0),
+        bathrooms: bathrooms + (Math.random() > 0.8 ? 0.5 : 0),
+        source: 'mock_airbnb_data'
+      });
+    }
+    
+    return properties;
+  }
+  
+  private filterAirbnbProperties(
+    properties: AirbnbProperty[], 
+    targetBedrooms: number, 
+    targetBathrooms: number,
+    targetSquareFootage?: number
+  ): AirbnbProperty[] {
+    
+    // Filter properties that are close matches
+    const filtered = properties.filter(prop => {
+      const bedroomMatch = Math.abs(prop.bedrooms - targetBedrooms) <= 1;
+      const bathroomMatch = Math.abs(prop.bathrooms - targetBathrooms) <= 0.5;
+      const reasonableRate = prop.dailyRate >= 50 && prop.dailyRate <= 2000;
+      const reasonableOccupancy = !prop.occupancyRate || (prop.occupancyRate >= 0.3 && prop.occupancyRate <= 1.0);
+      
+      return bedroomMatch && bathroomMatch && reasonableRate && reasonableOccupancy;
+    });
+    
+    // Deduplicate by daily rate (remove exact duplicates)
+    const seen = new Set();
+    const deduplicated = filtered.filter(prop => {
+      const key = `${prop.dailyRate}-${prop.bedrooms}-${prop.bathrooms}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+    
+    // Sort by how close they match target criteria
+    return deduplicated.sort((a, b) => {
+      const aScore = this.calculateAirbnbMatchScore(a, targetBedrooms, targetBathrooms, targetSquareFootage);
+      const bScore = this.calculateAirbnbMatchScore(b, targetBedrooms, targetBathrooms, targetSquareFootage);
+      return bScore - aScore;
+    });
+  }
+  
+  private calculateAirbnbMatchScore(
+    property: AirbnbProperty, 
+    targetBedrooms: number, 
+    targetBathrooms: number,
+    targetSquareFootage?: number
+  ): number {
+    let score = 0;
+    
+    // Bedroom match scoring
+    const bedroomDiff = Math.abs(property.bedrooms - targetBedrooms);
+    if (bedroomDiff === 0) score += 40;
+    else if (bedroomDiff === 1) score += 20;
+    
+    // Bathroom match scoring  
+    const bathroomDiff = Math.abs(property.bathrooms - targetBathrooms);
+    if (bathroomDiff === 0) score += 30;
+    else if (bathroomDiff <= 0.5) score += 15;
+    
+    // Bonus for having occupancy data
+    if (property.occupancyRate) score += 10;
+    
+    return score;
+  }
+  
+  private calculateAverageDailyRate(properties: AirbnbProperty[]): number {
+    if (properties.length === 0) return 0;
+    
+    // Remove outliers (top and bottom 10% if we have enough data)
+    if (properties.length >= 5) {
+      const sorted = [...properties].sort((a, b) => a.dailyRate - b.dailyRate);
+      const removeCount = Math.floor(properties.length * 0.1);
+      const trimmed = sorted.slice(removeCount, -removeCount || undefined);
+      
+      const total = trimmed.reduce((sum, prop) => sum + prop.dailyRate, 0);
+      return Math.round(total / trimmed.length);
+    }
+    
+    // For smaller datasets, use simple average
+    const total = properties.reduce((sum, prop) => sum + prop.dailyRate, 0);
+    return Math.round(total / properties.length);
+  }
+  
+  private calculateAverageOccupancyRate(properties: AirbnbProperty[]): number {
+    const propertiesWithOccupancy = properties.filter(prop => prop.occupancyRate !== undefined);
+    
+    if (propertiesWithOccupancy.length === 0) {
+      // Return average occupancy rate for the area if no data
+      return 0.72; // 72% default occupancy rate
+    }
+    
+    const total = propertiesWithOccupancy.reduce((sum, prop) => sum + (prop.occupancyRate || 0), 0);
+    return Math.round((total / propertiesWithOccupancy.length) * 100) / 100; // Round to 2 decimal places
   }
 }
 

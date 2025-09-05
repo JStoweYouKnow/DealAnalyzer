@@ -690,6 +690,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get Airbnb data (ADR and occupancy) for a property
+  app.post("/api/airbnb-data", async (req, res) => {
+    try {
+      const { address, bedrooms, bathrooms, squareFootage } = req.body;
+      
+      if (!address || !bedrooms || !bathrooms) {
+        res.status(400).json({
+          success: false,
+          error: "Address, bedrooms, and bathrooms are required"
+        });
+        return;
+      }
+      
+      console.log(`Searching Airbnb data for: ${address}, ${bedrooms}BR/${bathrooms}BA`);
+      
+      const airbnbResult = await rentalCompsService.searchAirbnbData(
+        address,
+        bedrooms,
+        bathrooms,
+        squareFootage
+      );
+      
+      res.json({
+        success: true,
+        data: airbnbResult
+      });
+      
+    } catch (error) {
+      console.error("Error fetching Airbnb data:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch Airbnb data"
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

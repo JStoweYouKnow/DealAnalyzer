@@ -14,7 +14,7 @@ export default function DealsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'reviewed' | 'analyzed' | 'archived'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingDeal, setEditingDeal] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{[key: string]: {price?: number, rent?: number}}>({});
+  const [editValues, setEditValues] = useState<{[key: string]: {price?: number, rent?: number, adr?: number, occupancyRate?: number}}>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -144,9 +144,49 @@ export default function DealsPage() {
     }
   });
 
+  // Fetch Airbnb data mutation
+  const fetchAirbnbDataMutation = useMutation({
+    mutationFn: async (property: { address: string; bedrooms: number; bathrooms: number; squareFootage?: number }) => {
+      const response = await apiRequest('POST', '/api/airbnb-data', property);
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      if (data.success) {
+        const dealId = Object.keys(editValues).find(id => editingDeal === id) || editingDeal;
+        if (dealId) {
+          setEditValues(prev => ({
+            ...prev,
+            [dealId]: {
+              ...prev[dealId],
+              adr: data.data.averageDailyRate,
+              occupancyRate: Math.round(data.data.occupancyRate * 100) // Convert to percentage
+            }
+          }));
+        }
+        toast({
+          title: "Airbnb Data Found",
+          description: `ADR: $${data.data.averageDailyRate}, Occupancy: ${Math.round(data.data.occupancyRate * 100)}% (${data.data.properties.length} comps, ${data.data.confidence} confidence)`,
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Airbnb Data Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   // Update property mutation
   const updatePropertyMutation = useMutation({
-    mutationFn: async ({ dealId, price, rent }: { dealId: string; price: number; rent: number }) => {
+    mutationFn: async ({ dealId, price, rent, adr, occupancyRate }: { 
+      dealId: string; 
+      price: number; 
+      rent: number;
+      adr?: number;
+      occupancyRate?: number;
+    }) => {
       const deal = emailDeals.find(d => d.id === dealId);
       if (!deal || !deal.extractedProperty) {
         throw new Error('Deal or property not found');
@@ -155,7 +195,9 @@ export default function DealsPage() {
       const updatedProperty = {
         ...deal.extractedProperty,
         purchasePrice: price,
-        monthlyRent: rent
+        monthlyRent: rent,
+        adr: adr || deal.extractedProperty?.adr,
+        occupancyRate: occupancyRate || deal.extractedProperty?.occupancyRate
       };
       
       const response = await apiRequest('POST', '/api/update-property', { 
@@ -417,7 +459,7 @@ export default function DealsPage() {
                           </div>
                           
                           {/* Editable Price and Rent Section */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
                             <div>
                               <span className="text-sm text-muted-foreground">Purchase Price:</span>
                               {editingDeal === deal.id ? (
@@ -466,10 +508,10 @@ export default function DealsPage() {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => {
-                                      const address = deal.extractedProperty.address || deal.analysis?.property?.address;
-                                      const bedrooms = deal.extractedProperty.bedrooms || deal.analysis?.property?.bedrooms;
-                                      const bathrooms = deal.extractedProperty.bathrooms || deal.analysis?.property?.bathrooms;
-                                      const squareFootage = deal.extractedProperty.squareFootage || deal.analysis?.property?.squareFootage;
+                                      const address = deal.extractedProperty?.address || deal.analysis?.property?.address;
+                                      const bedrooms = deal.extractedProperty?.bedrooms || deal.analysis?.property?.bedrooms;
+                                      const bathrooms = deal.extractedProperty?.bathrooms || deal.analysis?.property?.bathrooms;
+                                      const squareFootage = deal.extractedProperty?.sqft || deal.analysis?.property?.squareFootage;
                                       
                                       if (address && bedrooms && bathrooms) {
                                         fetchRentalCompsMutation.mutate({
@@ -502,6 +544,95 @@ export default function DealsPage() {
                                 </p>
                               )}
                             </div>
+                            
+                            {/* Airbnb ADR Section */}
+                            <div>
+                              <span className="text-sm text-muted-foreground">ADR (Daily Rate):</span>
+                              {editingDeal === deal.id ? (
+                                <div className="space-y-2">
+                                  <Input
+                                    type="number"
+                                    placeholder="Enter daily rate"
+                                    value={editValues[deal.id]?.adr ?? deal.analysis?.property?.adr ?? ''}
+                                    onChange={(e) => setEditValues(prev => ({
+                                      ...prev,
+                                      [deal.id]: {
+                                        ...prev[deal.id],
+                                        adr: e.target.value ? Number(e.target.value) : undefined
+                                      }
+                                    }))}
+                                    className="mt-1"
+                                    data-testid={`input-adr-${deal.id}`}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const address = deal.extractedProperty?.address || deal.analysis?.property?.address;
+                                      const bedrooms = deal.extractedProperty?.bedrooms || deal.analysis?.property?.bedrooms;
+                                      const bathrooms = deal.extractedProperty?.bathrooms || deal.analysis?.property?.bathrooms;
+                                      const squareFootage = deal.extractedProperty?.sqft || deal.analysis?.property?.squareFootage;
+                                      
+                                      if (address && bedrooms && bathrooms) {
+                                        fetchAirbnbDataMutation.mutate({
+                                          address,
+                                          bedrooms,
+                                          bathrooms,
+                                          squareFootage
+                                        });
+                                      } else {
+                                        toast({
+                                          title: "Missing Information",
+                                          description: "Need address, bedrooms, and bathrooms to fetch Airbnb data",
+                                          variant: "destructive",
+                                        });
+                                      }
+                                    }}
+                                    disabled={fetchAirbnbDataMutation.isPending}
+                                    className="text-xs"
+                                    data-testid={`button-airbnb-data-${deal.id}`}
+                                  >
+                                    <i className="fas fa-home mr-1"></i>
+                                    {fetchAirbnbDataMutation.isPending ? 'Searching...' : 'Get Airbnb Data'}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <p className="font-medium text-lg mt-1">
+                                  {deal.analysis?.property?.adr
+                                    ? `$${deal.analysis.property.adr}`
+                                    : 'Not specified'}
+                                </p>
+                              )}
+                            </div>
+                            
+                            {/* Airbnb Occupancy Rate Section */}
+                            <div>
+                              <span className="text-sm text-muted-foreground">Occupancy Rate:</span>
+                              {editingDeal === deal.id ? (
+                                <Input
+                                  type="number"
+                                  placeholder="Enter occupancy %"
+                                  min="0"
+                                  max="100"
+                                  value={editValues[deal.id]?.occupancyRate ?? (deal.analysis?.property?.occupancyRate ? Math.round(deal.analysis.property.occupancyRate * 100) : '') ?? ''}
+                                  onChange={(e) => setEditValues(prev => ({
+                                    ...prev,
+                                    [deal.id]: {
+                                      ...prev[deal.id],
+                                      occupancyRate: e.target.value ? Number(e.target.value) : undefined
+                                    }
+                                  }))}
+                                  className="mt-1"
+                                  data-testid={`input-occupancy-${deal.id}`}
+                                />
+                              ) : (
+                                <p className="font-medium text-lg mt-1">
+                                  {deal.analysis?.property?.occupancyRate
+                                    ? `${Math.round(deal.analysis.property.occupancyRate * 100)}%`
+                                    : 'Not specified'}
+                                </p>
+                              )}
+                            </div>
                           </div>
                           
                           {/* Edit Controls */}
@@ -512,12 +643,21 @@ export default function DealsPage() {
                                 onClick={() => {
                                   const price = editValues[deal.id]?.price ?? deal.analysis?.property?.purchasePrice ?? deal.extractedProperty?.price;
                                   const rent = editValues[deal.id]?.rent ?? deal.analysis?.property?.monthlyRent ?? deal.extractedProperty?.monthlyRent;
-                                  if (price && rent) {
-                                    updatePropertyMutation.mutate({ dealId: deal.id, price, rent });
+                                  const adr = editValues[deal.id]?.adr ?? deal.analysis?.property?.adr;
+                                  const occupancyRate = editValues[deal.id]?.occupancyRate ? editValues[deal.id].occupancyRate! / 100 : deal.analysis?.property?.occupancyRate;
+                                  
+                                  if (price && (rent || (adr && occupancyRate))) {
+                                    updatePropertyMutation.mutate({ 
+                                      dealId: deal.id, 
+                                      price, 
+                                      rent: rent || 0,
+                                      adr,
+                                      occupancyRate
+                                    });
                                   }
                                 }}
                                 disabled={updatePropertyMutation.isPending || 
-                                  (!editValues[deal.id]?.price && !editValues[deal.id]?.rent)}
+                                  (!editValues[deal.id]?.price && !editValues[deal.id]?.rent && !editValues[deal.id]?.adr)}
                                 data-testid={`button-save-${deal.id}`}
                               >
                                 <i className="fas fa-save mr-2"></i>
