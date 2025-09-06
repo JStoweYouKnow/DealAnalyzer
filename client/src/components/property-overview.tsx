@@ -19,9 +19,11 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   const [editableBathrooms, setEditableBathrooms] = useState(property.bathrooms);
   const [editableAdr, setEditableAdr] = useState(property.adr || 0);
   const [editableOccupancyRate, setEditableOccupancyRate] = useState(property.occupancyRate ? Math.round(property.occupancyRate * 100) : 0);
+  const [editableAddress, setEditableAddress] = useState(property.address);
   const [isEditingRent, setIsEditingRent] = useState(false);
   const [isEditingBeds, setIsEditingBeds] = useState(false);
   const [isEditingStr, setIsEditingStr] = useState(false);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
   const { toast } = useToast();
 
   // Sync local state with updated analysis data
@@ -31,7 +33,8 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     setEditableBathrooms(property.bathrooms);
     setEditableAdr(property.adr || 0);
     setEditableOccupancyRate(property.occupancyRate ? Math.round(property.occupancyRate * 100) : 0);
-  }, [property.monthlyRent, property.bedrooms, property.bathrooms, property.adr, property.occupancyRate]);
+    setEditableAddress(property.address);
+  }, [property.monthlyRent, property.bedrooms, property.bathrooms, property.adr, property.occupancyRate, property.address]);
 
   // Fetch rental comps mutation
   const fetchRentalCompsMutation = useMutation({
@@ -184,6 +187,40 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     },
   });
 
+  // Mutation for updating property address
+  const updateAddressMutation = useMutation({
+    mutationFn: async (newAddress: string) => {
+      const updatedProperty = { ...property, address: newAddress };
+      const response = await apiRequest("POST", "/api/update-property", {
+        property: updatedProperty,
+      });
+      return response.json() as Promise<AnalyzePropertyResponse>;
+    },
+    onSuccess: (data) => {
+      if (data.success && data.data && onAnalysisUpdate) {
+        onAnalysisUpdate(data.data);
+        setIsEditingAddress(false);
+        toast({
+          title: "Property Renamed",
+          description: "Property address updated successfully.",
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: data.error || "Failed to update property address",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleRentUpdate = async () => {
     if (editableRent !== property.monthlyRent && editableRent >= 0) {
       updateRentMutation.mutate(editableRent);
@@ -215,6 +252,15 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     }
   };
 
+  const handleAddressUpdate = async () => {
+    if (editableAddress.trim() !== property.address && editableAddress.trim()) {
+      updateAddressMutation.mutate(editableAddress.trim());
+    } else {
+      setIsEditingAddress(false);
+      setEditableAddress(property.address); // Reset to original value
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -241,11 +287,38 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
             <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
               <i className="fas fa-home text-primary"></i>
             </div>
-            <div>
+            <div className="flex-1">
               <h3 className="text-lg font-semibold text-card-foreground">Property Analysis</h3>
-              <p className="text-sm text-muted-foreground" data-testid="text-property-address">
-                {property.address}
-              </p>
+              <div className="flex items-center space-x-2">
+                {isEditingAddress ? (
+                  <Input
+                    type="text"
+                    value={editableAddress}
+                    onChange={(e) => setEditableAddress(e.target.value)}
+                    onBlur={handleAddressUpdate}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddressUpdate()}
+                    className="text-sm min-w-0 flex-1"
+                    data-testid="input-property-address"
+                    placeholder="Enter property address"
+                  />
+                ) : (
+                  <p 
+                    className="text-sm text-muted-foreground cursor-pointer hover:bg-orange-50 px-2 py-1 rounded flex-1 min-w-0" 
+                    data-testid="text-property-address"
+                    onClick={() => setIsEditingAddress(true)}
+                    title="Click to edit property address"
+                  >
+                    {property.address}
+                  </p>
+                )}
+                <button
+                  onClick={() => setIsEditingAddress(!isEditingAddress)}
+                  className="text-xs text-muted-foreground hover:text-primary"
+                  title={isEditingAddress ? "Cancel" : "Rename property"}
+                >
+                  <i className={`fas ${isEditingAddress ? 'fa-times' : 'fa-edit'}`}></i>
+                </button>
+              </div>
             </div>
           </div>
           
