@@ -20,10 +20,12 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   const [editableAdr, setEditableAdr] = useState(property.adr || 0);
   const [editableOccupancyRate, setEditableOccupancyRate] = useState(property.occupancyRate ? Math.round(property.occupancyRate * 100) : 0);
   const [editableAddress, setEditableAddress] = useState(property.address);
+  const [editablePrice, setEditablePrice] = useState(property.purchasePrice);
   const [isEditingRent, setIsEditingRent] = useState(false);
   const [isEditingBeds, setIsEditingBeds] = useState(false);
   const [isEditingStr, setIsEditingStr] = useState(false);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [isEditingPrice, setIsEditingPrice] = useState(false);
   const { toast } = useToast();
 
   // Sync local state with updated analysis data
@@ -34,7 +36,8 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     setEditableAdr(property.adr || 0);
     setEditableOccupancyRate(property.occupancyRate ? Math.round(property.occupancyRate * 100) : 0);
     setEditableAddress(property.address);
-  }, [property.monthlyRent, property.bedrooms, property.bathrooms, property.adr, property.occupancyRate, property.address]);
+    setEditablePrice(property.purchasePrice);
+  }, [property.monthlyRent, property.bedrooms, property.bathrooms, property.adr, property.occupancyRate, property.address, property.purchasePrice]);
 
   // Fetch rental comps mutation
   const fetchRentalCompsMutation = useMutation({
@@ -221,6 +224,40 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     },
   });
 
+  // Mutation for updating property price
+  const updatePriceMutation = useMutation({
+    mutationFn: async (newPrice: number) => {
+      const updatedProperty = { ...property, purchasePrice: newPrice };
+      const response = await apiRequest("POST", "/api/update-property", {
+        property: updatedProperty,
+      });
+      return response.json() as Promise<AnalyzePropertyResponse>;
+    },
+    onSuccess: (data) => {
+      if (data.success && data.data && onAnalysisUpdate) {
+        onAnalysisUpdate(data.data);
+        setIsEditingPrice(false);
+        toast({
+          title: "Price Updated",
+          description: "Property price updated and analysis refreshed.",
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: data.error || "Failed to update property price",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleRentUpdate = async () => {
     if (editableRent !== property.monthlyRent && editableRent >= 0) {
       updateRentMutation.mutate(editableRent);
@@ -258,6 +295,15 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     } else {
       setIsEditingAddress(false);
       setEditableAddress(property.address); // Reset to original value
+    }
+  };
+
+  const handlePriceUpdate = async () => {
+    if (editablePrice !== property.purchasePrice && editablePrice > 0) {
+      updatePriceMutation.mutate(editablePrice);
+    } else {
+      setIsEditingPrice(false);
+      setEditablePrice(property.purchasePrice); // Reset to original value
     }
   };
 
@@ -342,11 +388,39 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
               Property Details
             </h4>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Price:</span>
-                <span className="font-medium text-primary" data-testid="text-purchase-price">
-                  {formatCurrency(property.purchasePrice)}
-                </span>
+                <div className="flex items-center space-x-2">
+                  {isEditingPrice ? (
+                    <Input
+                      type="number"
+                      value={editablePrice}
+                      onChange={(e) => setEditablePrice(Number(e.target.value))}
+                      onBlur={handlePriceUpdate}
+                      onKeyDown={(e) => e.key === 'Enter' && handlePriceUpdate()}
+                      className="w-28 h-6 text-right text-sm"
+                      data-testid="input-purchase-price"
+                      min="0"
+                      step="1000"
+                    />
+                  ) : (
+                    <span 
+                      className="font-medium text-primary cursor-pointer hover:bg-orange-50 px-2 py-1 rounded" 
+                      data-testid="text-purchase-price"
+                      onClick={() => setIsEditingPrice(true)}
+                      title="Click to edit price"
+                    >
+                      {formatCurrency(property.purchasePrice)}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setIsEditingPrice(!isEditingPrice)}
+                    className="text-xs text-muted-foreground hover:text-primary"
+                    title={isEditingPrice ? "Cancel" : "Edit price"}
+                  >
+                    <i className={`fas ${isEditingPrice ? 'fa-times' : 'fa-edit'}`}></i>
+                  </button>
+                </div>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Monthly Rent:</span>
