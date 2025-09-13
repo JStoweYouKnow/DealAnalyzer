@@ -91,9 +91,20 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   // Mutation for updating rent and re-analyzing
   const updateRentMutation = useMutation({
     mutationFn: async (newRent: number) => {
-      const updatedProperty = { ...property, monthlyRent: newRent };
-      const response = await apiRequest("POST", "/api/update-rent", {
-        property: updatedProperty,
+      // Only send essential property fields to reduce payload size
+      const essentialProperty = {
+        address: property.address,
+        purchasePrice: property.purchasePrice,
+        monthlyRent: newRent,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        squareFootage: property.squareFootage,
+        adr: property.adr,
+        occupancyRate: property.occupancyRate,
+        propertyType: property.propertyType
+      };
+      const response = await apiRequest("POST", "/api/update-property", {
+        property: essentialProperty,
       });
       return response.json() as Promise<AnalyzePropertyResponse>;
     },
@@ -125,9 +136,20 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   // Mutation for updating bedrooms/bathrooms and re-analyzing
   const updateBedsAndBathsMutation = useMutation({
     mutationFn: async ({ bedrooms, bathrooms }: { bedrooms: number; bathrooms: number }) => {
-      const updatedProperty = { ...property, bedrooms, bathrooms };
+      // Only send essential property fields to reduce payload size
+      const essentialProperty = {
+        address: property.address,
+        purchasePrice: property.purchasePrice,
+        monthlyRent: property.monthlyRent,
+        bedrooms,
+        bathrooms,
+        squareFootage: property.squareFootage,
+        adr: property.adr,
+        occupancyRate: property.occupancyRate,
+        propertyType: property.propertyType
+      };
       const response = await apiRequest("POST", "/api/update-property", {
-        property: updatedProperty,
+        property: essentialProperty,
       });
       return response.json() as Promise<AnalyzePropertyResponse>;
     },
@@ -159,9 +181,20 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   // Mutation for updating ADR/occupancy and re-analyzing
   const updateStrMutation = useMutation({
     mutationFn: async ({ adr, occupancyRate }: { adr: number; occupancyRate: number }) => {
-      const updatedProperty = { ...property, adr, occupancyRate: occupancyRate / 100 }; // Convert percentage to decimal
+      // Only send essential property fields to reduce payload size
+      const essentialProperty = {
+        address: property.address,
+        purchasePrice: property.purchasePrice,
+        monthlyRent: property.monthlyRent,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        squareFootage: property.squareFootage,
+        adr,
+        occupancyRate: occupancyRate / 100, // Convert percentage to decimal
+        propertyType: property.propertyType
+      };
       const response = await apiRequest("POST", "/api/update-property", {
-        property: updatedProperty,
+        property: essentialProperty,
       });
       return response.json() as Promise<AnalyzePropertyResponse>;
     },
@@ -193,9 +226,20 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   // Mutation for updating property address
   const updateAddressMutation = useMutation({
     mutationFn: async (newAddress: string) => {
-      const updatedProperty = { ...property, address: newAddress };
+      // Only send essential property fields to reduce payload size
+      const essentialProperty = {
+        address: newAddress,
+        purchasePrice: property.purchasePrice,
+        monthlyRent: property.monthlyRent,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        squareFootage: property.squareFootage,
+        adr: property.adr,
+        occupancyRate: property.occupancyRate,
+        propertyType: property.propertyType
+      };
       const response = await apiRequest("POST", "/api/update-property", {
-        property: updatedProperty,
+        property: essentialProperty,
       });
       return response.json() as Promise<AnalyzePropertyResponse>;
     },
@@ -227,9 +271,20 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   // Mutation for updating property price
   const updatePriceMutation = useMutation({
     mutationFn: async (newPrice: number) => {
-      const updatedProperty = { ...property, purchasePrice: newPrice };
+      // Only send essential property fields to reduce payload size
+      const essentialProperty = {
+        address: property.address,
+        purchasePrice: newPrice,
+        monthlyRent: property.monthlyRent,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        squareFootage: property.squareFootage,
+        adr: property.adr,
+        occupancyRate: property.occupancyRate,
+        propertyType: property.propertyType
+      };
       const response = await apiRequest("POST", "/api/update-property", {
-        property: updatedProperty,
+        property: essentialProperty,
       });
       return response.json() as Promise<AnalyzePropertyResponse>;
     },

@@ -43,23 +43,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Update property data and re-analyze
+  // Update property data and re-analyze (optimized for smaller payloads)
   app.post("/api/update-property", async (req, res) => {
     try {
+      // Extract only essential data to reduce payload size
       const { property, dealId } = req.body;
       
-      if (!property || (property.monthlyRent && property.monthlyRent < 0) || (property.adr && property.adr < 0)) {
+      if (!property) {
         res.status(400).json({
           success: false,
-          error: "Invalid property data"
+          error: "Property data is required"
         });
         return;
       }
 
-      // Convert property back to analysis format by running Python analysis
-      // We'll serialize the property data and pass it to Python for re-analysis
-      const propertyData = JSON.stringify(property);
-      const analysisResult = await runPythonPropertyUpdate(property);
+      // Validate essential fields only
+      if (property.monthlyRent && property.monthlyRent < 0) {
+        res.status(400).json({
+          success: false,
+          error: "Monthly rent cannot be negative"
+        });
+        return;
+      }
+
+      if (property.adr && property.adr < 0) {
+        res.status(400).json({
+          success: false,
+          error: "ADR cannot be negative"
+        });
+        return;
+      }
+
+      if (property.purchasePrice && property.purchasePrice <= 0) {
+        res.status(400).json({
+          success: false,
+          error: "Purchase price must be positive"
+        });
+        return;
+      }
+
+      // Create minimal property object for analysis (exclude large fields like email content)
+      const analysisProperty = {
+        address: property.address,
+        purchasePrice: property.purchasePrice,
+        monthlyRent: property.monthlyRent,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        squareFootage: property.squareFootage,
+        adr: property.adr,
+        occupancyRate: property.occupancyRate,
+        propertyType: property.propertyType
+      };
+
+      const analysisResult = await runPythonPropertyUpdate(analysisProperty);
       
       if (!analysisResult.success) {
         res.status(400).json({
@@ -81,6 +117,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } catch (error) {
         console.warn("AI analysis failed for updated property, continuing without AI insights:", error);
+        // Provide fallback AI analysis based on financial metrics
+        try {
+          const fallbackAiAnalysis = {
+            summary: "Analysis completed using financial metrics",
+            keyInsights: [
+              `Property ${analysisResult.data!.meetsCriteria ? 'meets' : 'does not meet'} investment criteria`,
+              `Monthly cash flow: ${analysisResult.data!.property.monthlyRent - analysisResult.data!.financialSummary.totalMonthlyExpenses >= 0 ? 'positive' : 'negative'}`,
+              `1% rule: ${analysisResult.data!.property.monthlyRent >= analysisResult.data!.property.purchasePrice * 0.01 ? 'passes' : 'fails'}`
+            ],
+            redFlags: analysisResult.data!.meetsCriteria ? [] : [
+              analysisResult.data!.property.monthlyRent < analysisResult.data!.property.purchasePrice * 0.01 ? "Does not meet 1% rule" : null,
+              analysisResult.data!.property.monthlyRent - analysisResult.data!.financialSummary.totalMonthlyExpenses < 0 ? "Negative cash flow" : null
+            ].filter(Boolean),
+            overallRating: analysisResult.data!.meetsCriteria ? "Good" : "Poor",
+            recommendation: analysisResult.data!.meetsCriteria ? "Consider for investment" : "Review criteria or pass"
+          };
+          
+          analysisWithAI = {
+            ...analysisResult.data!,
+            aiAnalysis: fallbackAiAnalysis
+          };
+        } catch (fallbackError) {
+          console.warn("Fallback AI analysis also failed:", fallbackError);
+        }
       }
 
       // Try to find existing analysis by property address and update it
