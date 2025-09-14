@@ -8,7 +8,19 @@ import {
   type AnalyzePropertyResponse,
   type CriteriaResponse,
   type ConfigurableCriteria,
-  type EmailMonitoringResponse
+  type EmailMonitoringResponse,
+  insertNeighborhoodTrendSchema,
+  insertComparableSaleSchema,
+  insertMarketHeatMapDataSchema,
+  insertSavedFilterSchema,
+  insertNaturalLanguageSearchSchema,
+  insertPropertyClassificationSchema,
+  type NeighborhoodTrend,
+  type ComparableSale,
+  type MarketHeatMapData,
+  type SavedFilter,
+  type NaturalLanguageSearch,
+  type PropertyClassification
 } from "@shared/schema";
 import { spawn } from "child_process";
 import path from "path";
@@ -120,18 +132,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Provide fallback AI analysis based on financial metrics
         try {
           const fallbackAiAnalysis = {
-            summary: "Analysis completed using financial metrics",
-            keyInsights: [
-              `Property ${analysisResult.data!.meetsCriteria ? 'meets' : 'does not meet'} investment criteria`,
-              `Monthly cash flow: ${analysisResult.data!.property.monthlyRent - analysisResult.data!.financialSummary.totalMonthlyExpenses >= 0 ? 'positive' : 'negative'}`,
-              `1% rule: ${analysisResult.data!.property.monthlyRent >= analysisResult.data!.property.purchasePrice * 0.01 ? 'passes' : 'fails'}`
-            ],
-            redFlags: analysisResult.data!.meetsCriteria ? [] : [
-              analysisResult.data!.property.monthlyRent < analysisResult.data!.property.purchasePrice * 0.01 ? "Does not meet 1% rule" : null,
-              analysisResult.data!.property.monthlyRent - analysisResult.data!.financialSummary.totalMonthlyExpenses < 0 ? "Negative cash flow" : null
-            ].filter(Boolean),
-            overallRating: analysisResult.data!.meetsCriteria ? "Good" : "Poor",
-            recommendation: analysisResult.data!.meetsCriteria ? "Consider for investment" : "Review criteria or pass"
+            propertyAssessment: {
+              overallScore: analysisResult.data!.meetsCriteria ? 7 : 4,
+              strengths: analysisResult.data!.meetsCriteria ? [
+                "Meets investment criteria",
+                "Positive cash flow potential"
+              ] : [],
+              redFlags: analysisResult.data!.meetsCriteria ? [] : [
+                analysisResult.data!.property.monthlyRent < analysisResult.data!.property.purchasePrice * 0.01 ? "Does not meet 1% rule" : "",
+                analysisResult.data!.cashFlow < 0 ? "Negative cash flow" : ""
+              ].filter(Boolean),
+              description: "Analysis completed using financial metrics and investment criteria",
+              marketPosition: analysisResult.data!.meetsCriteria ? "Favorable" : "Requires review"
+            },
+            marketIntelligence: {
+              sentimentScore: analysisResult.data!.meetsCriteria ? 0.6 : -0.2,
+              riskLevel: (analysisResult.data!.meetsCriteria ? 'low' : 'medium') as 'low' | 'medium' | 'high',
+              marketTrends: [`1% rule ${analysisResult.data!.property.monthlyRent >= analysisResult.data!.property.purchasePrice * 0.01 ? 'passes' : 'fails'}`],
+              competitiveAnalysis: "Basic financial metrics analysis completed"
+            },
+            investmentRecommendation: {
+              recommendation: (analysisResult.data!.meetsCriteria ? 'buy' : 'hold') as 'strong_buy' | 'buy' | 'hold' | 'avoid',
+              confidence: analysisResult.data!.meetsCriteria ? 0.7 : 0.4,
+              reasoning: [
+                `Property ${analysisResult.data!.meetsCriteria ? 'meets' : 'does not meet'} investment criteria`,
+                `Cash flow is ${analysisResult.data!.cashFlow >= 0 ? 'positive' : 'negative'}`
+              ],
+              suggestedStrategy: analysisResult.data!.meetsCriteria ? "Long-term hold for cash flow" : "Review and reassess",
+              timeHorizon: "5-10 years"
+            },
+            predictiveAnalysis: {
+              appreciationForecast: 3.5, // Conservative 3.5% annual appreciation
+              rentGrowthForecast: 2.5, // Conservative 2.5% annual rent growth
+              exitStrategy: "Hold for cash flow, potential future sale",
+              keyRisks: analysisResult.data!.meetsCriteria ? ["Market downturn", "Interest rate changes"] : ["Poor cash flow", "Market downturn", "High maintenance costs"]
+            }
           };
           
           analysisWithAI = {
@@ -527,7 +562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         refresh_token: tokens.refresh_token || '',
         scope: tokens.scope || '',
         token_type: tokens.token_type || 'Bearer',
-        expiry_date: tokens.expiry_date
+        expiry_date: tokens.expiry_date || undefined
       };
       
       // Redirect to deals page
@@ -602,6 +637,343 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting email deals:", error);
       res.status(500).json({ error: "Failed to get email deals" });
+    }
+  });
+
+  // ========================================
+  // Market Intelligence API Routes
+  // ========================================
+
+  // Get neighborhood trends
+  app.get("/api/market/neighborhood-trends", async (req, res) => {
+    try {
+      const { city, state } = req.query;
+      const trends = await storage.getNeighborhoodTrends(
+        city as string | undefined, 
+        state as string | undefined
+      );
+      res.json({ success: true, data: trends });
+    } catch (error) {
+      console.error("Error fetching neighborhood trends:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch neighborhood trends"
+      });
+    }
+  });
+
+  // Get comparable sales
+  app.get("/api/market/comparable-sales", async (req, res) => {
+    try {
+      const { address, radius } = req.query;
+      if (!address) {
+        res.status(400).json({
+          success: false,
+          error: "Address is required"
+        });
+        return;
+      }
+      
+      const sales = await storage.getComparableSales(
+        address as string, 
+        radius ? Number(radius) : undefined
+      );
+      res.json({ success: true, data: sales });
+    } catch (error) {
+      console.error("Error fetching comparable sales:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch comparable sales"
+      });
+    }
+  });
+
+  // Get market heat map data
+  app.get("/api/market/heat-map", async (req, res) => {
+    try {
+      const { north, south, east, west } = req.query;
+      const bounds = (north && south && east && west) ? {
+        north: Number(north),
+        south: Number(south),
+        east: Number(east),
+        west: Number(west)
+      } : undefined;
+      
+      const heatMapData = await storage.getMarketHeatMapData(bounds);
+      res.json({ success: true, data: heatMapData });
+    } catch (error) {
+      console.error("Error fetching heat map data:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch heat map data"
+      });
+    }
+  });
+
+  // Create neighborhood trend data
+  app.post("/api/market/neighborhood-trends", async (req, res) => {
+    try {
+      const validated = insertNeighborhoodTrendSchema.parse(req.body);
+      const trend = await storage.createNeighborhoodTrend(validated);
+      res.json({ success: true, data: trend });
+    } catch (error) {
+      console.error("Error creating neighborhood trend:", error);
+      res.status(400).json({
+        success: false,
+        error: "Failed to create neighborhood trend"
+      });
+    }
+  });
+
+  // Create comparable sale data
+  app.post("/api/market/comparable-sales", async (req, res) => {
+    try {
+      const validated = insertComparableSaleSchema.parse(req.body);
+      const sale = await storage.createComparableSale(validated);
+      res.json({ success: true, data: sale });
+    } catch (error) {
+      console.error("Error creating comparable sale:", error);
+      res.status(400).json({
+        success: false,
+        error: "Failed to create comparable sale"
+      });
+    }
+  });
+
+  // ========================================
+  // Advanced Filtering & Search API Routes
+  // ========================================
+
+  // Get saved filters
+  app.get("/api/filters", async (req, res) => {
+    try {
+      const filters = await storage.getSavedFilters();
+      res.json({ success: true, data: filters });
+    } catch (error) {
+      console.error("Error fetching saved filters:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch saved filters"
+      });
+    }
+  });
+
+  // Create saved filter
+  app.post("/api/filters", async (req, res) => {
+    try {
+      const validated = insertSavedFilterSchema.parse(req.body);
+      const filter = await storage.createSavedFilter(validated);
+      res.json({ success: true, data: filter });
+    } catch (error) {
+      console.error("Error creating saved filter:", error);
+      res.status(400).json({
+        success: false,
+        error: "Failed to create saved filter"
+      });
+    }
+  });
+
+  // Update saved filter
+  app.put("/api/filters/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = insertSavedFilterSchema.partial().parse(req.body);
+      const filter = await storage.updateSavedFilter(id, updates);
+      
+      if (!filter) {
+        res.status(404).json({
+          success: false,
+          error: "Filter not found"
+        });
+        return;
+      }
+      
+      res.json({ success: true, data: filter });
+    } catch (error) {
+      console.error("Error updating saved filter:", error);
+      res.status(400).json({
+        success: false,
+        error: "Failed to update saved filter"
+      });
+    }
+  });
+
+  // Delete saved filter
+  app.delete("/api/filters/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteSavedFilter(id);
+      
+      if (!deleted) {
+        res.status(404).json({
+          success: false,
+          error: "Filter not found"
+        });
+        return;
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting saved filter:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to delete saved filter"
+      });
+    }
+  });
+
+  // Use saved filter (increment usage and search)
+  app.post("/api/filters/:id/use", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const filter = await storage.getSavedFilter(id);
+      
+      if (!filter) {
+        res.status(404).json({
+          success: false,
+          error: "Filter not found"
+        });
+        return;
+      }
+      
+      // Increment usage count
+      await storage.incrementFilterUsage(id);
+      
+      // Search properties using filter criteria
+      const results = await storage.searchProperties(filter.filterCriteria);
+      
+      res.json({ 
+        success: true, 
+        data: {
+          filter,
+          results
+        }
+      });
+    } catch (error) {
+      console.error("Error using saved filter:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to use saved filter"
+      });
+    }
+  });
+
+  // Natural language search
+  app.post("/api/search/natural-language", async (req, res) => {
+    try {
+      const { query } = req.body;
+      if (!query || typeof query !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: "Search query is required"
+        });
+        return;
+      }
+      
+      const searchResult = await storage.searchNaturalLanguage(query);
+      const properties = await storage.searchProperties(searchResult.parsedCriteria);
+      
+      res.json({ 
+        success: true, 
+        data: {
+          search: searchResult,
+          results: properties
+        }
+      });
+    } catch (error) {
+      console.error("Error performing natural language search:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to perform search"
+      });
+    }
+  });
+
+  // Get search history
+  app.get("/api/search/history", async (req, res) => {
+    try {
+      const history = await storage.getSearchHistory();
+      res.json({ success: true, data: history });
+    } catch (error) {
+      console.error("Error fetching search history:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch search history"
+      });
+    }
+  });
+
+  // Advanced property search with filters
+  app.post("/api/search/properties", async (req, res) => {
+    try {
+      const filters = req.body;
+      const results = await storage.searchProperties(filters);
+      res.json({ success: true, data: results });
+    } catch (error) {
+      console.error("Error searching properties:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to search properties"
+      });
+    }
+  });
+
+  // ========================================
+  // Property Classification API Routes
+  // ========================================
+
+  // Get property classification
+  app.get("/api/properties/:id/classification", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const classification = await storage.getPropertyClassification(id);
+      
+      if (!classification) {
+        res.status(404).json({
+          success: false,
+          error: "Property classification not found"
+        });
+        return;
+      }
+      
+      res.json({ success: true, data: classification });
+    } catch (error) {
+      console.error("Error fetching property classification:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch property classification"
+      });
+    }
+  });
+
+  // Create or update property classification
+  app.post("/api/properties/:id/classification", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const classificationData = {
+        ...req.body,
+        propertyId: id
+      };
+      
+      const validated = insertPropertyClassificationSchema.parse(classificationData);
+      
+      // Check if classification already exists
+      const existing = await storage.getPropertyClassification(id);
+      let classification;
+      
+      if (existing) {
+        classification = await storage.updatePropertyClassification(id, validated);
+      } else {
+        classification = await storage.createPropertyClassification(validated);
+      }
+      
+      res.json({ success: true, data: classification });
+    } catch (error) {
+      console.error("Error creating/updating property classification:", error);
+      res.status(400).json({
+        success: false,
+        error: "Failed to create/update property classification"
+      });
     }
   });
 
