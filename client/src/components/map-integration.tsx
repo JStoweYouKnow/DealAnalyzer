@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -90,6 +90,9 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
   // Mock map properties data (in real implementation, this would come from backend)
   const [mapProperties, setMapProperties] = useState<MapProperty[]>([]);
   const [pointsOfInterest, setPointsOfInterest] = useState<PointOfInterest[]>([]);
+  
+  // Geocoding cache to prevent repeated API calls
+  const [geocodeCache, setGeocodeCache] = useState<{ [key: string]: { lat: number; lng: number } | null }>({});
 
   // Fetch comparable sales for map
   const { data: comparableSales = [] } = useQuery<ComparableSale[]>({
@@ -106,38 +109,79 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
     enabled: !!analysis?.property.address
   });
 
-  // Geocoding function - uses backend service for consistent results
-  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+  // Memoized geocoding function with caching to prevent repeated API calls
+  const geocodeAddress = useCallback(async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    if (!address || address.trim() === '') return null;
+    
+    const cleanAddress = address.trim();
+    
+    // Check cache first
+    if (cleanAddress in geocodeCache) {
+      return geocodeCache[cleanAddress] || null;
+    }
+    
     try {
       const response = await apiRequest('POST', '/api/geocode', {
-        address: address
+        address: cleanAddress
       });
       const data = await response.json();
       
+      let result: { lat: number; lng: number } | null = null;
+      
       if (data.success && data.data) {
-        return {
+        result = {
           lat: data.data.lat,
           lng: data.data.lng
         };
       }
-      return null;
+      
+      // Cache the result (even if null)
+      setGeocodeCache(prev => ({ ...prev, [cleanAddress]: result }));
+      return result;
     } catch (error) {
       console.error('Geocoding failed:', error);
       // Fallback to center of US if geocoding fails
-      return {
+      const fallback = {
         lat: 39.8283,
         lng: -98.5795
       };
+      
+      // Cache the fallback result
+      setGeocodeCache(prev => ({ ...prev, [cleanAddress]: fallback }));
+      return fallback;
     }
-  };
+  }, [geocodeCache]);
 
-  // Initialize map data
+  // Memoize address lists to prevent unnecessary re-geocoding
+  const allAddresses = useMemo(() => {
+    const addresses: string[] = [];
+    
+    if (analysis?.property.address) {
+      addresses.push(analysis.property.address);
+    }
+    
+    comparisonAnalyses.forEach(comp => {
+      if (comp.property.address) {
+        addresses.push(comp.property.address);
+      }
+    });
+    
+    comparableSales.forEach(sale => {
+      if (sale.address) {
+        addresses.push(sale.address);
+      }
+    });
+    
+    return addresses;
+  }, [analysis?.property.address, comparisonAnalyses, comparableSales]);
+
+  // Initialize map data with optimized geocoding
   useEffect(() => {
     const initializeMapData = async () => {
       const properties: MapProperty[] = [];
       
       // Add primary property
-      if (analysis) {
+      if (analysis?.property.address) {
         const coords = await geocodeAddress(analysis.property.address);
         if (coords) {
           properties.push({
@@ -150,47 +194,75 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
             status: analysis.meetsCriteria ? 'meets_criteria' : 'does_not_meet',
             details: analysis
           });
-          setMapCenter(coords);
-          setZoomLevel(12);
+          
+          // Only update map center if it's significantly different or first time
+          const currentDistance = Math.sqrt(
+            Math.pow(coords.lat - mapCenter.lat, 2) + Math.pow(coords.lng - mapCenter.lng, 2)
+          );
+          if (currentDistance > 0.1 || mapCenter.lat === 39.8283) { // Default center
+            setMapCenter(coords);
+            setZoomLevel(12);
+          }
         }
       }
 
       // Add comparison properties
-      for (const comp of comparisonAnalyses) {
-        const coords = await geocodeAddress(comp.property.address);
-        if (coords) {
-          properties.push({
-            id: comp.propertyId,
-            lat: coords.lat,
-            lng: coords.lng,
-            address: comp.property.address,
-            price: comp.property.purchasePrice,
-            type: 'comparison',
-            status: comp.meetsCriteria ? 'meets_criteria' : 'does_not_meet',
-            details: comp
-          });
+      const compPromises = comparisonAnalyses.map(async (comp) => {
+        if (comp.property.address) {
+          const coords = await geocodeAddress(comp.property.address);
+          if (coords) {
+            return {
+              id: comp.propertyId,
+              lat: coords.lat,
+              lng: coords.lng,
+              address: comp.property.address,
+              price: comp.property.purchasePrice,
+              type: 'comparison' as const,
+              status: comp.meetsCriteria ? 'meets_criteria' as const : 'does_not_meet' as const,
+              details: comp
+            };
+          }
         }
-      }
+        return null;
+      });
 
       // Add comparable sales
-      for (const sale of comparableSales) {
-        const coords = await geocodeAddress(sale.address);
-        if (coords) {
-          properties.push({
-            id: sale.id!,
-            lat: coords.lat,
-            lng: coords.lng,
-            address: sale.address,
-            price: sale.salePrice,
-            type: 'comparable',
-            details: sale
-          });
+      const salesPromises = comparableSales.map(async (sale) => {
+        if (sale.address) {
+          const coords = await geocodeAddress(sale.address);
+          if (coords) {
+            return {
+              id: sale.id!,
+              lat: coords.lat,
+              lng: coords.lng,
+              address: sale.address,
+              price: sale.salePrice,
+              type: 'comparable' as const,
+              details: sale
+            };
+          }
         }
-      }
+        return null;
+      });
+
+      // Wait for all geocoding to complete
+      const [compResults, salesResults] = await Promise.all([
+        Promise.all(compPromises),
+        Promise.all(salesPromises)
+      ]);
+
+      // Add non-null results to properties
+      compResults.forEach(result => {
+        if (result) properties.push(result);
+      });
+      
+      salesResults.forEach(result => {
+        if (result) properties.push(result);
+      });
 
       setMapProperties(properties);
 
-      // Generate mock points of interest
+      // Generate points of interest only if we have properties
       if (properties.length > 0) {
         const center = properties[0]; // Use first property as center
         const pois: PointOfInterest[] = [
@@ -243,8 +315,11 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
       }
     };
 
-    initializeMapData();
-  }, [analysis, comparisonAnalyses, comparableSales]);
+    // Only run if we have addresses to geocode
+    if (allAddresses.length > 0) {
+      initializeMapData();
+    }
+  }, [allAddresses, geocodeAddress, mapCenter.lat]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
@@ -556,7 +631,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
                     {property.status && (
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Status:</span>
-                        <Badge size="sm" className={
+                        <Badge className={
                           property.status === 'meets_criteria' 
                             ? 'bg-green-100 text-green-800 border-green-200'
                             : 'bg-red-100 text-red-800 border-red-200'
