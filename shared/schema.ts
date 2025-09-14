@@ -263,9 +263,157 @@ export type ComparisonResponse = z.infer<typeof comparisonResponseSchema>;
 export type EmailDeal = z.infer<typeof emailDealSchema>;
 export type EmailMonitoringResponse = z.infer<typeof emailMonitoringResponseSchema>;
 
+// Market Intelligence schemas
+export const neighborhoodTrendSchema = z.object({
+  id: z.string().optional(),
+  neighborhood: z.string(),
+  city: z.string(),
+  state: z.string(),
+  zipCode: z.string().optional(),
+  // Price trends
+  averagePrice: z.number(),
+  priceChangePercent3Month: z.number(),
+  priceChangePercent6Month: z.number(),
+  priceChangePercent1Year: z.number(),
+  // Rent trends
+  averageRent: z.number(),
+  rentChangePercent3Month: z.number(),
+  rentChangePercent6Month: z.number(),
+  rentChangePercent1Year: z.number(),
+  // Market indicators
+  daysOnMarket: z.number(),
+  pricePerSqft: z.number(),
+  rentYield: z.number(),
+  marketHeat: z.enum(['hot', 'warm', 'balanced', 'cool', 'cold']),
+  investmentGrade: z.enum(['A', 'B', 'C', 'D']).optional(),
+  lastUpdated: z.date(),
+});
+
+export const comparableSaleSchema = z.object({
+  id: z.string().optional(),
+  address: z.string(),
+  city: z.string(),
+  state: z.string(),
+  zipCode: z.string(),
+  salePrice: z.number(),
+  saleDate: z.date(),
+  bedrooms: z.number(),
+  bathrooms: z.number(),
+  squareFootage: z.number(),
+  lotSize: z.number().optional(),
+  yearBuilt: z.number(),
+  propertyType: z.string(),
+  pricePerSqft: z.number(),
+  distance: z.number(), // Distance from subject property in miles
+  adjustments: z.object({
+    size: z.number().optional(),
+    condition: z.number().optional(),
+    age: z.number().optional(),
+    location: z.number().optional(),
+    total: z.number(),
+  }).optional(),
+  createdAt: z.date(),
+});
+
+export const marketHeatMapDataSchema = z.object({
+  id: z.string().optional(),
+  zipCode: z.string(),
+  city: z.string(),
+  state: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  averagePrice: z.number(),
+  priceChangePercent: z.number(),
+  averageRent: z.number(),
+  rentChangePercent: z.number(),
+  dealVolume: z.number(),
+  investmentScore: z.number().min(0).max(100),
+  heatLevel: z.enum(['very_hot', 'hot', 'warm', 'balanced', 'cool']),
+  lastUpdated: z.date(),
+});
+
+// Advanced Filtering & Search schemas
+export const savedFilterSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  description: z.string().optional(),
+  filterCriteria: z.object({
+    priceMin: z.number().optional(),
+    priceMax: z.number().optional(),
+    bedroomsMin: z.number().optional(),
+    bedroomsMax: z.number().optional(),
+    bathroomsMin: z.number().optional(),
+    bathroomsMax: z.number().optional(),
+    sqftMin: z.number().optional(),
+    sqftMax: z.number().optional(),
+    cocReturnMin: z.number().optional(),
+    cocReturnMax: z.number().optional(),
+    capRateMin: z.number().optional(),
+    capRateMax: z.number().optional(),
+    cashFlowMin: z.number().optional(),
+    propertyTypes: z.array(z.string()).optional(),
+    cities: z.array(z.string()).optional(),
+    states: z.array(z.string()).optional(),
+    meetsCriteria: z.boolean().optional(),
+    investmentGrade: z.array(z.enum(['A', 'B', 'C', 'D'])).optional(),
+  }),
+  isSystem: z.boolean().default(false), // System filters vs user-created
+  usageCount: z.number().default(0),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export const naturalLanguageSearchSchema = z.object({
+  id: z.string().optional(),
+  query: z.string(),
+  parsedCriteria: z.object({
+    bedrooms: z.number().optional(),
+    bathrooms: z.number().optional(),
+    priceMax: z.number().optional(),
+    priceMin: z.number().optional(),
+    location: z.string().optional(),
+    propertyType: z.string().optional(),
+    features: z.array(z.string()).optional(),
+  }),
+  resultCount: z.number(),
+  searchDate: z.date(),
+});
+
+export const propertyClassificationSchema = z.object({
+  propertyId: z.string(),
+  investmentGrade: z.enum(['A', 'B', 'C', 'D']),
+  classificationReasons: z.array(z.string()),
+  confidenceScore: z.number().min(0).max(1),
+  factors: z.object({
+    locationScore: z.number(),
+    conditionScore: z.number(),
+    marketScore: z.number(),
+    financialScore: z.number(),
+  }),
+  lastUpdated: z.date(),
+});
+
 // Insert schemas
 export const insertPropertySchema = propertySchema.omit({ id: true });
 export const insertDealAnalysisSchema = dealAnalysisSchema.omit({ id: true, analysisDate: true });
+export const insertNeighborhoodTrendSchema = neighborhoodTrendSchema.omit({ id: true });
+export const insertComparableSaleSchema = comparableSaleSchema.omit({ id: true });
+export const insertMarketHeatMapDataSchema = marketHeatMapDataSchema.omit({ id: true });
+export const insertSavedFilterSchema = savedFilterSchema.omit({ id: true, createdAt: true, updatedAt: true });
+export const insertNaturalLanguageSearchSchema = naturalLanguageSearchSchema.omit({ id: true });
+export const insertPropertyClassificationSchema = propertyClassificationSchema.omit({});
 
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type InsertDealAnalysis = z.infer<typeof insertDealAnalysisSchema>;
+export type NeighborhoodTrend = z.infer<typeof neighborhoodTrendSchema>;
+export type ComparableSale = z.infer<typeof comparableSaleSchema>;
+export type MarketHeatMapData = z.infer<typeof marketHeatMapDataSchema>;
+export type SavedFilter = z.infer<typeof savedFilterSchema>;
+export type NaturalLanguageSearch = z.infer<typeof naturalLanguageSearchSchema>;
+export type PropertyClassification = z.infer<typeof propertyClassificationSchema>;
+export type InsertNeighborhoodTrend = z.infer<typeof insertNeighborhoodTrendSchema>;
+export type InsertComparableSale = z.infer<typeof insertComparableSaleSchema>;
+export type InsertMarketHeatMapData = z.infer<typeof insertMarketHeatMapDataSchema>;
+export type InsertSavedFilter = z.infer<typeof insertSavedFilterSchema>;
+export type InsertNaturalLanguageSearch = z.infer<typeof insertNaturalLanguageSearchSchema>;
+export type InsertPropertyClassification = z.infer<typeof insertPropertyClassificationSchema>;
