@@ -46,82 +46,114 @@ export function AdvancedSearch() {
   const queryClient = useQueryClient();
 
   // Fetch saved filters
-  const { data: savedFilters = [], isLoading: filtersLoading } = useQuery<SavedFilter[]>({
-    queryKey: ['/api/advanced-search/saved-filters'],
+  const { data: savedFilters = [], isLoading: filtersLoading, error: filtersError } = useQuery<SavedFilter[]>({
+    queryKey: ['/api/filters'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/advanced-search/saved-filters');
+      const response = await apiRequest('GET', '/api/filters');
       const data = await response.json();
       return data.data || [];
     }
   });
 
   // Fetch search history
-  const { data: searchHistory = [] } = useQuery<NaturalLanguageSearch[]>({
-    queryKey: ['/api/advanced-search/history'],
+  const { data: searchHistory = [], error: historyError } = useQuery<NaturalLanguageSearch[]>({
+    queryKey: ['/api/search/history'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/advanced-search/history');
+      const response = await apiRequest('GET', '/api/search/history');
       const data = await response.json();
       return data.data || [];
     }
   });
 
-  // Fetch smart recommendations
-  const { data: recommendations = [] } = useQuery<SmartPropertyRecommendation[]>({
+  // Fetch smart recommendations (using first available property for demo)
+  const { data: recommendations = [], error: recommendationsError } = useQuery<SmartPropertyRecommendation[]>({
     queryKey: ['/api/recommendations/smart-properties'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/recommendations/smart-properties');
-      const data = await response.json();
-      return data.data || [];
+      // Get first available property to generate recommendations
+      const analysisResponse = await apiRequest('GET', '/api/analysis-history');
+      const analysisData = await analysisResponse.json();
+      
+      if (analysisData.data && analysisData.data.length > 0) {
+        const firstProperty = analysisData.data[0];
+        if (firstProperty.property?.id) {
+          const response = await apiRequest('GET', `/api/properties/${firstProperty.property.id}/recommendations`);
+          const data = await response.json();
+          return data.data || [];
+        }
+      }
+      
+      return [];
     }
   });
 
   // Natural language search mutation
   const naturalSearchMutation = useMutation({
     mutationFn: async (query: string) => {
-      const response = await apiRequest('POST', '/api/advanced-search/natural-language', { query });
+      const response = await apiRequest('POST', '/api/search/natural-language', { query });
       return response.json();
     },
     onSuccess: (data) => {
       if (data.success) {
         setPropertyResults(data.results || []);
-        queryClient.invalidateQueries({ queryKey: ['/api/advanced-search/history'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/search/history'] });
         toast({
           title: "Search Complete",
           description: `Found ${data.results?.length || 0} properties matching your query.`,
         });
       }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Search Failed",
+        description: error.message || "Failed to perform natural language search",
+        variant: "destructive",
+      });
     }
   });
 
   // Advanced search mutation
   const advancedSearchMutation = useMutation({
     mutationFn: async (filters: SearchFilters) => {
-      const response = await apiRequest('POST', '/api/advanced-search/properties', { filters });
+      const response = await apiRequest('POST', '/api/search/properties', { filters });
       return response.json();
     },
     onSuccess: (data) => {
       if (data.success) {
-        setPropertyResults(data.results || []);
+        setPropertyResults(data.data || []);
         toast({
           title: "Search Complete",
-          description: `Found ${data.results?.length || 0} properties matching your criteria.`,
+          description: `Found ${data.data?.length || 0} properties matching your criteria.`,
         });
       }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Search Failed",
+        description: error.message || "Failed to search properties",
+        variant: "destructive",
+      });
     }
   });
 
   // Save filter mutation
   const saveFilterMutation = useMutation({
     mutationFn: async (filterData: { name: string; description?: string; filterCriteria: SearchFilters }) => {
-      const response = await apiRequest('POST', '/api/advanced-search/saved-filters', filterData);
+      const response = await apiRequest('POST', '/api/filters', filterData);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/advanced-search/saved-filters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/filters'] });
       setNewFilterName("");
       toast({
         title: "Filter Saved",
         description: "Your search filter has been saved successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save filter",
+        variant: "destructive",
       });
     }
   });
@@ -129,14 +161,21 @@ export function AdvancedSearch() {
   // Delete filter mutation
   const deleteFilterMutation = useMutation({
     mutationFn: async (filterId: string) => {
-      const response = await apiRequest('DELETE', `/api/advanced-search/saved-filters/${filterId}`);
+      const response = await apiRequest('DELETE', `/api/filters/${filterId}`);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/advanced-search/saved-filters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/filters'] });
       toast({
         title: "Filter Deleted",
         description: "The saved filter has been removed.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete filter",
+        variant: "destructive",
       });
     }
   });
@@ -434,6 +473,10 @@ export function AdvancedSearch() {
         <TabsContent value="saved" className="space-y-6">
           {filtersLoading ? (
             <div className="text-center py-8">Loading saved filters...</div>
+          ) : filtersError ? (
+            <div className="text-center py-8 text-red-600">Failed to load saved filters. Please try again later.</div>
+          ) : savedFilters.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No saved filters yet. Create a filter above and save it to see it here.</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {savedFilters.map((filter) => (
@@ -495,7 +538,11 @@ export function AdvancedSearch() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {recommendations.length === 0 ? (
+              {recommendationsError ? (
+                <div className="text-center py-8 text-red-600">
+                  Failed to load recommendations. Please try again later.
+                </div>
+              ) : recommendations.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No recommendations available. Analyze some properties to get personalized suggestions.
                 </div>

@@ -16,26 +16,26 @@ export function MarketIntelligence() {
   const [searchAddress, setSearchAddress] = useState<string>("");
 
   // Fetch neighborhood trends
-  const { data: neighborhoodTrends = [], isLoading: trendsLoading } = useQuery<NeighborhoodTrend[]>({
-    queryKey: ['/api/market-intelligence/neighborhood-trends', selectedCity, selectedState],
+  const { data: neighborhoodTrends = [], isLoading: trendsLoading, error: trendsError } = useQuery<NeighborhoodTrend[]>({
+    queryKey: ['/api/market/neighborhood-trends', selectedCity, selectedState],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedCity !== "all") params.append('city', selectedCity);
       if (selectedState !== "all") params.append('state', selectedState);
       
-      const response = await apiRequest('GET', `/api/market-intelligence/neighborhood-trends?${params}`);
+      const response = await apiRequest('GET', `/api/market/neighborhood-trends?${params}`);
       const data = await response.json();
       return data.data || [];
     }
   });
 
   // Fetch comparable sales
-  const { data: comparableSales = [], isLoading: salesLoading } = useQuery<ComparableSale[]>({
-    queryKey: ['/api/market-intelligence/comparable-sales', searchAddress],
+  const { data: comparableSales = [], isLoading: salesLoading, error: salesError } = useQuery<ComparableSale[]>({
+    queryKey: ['/api/market/comparable-sales', searchAddress],
     queryFn: async () => {
       if (!searchAddress) return [];
       
-      const response = await apiRequest('GET', `/api/market-intelligence/comparable-sales?address=${encodeURIComponent(searchAddress)}&radius=2`);
+      const response = await apiRequest('GET', `/api/market/comparable-sales?address=${encodeURIComponent(searchAddress)}&radius=2`);
       const data = await response.json();
       return data.data || [];
     },
@@ -43,10 +43,10 @@ export function MarketIntelligence() {
   });
 
   // Fetch market heat map data
-  const { data: heatMapData = [], isLoading: heatMapLoading } = useQuery<MarketHeatMapData[]>({
-    queryKey: ['/api/market-intelligence/heat-map'],
+  const { data: heatMapData = [], isLoading: heatMapLoading, error: heatMapError } = useQuery<MarketHeatMapData[]>({
+    queryKey: ['/api/market/heat-map'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/market-intelligence/heat-map');
+      const response = await apiRequest('GET', '/api/market/heat-map');
       const data = await response.json();
       return data.data || [];
     }
@@ -129,6 +129,10 @@ export function MarketIntelligence() {
 
           {trendsLoading ? (
             <div className="text-center py-8">Loading neighborhood trends...</div>
+          ) : trendsError ? (
+            <div className="text-center py-8 text-red-600">Failed to load neighborhood trends. Please try again later.</div>
+          ) : neighborhoodTrends.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No neighborhood trends available for the selected area.</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {neighborhoodTrends.map((trend) => (
@@ -219,6 +223,8 @@ export function MarketIntelligence() {
 
           {salesLoading ? (
             <div className="text-center py-8">Loading comparable sales...</div>
+          ) : salesError ? (
+            <div className="text-center py-8 text-red-600">Failed to load comparable sales. Please try again.</div>
           ) : searchAddress ? (
             <div className="space-y-4">
               {comparableSales.length === 0 ? (
@@ -298,8 +304,12 @@ export function MarketIntelligence() {
         <TabsContent value="heatmap" className="space-y-4">
           {heatMapLoading ? (
             <div className="text-center py-8">Loading market heat map data...</div>
+          ) : heatMapError ? (
+            <div className="text-center py-8 text-red-600">Failed to load market heat map data. Please try again later.</div>
+          ) : heatMapData.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No market heat map data available.</div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex items-center space-x-4 text-sm">
                 <span className="font-medium">Market Heat Legend:</span>
                 <div className="flex space-x-2">
@@ -318,6 +328,39 @@ export function MarketIntelligence() {
                 </div>
               </div>
 
+              {/* Map-style Grid Visualization */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Interactive Heat Map</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Visual representation of market activity by area. Hover over tiles for details.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-1 p-4 bg-muted/30 rounded-lg" data-testid="heatmap-grid">
+                    {heatMapData.map((area, index) => (
+                      <div
+                        key={area.id}
+                        className={`
+                          relative aspect-square rounded cursor-pointer transition-all duration-200
+                          hover:scale-110 hover:z-10 hover:shadow-lg
+                          ${getHeatLevelColor(area.heatLevel)}
+                        `}
+                        title={`${area.zipCode} - ${area.city}, ${area.state}\nInvestment Score: ${area.investmentScore}/100\nAvg Price: ${formatCurrency(area.averagePrice)}\nDeal Volume: ${area.dealVolume}`}
+                        data-testid={`heatmap-tile-${area.id}`}
+                      >
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-xs font-medium opacity-80">
+                            {area.zipCode.slice(-3)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Detailed Cards View */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {heatMapData.map((area) => (
                   <Card key={area.id} className="hover:shadow-lg transition-shadow" data-testid={`heatmap-card-${area.id}`}>
