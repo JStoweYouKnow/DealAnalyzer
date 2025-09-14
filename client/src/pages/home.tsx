@@ -120,50 +120,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Top Navigation */}
-      <header 
-        className="border-b border-border sticky top-0 z-50"
-        style={{ backgroundColor: '#1e7b1a' }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-2">
-              <img 
-                src={comfortFinderLogo} 
-                alt="The Comfort Finder Logo" 
-                className="w-8 h-8 object-contain"
-              />
-            </div>
-
-            <div className="absolute left-1/2 transform -translate-x-1/2">
-              <h1 className="text-xl font-bold text-foreground">The Comfort Finder</h1>
-            </div>
-            
-            <nav className="flex items-center space-x-6">
-              <a href="/" className="font-medium flex items-center text-foreground">
-                <i className="fas fa-home mr-2"></i>Home
-              </a>
-              <a href="/deals" className="font-medium flex items-center transition-colors opacity-75 hover:opacity-100 text-foreground">
-                <i className="fas fa-inbox mr-2"></i>Email Deal Pipeline
-              </a>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <section className="bg-gradient-to-b from-muted/50 to-background py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-foreground mb-2">Find Your Perfect Investment Property</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Upload your property data files to instantly analyze investment potential and find your comfort zone
-          </p>
-        </div>
-      </section>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="container mx-auto px-4 py-8">
 
         {/* Criteria Configuration */}
         <div className="mb-8">
@@ -253,8 +210,6 @@ export default function Home() {
             comparisonList={comparisonList}
           />
         </div>
-
-      </main>
     </div>
   );
 }
