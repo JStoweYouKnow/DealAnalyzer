@@ -1,4 +1,4 @@
-import { type Property, type DealAnalysis, type InsertProperty, type InsertDealAnalysis, type PropertyComparison, type EmailDeal, type NeighborhoodTrend, type ComparableSale, type MarketHeatMapData, type SavedFilter, type NaturalLanguageSearch, type PropertyClassification, type SmartPropertyRecommendation, type RentPricingRecommendation, type InvestmentTimingAdvice, type AnalysisTemplate, type ApiIntegration, type InsertNeighborhoodTrend, type InsertComparableSale, type InsertMarketHeatMapData, type InsertSavedFilter, type InsertNaturalLanguageSearch, type InsertPropertyClassification, type InsertSmartPropertyRecommendation, type InsertRentPricingRecommendation, type InsertInvestmentTimingAdvice, type InsertAnalysisTemplate, type InsertApiIntegration } from "@shared/schema";
+import { type Property, type DealAnalysis, type InsertProperty, type InsertDealAnalysis, type PropertyComparison, type EmailDeal, type NeighborhoodTrend, type ComparableSale, type MarketHeatMapData, type SavedFilter, type NaturalLanguageSearch, type PropertyClassification, type SmartPropertyRecommendation, type RentPricingRecommendation, type InvestmentTimingAdvice, type AnalysisTemplate, type ApiIntegration, type PhotoAnalysis, type InsertPhotoAnalysis, type InsertNeighborhoodTrend, type InsertComparableSale, type InsertMarketHeatMapData, type InsertSavedFilter, type InsertNaturalLanguageSearch, type InsertPropertyClassification, type InsertSmartPropertyRecommendation, type InsertRentPricingRecommendation, type InsertInvestmentTimingAdvice, type InsertAnalysisTemplate, type InsertApiIntegration } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -86,6 +86,12 @@ export interface IStorage {
   getApiIntegration(id: string): Promise<ApiIntegration | undefined>;
   updateApiIntegration(id: string, updates: Partial<InsertApiIntegration>): Promise<ApiIntegration | undefined>;
   deleteApiIntegration(id: string): Promise<boolean>;
+
+  // Photo Analysis methods
+  getPhotoAnalyses(propertyId: string): Promise<PhotoAnalysis[]>;
+  getPhotoAnalysis(id: string): Promise<PhotoAnalysis | undefined>;
+  createPhotoAnalysis(analysis: InsertPhotoAnalysis): Promise<PhotoAnalysis>;
+  deletePhotoAnalysis(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -104,6 +110,7 @@ export class MemStorage implements IStorage {
   private investmentTimingAdvice: Map<string, InvestmentTimingAdvice>;
   private analysisTemplates: Map<string, AnalysisTemplate>;
   private apiIntegrations: Map<string, ApiIntegration>;
+  private photoAnalyses: Map<string, PhotoAnalysis>;
 
   constructor() {
     this.properties = new Map();
@@ -121,6 +128,7 @@ export class MemStorage implements IStorage {
     this.investmentTimingAdvice = new Map();
     this.analysisTemplates = new Map();
     this.apiIntegrations = new Map();
+    this.photoAnalyses = new Map();
     
     // Initialize with some default system filters and templates
     this.initializeSystemFilters();
@@ -791,7 +799,7 @@ export class MemStorage implements IStorage {
         description: "Properties meeting all investment criteria",
         filterCriteria: {
           meetsCriteria: true,
-          investmentGrade: ['A', 'B']
+          investmentGrade: ['A', 'B'] as ('A' | 'B' | 'C' | 'D')[]
         },
         isSystem: true
       },
@@ -808,7 +816,7 @@ export class MemStorage implements IStorage {
         description: "High-grade properties in desirable areas",
         filterCriteria: {
           priceMin: 300000,
-          investmentGrade: ['A'],
+          investmentGrade: ['A'] as ('A' | 'B' | 'C' | 'D')[],
           meetsCriteria: true
         },
         isSystem: true
@@ -870,6 +878,35 @@ export class MemStorage implements IStorage {
 
   async deleteApiIntegration(id: string): Promise<boolean> {
     return this.apiIntegrations.delete(id);
+  }
+
+  // Photo Analysis methods
+  async getPhotoAnalyses(propertyId: string): Promise<PhotoAnalysis[]> {
+    const analyses: PhotoAnalysis[] = [];
+    this.photoAnalyses.forEach((analysis) => {
+      if (analysis.propertyId === propertyId) {
+        analyses.push(analysis);
+      }
+    });
+    return analyses.sort((a, b) => new Date(b.analysisDate).getTime() - new Date(a.analysisDate).getTime());
+  }
+
+  async getPhotoAnalysis(id: string): Promise<PhotoAnalysis | undefined> {
+    return this.photoAnalyses.get(id);
+  }
+
+  async createPhotoAnalysis(analysis: InsertPhotoAnalysis): Promise<PhotoAnalysis> {
+    const id = randomUUID();
+    const photoAnalysis: PhotoAnalysis = {
+      id,
+      ...analysis,
+    };
+    this.photoAnalyses.set(id, photoAnalysis);
+    return photoAnalysis;
+  }
+
+  async deletePhotoAnalysis(id: string): Promise<boolean> {
+    return this.photoAnalyses.delete(id);
   }
 }
 

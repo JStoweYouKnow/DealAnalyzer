@@ -650,3 +650,30 @@ export type CsvExportRequest = z.infer<typeof csvExportRequestSchema>;
 export type ImportResult = z.infer<typeof importResultSchema>;
 export type ApiIntegration = z.infer<typeof apiIntegrationSchema>;
 export type InsertApiIntegration = z.infer<typeof insertApiIntegrationSchema>;
+
+// ========================================
+// Photo Analysis Schema
+// ========================================
+
+export const photoAnalysisSchema = z.object({
+  id: z.string(),
+  propertyId: z.string(),
+  filename: z.string(),
+  url: z.string(),
+  aiScore: z.number(),
+  qualityScore: z.number(),
+  compositionScore: z.number(),
+  lightingScore: z.number(),
+  propertyConditionScore: z.number(),
+  insights: z.array(z.string()),
+  suggestions: z.array(z.string()),
+  tags: z.array(z.string()),
+  roomType: z.string().optional(),
+  marketability: z.enum(['high', 'medium', 'low']),
+  analysisDate: z.string(),
+});
+
+export const insertPhotoAnalysisSchema = photoAnalysisSchema.omit({ id: true });
+
+export type PhotoAnalysis = z.infer<typeof photoAnalysisSchema>;
+export type InsertPhotoAnalysis = z.infer<typeof insertPhotoAnalysisSchema>;

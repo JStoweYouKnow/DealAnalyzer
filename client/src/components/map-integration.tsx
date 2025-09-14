@@ -1,5 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -18,10 +21,37 @@ import {
   Car,
   TrendingUp,
   TrendingDown,
-  Info
+  Info,
+  X
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { DealAnalysis, ComparableSale, NeighborhoodTrend } from "@shared/schema";
+
+// Fix for Leaflet default icons in React
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Custom marker icons
+const createCustomIcon = (color: string) => new L.Icon({
+  iconUrl: `data:image/svg+xml;base64,${btoa(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" width="24" height="24">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+    </svg>
+  `)}`,
+  iconSize: [24, 24],
+  iconAnchor: [12, 24],
+  popupAnchor: [0, -24],
+});
+
+const primaryIcon = createCustomIcon('#22c55e'); // green
+const primaryFailIcon = createCustomIcon('#ef4444'); // red  
+const comparisonIcon = createCustomIcon('#3b82f6'); // blue
+const comparableIcon = createCustomIcon('#8b5cf6'); // purple
+const poiIcon = createCustomIcon('#06b6d4'); // cyan
 
 interface MapIntegrationProps {
   analysis?: DealAnalysis;
@@ -76,37 +106,29 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
     enabled: !!analysis?.property.address
   });
 
-  // Mock geocoding function (in real implementation, use Google Maps API or similar)
+  // Geocoding function - uses backend service for consistent results
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
-    // Mock coordinates based on some common cities
-    const mockCoordinates: { [key: string]: { lat: number; lng: number } } = {
-      'austin': { lat: 30.2672, lng: -97.7431 },
-      'dallas': { lat: 32.7767, lng: -96.7970 },
-      'houston': { lat: 29.7604, lng: -95.3698 },
-      'los angeles': { lat: 34.0522, lng: -118.2437 },
-      'miami': { lat: 25.7617, lng: -80.1918 },
-      'new york': { lat: 40.7128, lng: -74.0060 },
-      'chicago': { lat: 41.8781, lng: -87.6298 },
-      'seattle': { lat: 47.6062, lng: -122.3321 }
-    };
-
-    const cityKey = Object.keys(mockCoordinates).find(city => 
-      address.toLowerCase().includes(city)
-    );
-
-    if (cityKey) {
-      const base = mockCoordinates[cityKey];
+    try {
+      const response = await apiRequest('POST', '/api/geocode', {
+        address: address
+      });
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        return {
+          lat: data.data.lat,
+          lng: data.data.lng
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Geocoding failed:', error);
+      // Fallback to center of US if geocoding fails
       return {
-        lat: base.lat + (Math.random() - 0.5) * 0.1,
-        lng: base.lng + (Math.random() - 0.5) * 0.1
+        lat: 39.8283,
+        lng: -98.5795
       };
     }
-
-    // Default to random coordinates in US
-    return {
-      lat: 39.8283 + (Math.random() - 0.5) * 20,
-      lng: -98.5795 + (Math.random() - 0.5) * 40
-    };
   };
 
   // Initialize map data
@@ -328,95 +350,85 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
               </div>
             </CardHeader>
             <CardContent>
-              {/* Mock Map Container */}
-              <div 
-                className="relative w-full h-96 bg-muted rounded-lg border-2 border-dashed border-muted-foreground/25 overflow-hidden"
-                data-testid="map-container"
-              >
-                {/* Map Background */}
-                <div className={`absolute inset-0 ${
-                  mapLayer === 'satellite' ? 'bg-green-100' : 
-                  mapLayer === 'terrain' ? 'bg-amber-50' : 'bg-gray-100'
-                }`}>
-                  <div className="absolute inset-0 opacity-20">
-                    {/* Grid lines to simulate map */}
-                    <svg className="w-full h-full">
-                      <defs>
-                        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#94a3b8" strokeWidth="1"/>
-                        </pattern>
-                      </defs>
-                      <rect width="100%" height="100%" fill="url(#grid)" />
-                    </svg>
-                  </div>
-                </div>
+              {/* Leaflet Map Container */}
+              <div className="w-full h-96 rounded-lg overflow-hidden" data-testid="map-container">
+                <MapContainer
+                  center={[mapCenter.lat, mapCenter.lng]}
+                  zoom={zoomLevel}
+                  style={{ height: '100%', width: '100%' }}
+                  className="rounded-lg"
+                >
+                  <TileLayer
+                    url={
+                      mapLayer === 'satellite' 
+                        ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                        : mapLayer === 'terrain'
+                        ? "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+                        : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    }
+                    attribution={
+                      mapLayer === 'satellite'
+                        ? '&copy; <a href="https://www.esri.com/">Esri</a>'
+                        : mapLayer === 'terrain'
+                        ? '&copy; <a href="https://opentopomap.org/">OpenTopoMap</a>'
+                        : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    }
+                  />
 
-                {/* Property Markers */}
-                {mapProperties.map((property, index) => (
-                  <div
-                    key={property.id}
-                    className={`absolute w-6 h-6 rounded-full border-2 border-white shadow-lg cursor-pointer transform -translate-x-3 -translate-y-3 ${getPropertyMarkerColor(property)}`}
-                    style={{
-                      left: `${20 + (index * 15) % 60}%`,
-                      top: `${30 + (index * 12) % 40}%`
-                    }}
-                    onClick={() => setSelectedProperty(property)}
-                    data-testid={`marker-${property.id}`}
-                    title={property.address}
-                  >
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Home className="w-3 h-3 text-white" />
-                    </div>
-                  </div>
-                ))}
+                  {/* Property Markers */}
+                  {mapProperties.map((property) => (
+                    <Marker
+                      key={property.id}
+                      position={[property.lat, property.lng]}
+                      icon={
+                        property.type === 'primary'
+                          ? property.status === 'meets_criteria' ? primaryIcon : primaryFailIcon
+                          : property.type === 'comparison' ? comparisonIcon
+                          : comparableIcon
+                      }
+                      eventHandlers={{
+                        click: () => setSelectedProperty(property),
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-2">
+                          <h3 className="font-medium text-sm">{property.address}</h3>
+                          <p className="text-xs text-gray-600 mb-2">
+                            {property.type === 'primary' ? 'Primary Property' :
+                             property.type === 'comparison' ? 'Comparison Property' :
+                             'Comparable Sale'}
+                          </p>
+                          <div className="text-sm">
+                            <p><strong>Price:</strong> {formatCurrency(property.price)}</p>
+                            {property.status && (
+                              <p><strong>Status:</strong> {property.status === 'meets_criteria' ? '✓ Meets Criteria' : '✗ Does Not Meet'}</p>
+                            )}
+                          </div>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
 
-                {/* POI Markers */}
-                {showPOIs && pointsOfInterest.map((poi, index) => (
-                  <div
-                    key={poi.id}
-                    className="absolute w-5 h-5 bg-blue-500 rounded-full border border-white shadow cursor-pointer transform -translate-x-2 -translate-y-2"
-                    style={{
-                      left: `${40 + (index * 10) % 40}%`,
-                      top: `${50 + (index * 8) % 30}%`
-                    }}
-                    title={`${poi.name} (${poi.distance}mi)`}
-                    data-testid={`poi-${poi.id}`}
-                  >
-                    <div className="w-full h-full flex items-center justify-center text-white">
-                      {getPOIIcon(poi.type)}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Map Controls */}
-                <div className="absolute top-2 right-2 flex flex-col space-y-1">
-                  <Button 
-                    size="sm" 
-                    variant="secondary"
-                    onClick={() => setZoomLevel(Math.min(zoomLevel + 1, 18))}
-                    data-testid="zoom-in"
-                  >
-                    +
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="secondary"
-                    onClick={() => setZoomLevel(Math.max(zoomLevel - 1, 1))}
-                    data-testid="zoom-out"
-                  >
-                    -
-                  </Button>
-                </div>
-
-                {/* Zoom Level Indicator */}
-                <div className="absolute bottom-2 left-2 bg-white/80 rounded px-2 py-1 text-xs">
-                  Zoom: {zoomLevel}
-                </div>
-
-                {/* Layer Indicator */}
-                <div className="absolute bottom-2 right-2 bg-white/80 rounded px-2 py-1 text-xs capitalize">
-                  {mapLayer} View
-                </div>
+                  {/* POI Markers */}
+                  {showPOIs && pointsOfInterest.map((poi) => (
+                    <Marker
+                      key={poi.id}
+                      position={[poi.lat, poi.lng]}
+                      icon={poiIcon}
+                    >
+                      <Popup>
+                        <div className="p-2">
+                          <h3 className="font-medium text-sm">{poi.name}</h3>
+                          <p className="text-xs text-gray-600 capitalize">{poi.type}</p>
+                          <p className="text-sm"><strong>Distance:</strong> {poi.distance} miles</p>
+                          {poi.rating && (
+                            <p className="text-sm"><strong>Rating:</strong> {poi.rating}/5 ⭐</p>
+                          )}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
               </div>
 
               {/* Map Legend */}

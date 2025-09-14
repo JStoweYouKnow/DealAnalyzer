@@ -43,11 +43,13 @@ import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
 import { generateReport, type ReportOptions, type ReportData } from "./report-generator";
-import { aiAnalysisService } from "./ai-service";
+import { aiAnalysisService as coreAiService } from "./ai-service";
 import { emailMonitoringService } from "./email-service";
 import { rentalCompsService } from "./rental-comps-service";
 import { importExportService } from "./import-export-service";
 import { apiIntegrationService } from "./api-integration-service";
+import { aiAnalysisService as photoAnalysisService } from "./services/ai-analysis-service";
+import { geocodingService } from "./services/geocoding-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -141,7 +143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let analysisWithAI = analysisResult.data!;
       try {
         if (process.env.OPENAI_API_KEY) {
-          const aiAnalysis = await aiAnalysisService.analyzeProperty(analysisResult.data!.property);
+          const aiAnalysis = await coreAiService.analyzeProperty(analysisResult.data!.property);
           analysisWithAI = {
             ...analysisResult.data!,
             aiAnalysis
@@ -329,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let analysisWithAI = analysisResult.data!;
       try {
         if (process.env.OPENAI_API_KEY) {
-          const aiAnalysis = await aiAnalysisService.analyzeProperty(analysisResult.data!.property);
+          const aiAnalysis = await coreAiService.analyzeProperty(analysisResult.data!.property);
           analysisWithAI = {
             ...analysisResult.data!,
             aiAnalysis
@@ -430,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let analysisWithAI = analysisResult.data!;
       try {
         if (process.env.OPENAI_API_KEY) {
-          const aiAnalysis = await aiAnalysisService.analyzeProperty(analysisResult.data!.property);
+          const aiAnalysis = await coreAiService.analyzeProperty(analysisResult.data!.property);
           analysisWithAI = {
             ...analysisResult.data!,
             aiAnalysis
@@ -1023,7 +1025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const recommendations = await aiAnalysisService.generateSmartPropertyRecommendations(
+      const recommendations = await coreAiService.generateSmartPropertyRecommendations(
         property, 
         availableProperties
       );
@@ -1071,7 +1073,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ]
         };
         
-        recommendation = await aiAnalysisService.generateRentPricingRecommendation(property, marketData);
+        recommendation = await coreAiService.generateRentPricingRecommendation(property, marketData);
         await storage.createRentPricingRecommendation(recommendation);
       }
       
@@ -1109,7 +1111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           marketPhase: "expansion"
         };
         
-        advice = await aiAnalysisService.generateInvestmentTimingAdvice(property, marketConditions);
+        advice = await coreAiService.generateInvestmentTimingAdvice(property, marketConditions);
         await storage.createInvestmentTimingAdvice(advice);
       }
       
@@ -1587,7 +1589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let analysisWithAI = analysisResult.data!;
       try {
         if (process.env.OPENAI_API_KEY) {
-          const aiAnalysis = await aiAnalysisService.analyzeProperty(analysisResult.data!.property);
+          const aiAnalysis = await coreAiService.analyzeProperty(analysisResult.data!.property);
           analysisWithAI = {
             ...analysisResult.data!,
             aiAnalysis
@@ -1653,6 +1655,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to fetch rental comparables"
+      });
+    }
+  });
+
+  // ========================================
+  // Photo Analysis Routes
+  // ========================================
+
+  // Configure multer for image uploads
+  const imageUpload = multer({
+    dest: 'temp_uploads/photos/',
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit per image
+      files: 10, // Max 10 files
+    },
+    fileFilter: (req, file, cb) => {
+      // Accept common image formats
+      const allowedMimes = [
+        'image/jpeg',
+        'image/jpg', 
+        'image/png',
+        'image/webp',
+        'image/gif'
+      ];
+      
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only JPEG, PNG, WebP, and GIF images are allowed'), false);
+      }
+    }
+  });
+
+  // Analyze property photos with AI
+  app.post("/api/analyze-property-photos", imageUpload.array('photos', 10), async (req, res) => {
+    try {
+      const files = req.files as Express.Multer.File[];
+      const { propertyId, propertyType, propertyDescription } = req.body;
+      
+      if (!files || files.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: "No photos provided"
+        });
+        return;
+      }
+
+      if (!propertyId) {
+        res.status(400).json({
+          success: false,
+          error: "Property ID is required"
+        });
+        return;
+      }
+
+      const analyses = [];
+      
+      for (const file of files) {
+        try {
+          // Read file and convert to base64
+          const imageBuffer = fs.readFileSync(file.path);
+          const base64Image = imageBuffer.toString('base64');
+          const mimeType = file.mimetype;
+          
+          // Analyze with OpenAI Vision
+          const analysis = await photoAnalysisService.analyzePropertyPhoto({
+            image: `data:${mimeType};base64,${base64Image}`,
+            filename: file.originalname,
+            propertyType: propertyType || 'unknown',
+            propertyDescription: propertyDescription
+          });
+          
+          // Store photo analysis
+          const photoAnalysis = await storage.createPhotoAnalysis({
+            propertyId: propertyId,
+            filename: file.originalname,
+            url: `/uploads/${file.filename}`,
+            ...analysis,
+            analysisDate: new Date().toISOString()
+          });
+          
+          analyses.push(photoAnalysis);
+          
+          // Clean up uploaded file
+          fs.unlinkSync(file.path);
+        } catch (error) {
+          console.error(`Error analyzing photo ${file.originalname}:`, error);
+          // Clean up uploaded file on error
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        }
+      }
+      
+      res.json({ success: true, data: analyses });
+    } catch (error) {
+      console.error("Error analyzing property photos:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to analyze property photos"
+      });
+    }
+  });
+
+  // Get photo analyses for a property
+  app.get("/api/properties/:id/photo-analyses", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const analyses = await storage.getPhotoAnalyses(id);
+      res.json({ success: true, data: analyses });
+    } catch (error) {
+      console.error("Error fetching photo analyses:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch photo analyses"
+      });
+    }
+  });
+
+  // Delete photo analysis
+  app.delete("/api/properties/:propertyId/photo-analyses/:photoId", async (req, res) => {
+    try {
+      const { photoId } = req.params;
+      const deleted = await storage.deletePhotoAnalysis(photoId);
+      
+      if (!deleted) {
+        res.status(404).json({
+          success: false,
+          error: "Photo analysis not found"
+        });
+        return;
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting photo analysis:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to delete photo analysis"
+      });
+    }
+  });
+
+  // ========================================
+  // Geocoding Routes
+  // ========================================
+
+  // Geocode an address to coordinates
+  app.post("/api/geocode", async (req, res) => {
+    try {
+      const { address } = req.body;
+      
+      if (!address || typeof address !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: "Address is required"
+        });
+        return;
+      }
+
+      const result = await geocodingService.geocodeAddress(address);
+      
+      if (!result) {
+        res.status(404).json({
+          success: false,
+          error: "Could not geocode address"
+        });
+        return;
+      }
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      console.error("Error geocoding address:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to geocode address"
+      });
+    }
+  });
+
+  // Batch geocode multiple addresses
+  app.post("/api/geocode/batch", async (req, res) => {
+    try {
+      const { addresses } = req.body;
+      
+      if (!addresses || !Array.isArray(addresses)) {
+        res.status(400).json({
+          success: false,
+          error: "Addresses array is required"
+        });
+        return;
+      }
+
+      const results = await geocodingService.geocodeAddresses(addresses);
+      res.json({ success: true, data: results });
+    } catch (error) {
+      console.error("Error batch geocoding addresses:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to geocode addresses"
       });
     }
   });
