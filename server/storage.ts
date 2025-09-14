@@ -1,4 +1,4 @@
-import { type Property, type DealAnalysis, type InsertProperty, type InsertDealAnalysis, type PropertyComparison, type EmailDeal, type NeighborhoodTrend, type ComparableSale, type MarketHeatMapData, type SavedFilter, type NaturalLanguageSearch, type PropertyClassification, type InsertNeighborhoodTrend, type InsertComparableSale, type InsertMarketHeatMapData, type InsertSavedFilter, type InsertNaturalLanguageSearch, type InsertPropertyClassification } from "@shared/schema";
+import { type Property, type DealAnalysis, type InsertProperty, type InsertDealAnalysis, type PropertyComparison, type EmailDeal, type NeighborhoodTrend, type ComparableSale, type MarketHeatMapData, type SavedFilter, type NaturalLanguageSearch, type PropertyClassification, type SmartPropertyRecommendation, type RentPricingRecommendation, type InvestmentTimingAdvice, type AnalysisTemplate, type InsertNeighborhoodTrend, type InsertComparableSale, type InsertMarketHeatMapData, type InsertSavedFilter, type InsertNaturalLanguageSearch, type InsertPropertyClassification, type InsertSmartPropertyRecommendation, type InsertRentPricingRecommendation, type InsertInvestmentTimingAdvice, type InsertAnalysisTemplate } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -59,6 +59,26 @@ export interface IStorage {
   
   // Advanced property search with filters
   searchProperties(filters: any): Promise<DealAnalysis[]>;
+  
+  // AI Recommendations methods
+  getSmartPropertyRecommendations(sourcePropertyId: string): Promise<SmartPropertyRecommendation[]>;
+  createSmartPropertyRecommendation(recommendation: InsertSmartPropertyRecommendation): Promise<SmartPropertyRecommendation>;
+  
+  getRentPricingRecommendation(propertyId: string): Promise<RentPricingRecommendation | undefined>;
+  createRentPricingRecommendation(recommendation: InsertRentPricingRecommendation): Promise<RentPricingRecommendation>;
+  updateRentPricingRecommendation(id: string, updates: Partial<InsertRentPricingRecommendation>): Promise<RentPricingRecommendation | undefined>;
+  
+  getInvestmentTimingAdvice(propertyId: string): Promise<InvestmentTimingAdvice | undefined>;
+  createInvestmentTimingAdvice(advice: InsertInvestmentTimingAdvice): Promise<InvestmentTimingAdvice>;
+  updateInvestmentTimingAdvice(id: string, updates: Partial<InsertInvestmentTimingAdvice>): Promise<InvestmentTimingAdvice | undefined>;
+  
+  // Templates & Presets methods
+  getAnalysisTemplates(): Promise<AnalysisTemplate[]>;
+  getAnalysisTemplate(id: string): Promise<AnalysisTemplate | undefined>;
+  createAnalysisTemplate(template: InsertAnalysisTemplate): Promise<AnalysisTemplate>;
+  updateAnalysisTemplate(id: string, updates: Partial<InsertAnalysisTemplate>): Promise<AnalysisTemplate | undefined>;
+  deleteAnalysisTemplate(id: string): Promise<boolean>;
+  getDefaultTemplates(): Promise<AnalysisTemplate[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -72,6 +92,10 @@ export class MemStorage implements IStorage {
   private savedFilters: Map<string, SavedFilter>;
   private searchHistory: Map<string, NaturalLanguageSearch>;
   private propertyClassifications: Map<string, PropertyClassification>;
+  private smartPropertyRecommendations: Map<string, SmartPropertyRecommendation>;
+  private rentPricingRecommendations: Map<string, RentPricingRecommendation>;
+  private investmentTimingAdvice: Map<string, InvestmentTimingAdvice>;
+  private analysisTemplates: Map<string, AnalysisTemplate>;
 
   constructor() {
     this.properties = new Map();
@@ -84,9 +108,14 @@ export class MemStorage implements IStorage {
     this.savedFilters = new Map();
     this.searchHistory = new Map();
     this.propertyClassifications = new Map();
+    this.smartPropertyRecommendations = new Map();
+    this.rentPricingRecommendations = new Map();
+    this.investmentTimingAdvice = new Map();
+    this.analysisTemplates = new Map();
     
-    // Initialize with some default system filters
+    // Initialize with some default system filters and templates
     this.initializeSystemFilters();
+    this.initializeDefaultTemplates();
   }
 
   async getProperty(id: string): Promise<Property | undefined> {
@@ -539,6 +568,193 @@ export class MemStorage implements IStorage {
     }
     
     return criteria;
+  }
+
+  // AI Recommendations methods
+  async getSmartPropertyRecommendations(sourcePropertyId: string): Promise<SmartPropertyRecommendation[]> {
+    return Array.from(this.smartPropertyRecommendations.values())
+      .filter(rec => rec.sourcePropertyId === sourcePropertyId);
+  }
+
+  async createSmartPropertyRecommendation(recommendation: InsertSmartPropertyRecommendation): Promise<SmartPropertyRecommendation> {
+    const id = randomUUID();
+    const now = new Date();
+    const rec: SmartPropertyRecommendation = {
+      ...recommendation,
+      id,
+      createdAt: now
+    };
+    this.smartPropertyRecommendations.set(id, rec);
+    return rec;
+  }
+
+  async getRentPricingRecommendation(propertyId: string): Promise<RentPricingRecommendation | undefined> {
+    return Array.from(this.rentPricingRecommendations.values())
+      .find(rec => rec.propertyId === propertyId && rec.validUntil > new Date());
+  }
+
+  async createRentPricingRecommendation(recommendation: InsertRentPricingRecommendation): Promise<RentPricingRecommendation> {
+    const id = randomUUID();
+    const now = new Date();
+    const rec: RentPricingRecommendation = {
+      ...recommendation,
+      id,
+      createdAt: now
+    };
+    this.rentPricingRecommendations.set(id, rec);
+    return rec;
+  }
+
+  async updateRentPricingRecommendation(id: string, updates: Partial<InsertRentPricingRecommendation>): Promise<RentPricingRecommendation | undefined> {
+    const existing = this.rentPricingRecommendations.get(id);
+    if (!existing) return undefined;
+    
+    const updated: RentPricingRecommendation = { ...existing, ...updates };
+    this.rentPricingRecommendations.set(id, updated);
+    return updated;
+  }
+
+  async getInvestmentTimingAdvice(propertyId: string): Promise<InvestmentTimingAdvice | undefined> {
+    return Array.from(this.investmentTimingAdvice.values())
+      .find(advice => advice.propertyId === propertyId && advice.expiresAt > new Date());
+  }
+
+  async createInvestmentTimingAdvice(advice: InsertInvestmentTimingAdvice): Promise<InvestmentTimingAdvice> {
+    const id = randomUUID();
+    const now = new Date();
+    const timing: InvestmentTimingAdvice = {
+      ...advice,
+      id,
+      createdAt: now
+    };
+    this.investmentTimingAdvice.set(id, timing);
+    return timing;
+  }
+
+  async updateInvestmentTimingAdvice(id: string, updates: Partial<InsertInvestmentTimingAdvice>): Promise<InvestmentTimingAdvice | undefined> {
+    const existing = this.investmentTimingAdvice.get(id);
+    if (!existing) return undefined;
+    
+    const updated: InvestmentTimingAdvice = { ...existing, ...updates };
+    this.investmentTimingAdvice.set(id, updated);
+    return updated;
+  }
+
+  // Templates & Presets methods
+  async getAnalysisTemplates(): Promise<AnalysisTemplate[]> {
+    return Array.from(this.analysisTemplates.values());
+  }
+
+  async getAnalysisTemplate(id: string): Promise<AnalysisTemplate | undefined> {
+    return this.analysisTemplates.get(id);
+  }
+
+  async createAnalysisTemplate(template: InsertAnalysisTemplate): Promise<AnalysisTemplate> {
+    const id = randomUUID();
+    const now = new Date();
+    const temp: AnalysisTemplate = {
+      ...template,
+      id,
+      createdAt: now
+    };
+    this.analysisTemplates.set(id, temp);
+    return temp;
+  }
+
+  async updateAnalysisTemplate(id: string, updates: Partial<InsertAnalysisTemplate>): Promise<AnalysisTemplate | undefined> {
+    const existing = this.analysisTemplates.get(id);
+    if (!existing) return undefined;
+    
+    const updated: AnalysisTemplate = { ...existing, ...updates };
+    this.analysisTemplates.set(id, updated);
+    return updated;
+  }
+
+  async deleteAnalysisTemplate(id: string): Promise<boolean> {
+    return this.analysisTemplates.delete(id);
+  }
+
+  async getDefaultTemplates(): Promise<AnalysisTemplate[]> {
+    return Array.from(this.analysisTemplates.values()).filter(template => template.isDefault);
+  }
+
+  private initializeDefaultTemplates(): void {
+    const defaultTemplates = [
+      {
+        name: "Conservative Single Family",
+        description: "Conservative analysis for single family rental properties",
+        propertyType: "single-family",
+        criteriaPreset: {
+          strategy: 'conservative' as const,
+          targetCoCReturn: 8.0,
+          targetCapRate: 7.0,
+          maxLoanToValue: 80.0,
+          vacancyRate: 8.0,
+          maintenanceRate: 5.0,
+          managementRate: 8.0,
+          expectedAppreciation: 3.0,
+        },
+        scenarios: {
+          bestCase: { rentIncrease: 5.0, appreciation: 5.0, vacancy: 3.0, maintenance: 3.0 },
+          realistic: { rentIncrease: 3.0, appreciation: 3.0, vacancy: 8.0, maintenance: 5.0 },
+          worstCase: { rentIncrease: 1.0, appreciation: 1.0, vacancy: 15.0, maintenance: 8.0 },
+        },
+        isDefault: true,
+      },
+      {
+        name: "Aggressive Multi-Family",
+        description: "Aggressive growth strategy for multi-family properties",
+        propertyType: "multi-family",
+        criteriaPreset: {
+          strategy: 'aggressive' as const,
+          targetCoCReturn: 12.0,
+          targetCapRate: 9.0,
+          maxLoanToValue: 85.0,
+          vacancyRate: 10.0,
+          maintenanceRate: 6.0,
+          managementRate: 10.0,
+          expectedAppreciation: 4.0,
+        },
+        scenarios: {
+          bestCase: { rentIncrease: 8.0, appreciation: 7.0, vacancy: 5.0, maintenance: 4.0 },
+          realistic: { rentIncrease: 4.0, appreciation: 4.0, vacancy: 10.0, maintenance: 6.0 },
+          worstCase: { rentIncrease: 2.0, appreciation: 2.0, vacancy: 20.0, maintenance: 10.0 },
+        },
+        isDefault: true,
+      },
+      {
+        name: "BRRRR Strategy",
+        description: "Buy-Rehab-Rent-Refinance-Repeat strategy template",
+        propertyType: "single-family",
+        criteriaPreset: {
+          strategy: 'brrrr' as const,
+          targetCoCReturn: 15.0,
+          targetCapRate: 10.0,
+          maxLoanToValue: 75.0,
+          vacancyRate: 6.0,
+          maintenanceRate: 4.0,
+          managementRate: 6.0,
+          expectedAppreciation: 5.0,
+        },
+        scenarios: {
+          bestCase: { rentIncrease: 10.0, appreciation: 8.0, vacancy: 2.0, maintenance: 2.0 },
+          realistic: { rentIncrease: 5.0, appreciation: 5.0, vacancy: 6.0, maintenance: 4.0 },
+          worstCase: { rentIncrease: 3.0, appreciation: 3.0, vacancy: 12.0, maintenance: 8.0 },
+        },
+        isDefault: true,
+      }
+    ];
+
+    defaultTemplates.forEach(template => {
+      const id = randomUUID();
+      const now = new Date();
+      const analysisTemplate: AnalysisTemplate = {
+        ...template,
+        id,
+        createdAt: now
+      };
+      this.analysisTemplates.set(id, analysisTemplate);
+    });
   }
 
   private initializeSystemFilters(): void {

@@ -15,12 +15,21 @@ import {
   insertSavedFilterSchema,
   insertNaturalLanguageSearchSchema,
   insertPropertyClassificationSchema,
+  insertSmartPropertyRecommendationSchema,
+  insertRentPricingRecommendationSchema,
+  insertInvestmentTimingAdviceSchema,
+  insertAnalysisTemplateSchema,
   type NeighborhoodTrend,
   type ComparableSale,
   type MarketHeatMapData,
   type SavedFilter,
   type NaturalLanguageSearch,
-  type PropertyClassification
+  type PropertyClassification,
+  type SmartPropertyRecommendation,
+  type RentPricingRecommendation,
+  type InvestmentTimingAdvice,
+  type AnalysisTemplate,
+  type Property
 } from "@shared/schema";
 import { spawn } from "child_process";
 import path from "path";
@@ -973,6 +982,251 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({
         success: false,
         error: "Failed to create/update property classification"
+      });
+    }
+  });
+
+  // AI-Powered Smart Recommendations endpoints
+  
+  // Get smart property recommendations for a property
+  app.get("/api/properties/:id/recommendations", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const property = await storage.getProperty(id);
+      
+      if (!property) {
+        res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+        return;
+      }
+      
+      // Get available properties to compare against (excluding the source property)
+      const allAnalyses = await storage.getAnalysisHistory();
+      const availableProperties: Property[] = [];
+      
+      for (const analysis of allAnalyses) {
+        if (analysis.property && analysis.property.id !== id) {
+          availableProperties.push(analysis.property);
+        }
+      }
+      
+      const recommendations = await aiAnalysisService.generateSmartPropertyRecommendations(
+        property, 
+        availableProperties
+      );
+      
+      // Store recommendations in database
+      for (const rec of recommendations) {
+        await storage.createSmartPropertyRecommendation(rec);
+      }
+      
+      res.json({ success: true, data: recommendations });
+    } catch (error) {
+      console.error("Error generating smart recommendations:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to generate smart recommendations"
+      });
+    }
+  });
+
+  // Get rent pricing recommendation for a property
+  app.get("/api/properties/:id/rent-pricing", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const property = await storage.getProperty(id);
+      
+      if (!property) {
+        res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+        return;
+      }
+      
+      // Check for existing valid recommendation
+      let recommendation = await storage.getRentPricingRecommendation(id);
+      
+      if (!recommendation) {
+        // Generate new recommendation
+        const marketData = {
+          medianRent: property.monthlyRent * 1.08, // Placeholder market data
+          competitorRents: [
+            property.monthlyRent * 0.92,
+            property.monthlyRent * 1.05,
+            property.monthlyRent * 1.12
+          ]
+        };
+        
+        recommendation = await aiAnalysisService.generateRentPricingRecommendation(property, marketData);
+        await storage.createRentPricingRecommendation(recommendation);
+      }
+      
+      res.json({ success: true, data: recommendation });
+    } catch (error) {
+      console.error("Error generating rent pricing recommendation:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to generate rent pricing recommendation"
+      });
+    }
+  });
+
+  // Get investment timing advice for a property
+  app.get("/api/properties/:id/timing-advice", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const property = await storage.getProperty(id);
+      
+      if (!property) {
+        res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+        return;
+      }
+      
+      // Check for existing valid advice
+      let advice = await storage.getInvestmentTimingAdvice(id);
+      
+      if (!advice) {
+        // Generate new advice
+        const marketConditions = {
+          interestRates: 6.5, // Current market rates
+          marketPhase: "expansion"
+        };
+        
+        advice = await aiAnalysisService.generateInvestmentTimingAdvice(property, marketConditions);
+        await storage.createInvestmentTimingAdvice(advice);
+      }
+      
+      res.json({ success: true, data: advice });
+    } catch (error) {
+      console.error("Error generating investment timing advice:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to generate investment timing advice"
+      });
+    }
+  });
+
+  // Analysis Templates & Presets endpoints
+  
+  // Get all analysis templates
+  app.get("/api/templates", async (req, res) => {
+    try {
+      const templates = await storage.getAnalysisTemplates();
+      res.json({ success: true, data: templates });
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch analysis templates"
+      });
+    }
+  });
+
+  // Get specific analysis template
+  app.get("/api/templates/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.getAnalysisTemplate(id);
+      
+      if (!template) {
+        res.status(404).json({
+          success: false,
+          error: "Template not found"
+        });
+        return;
+      }
+      
+      res.json({ success: true, data: template });
+    } catch (error) {
+      console.error("Error fetching template:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch template"
+      });
+    }
+  });
+
+  // Create new analysis template
+  app.post("/api/templates", async (req, res) => {
+    try {
+      const validated = insertAnalysisTemplateSchema.parse(req.body);
+      const template = await storage.createAnalysisTemplate(validated);
+      
+      res.json({ success: true, data: template });
+    } catch (error) {
+      console.error("Error creating template:", error);
+      res.status(400).json({
+        success: false,
+        error: "Failed to create analysis template"
+      });
+    }
+  });
+
+  // Update analysis template
+  app.put("/api/templates/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = insertAnalysisTemplateSchema.partial().parse(req.body);
+      const template = await storage.updateAnalysisTemplate(id, updates);
+      
+      if (!template) {
+        res.status(404).json({
+          success: false,
+          error: "Template not found"
+        });
+        return;
+      }
+      
+      res.json({ success: true, data: template });
+    } catch (error) {
+      console.error("Error updating template:", error);
+      res.status(400).json({
+        success: false,
+        error: "Failed to update template"
+      });
+    }
+  });
+
+  // Delete analysis template
+  app.delete("/api/templates/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteAnalysisTemplate(id);
+      
+      if (!success) {
+        res.status(404).json({
+          success: false,
+          error: "Template not found"
+        });
+        return;
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to delete template"
+      });
+    }
+  });
+
+  // Get default templates
+  app.get("/api/templates/defaults", async (req, res) => {
+    try {
+      const templates = await storage.getDefaultTemplates();
+      res.json({ success: true, data: templates });
+    } catch (error) {
+      console.error("Error fetching default templates:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch default templates"
       });
     }
   });

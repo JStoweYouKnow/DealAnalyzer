@@ -393,6 +393,117 @@ export const propertyClassificationSchema = z.object({
   lastUpdated: z.date(),
 });
 
+// AI-Powered Smart Recommendations schemas
+export const smartPropertyRecommendationSchema = z.object({
+  id: z.string().optional(),
+  sourcePropertyId: z.string(),
+  recommendedPropertyId: z.string(),
+  similarityScore: z.number().min(0).max(100),
+  matchReasons: z.array(z.string()),
+  recommendationType: z.enum(['similar_location', 'similar_metrics', 'upgrade_opportunity', 'diversification']),
+  confidenceScore: z.number().min(0).max(1),
+  aiInsights: z.string(),
+  createdAt: z.date(),
+});
+
+export const rentPricingRecommendationSchema = z.object({
+  id: z.string().optional(),
+  propertyId: z.string(),
+  currentRent: z.number(),
+  recommendedRent: z.number(),
+  adjustmentPercentage: z.number(),
+  adjustmentReasons: z.array(z.string()),
+  marketData: z.object({
+    areaMedianRent: z.number(),
+    competitorRents: z.array(z.number()),
+    seasonalFactors: z.array(z.string()),
+    demandIndicators: z.array(z.string()),
+  }),
+  riskAssessment: z.object({
+    tenantRetentionRisk: z.enum(['low', 'medium', 'high']),
+    vacancyRisk: z.enum(['low', 'medium', 'high']),
+    marketRisk: z.enum(['low', 'medium', 'high']),
+  }),
+  implementation: z.object({
+    recommendedTiming: z.string(),
+    gradualIncreaseSchedule: z.array(z.object({
+      effectiveDate: z.string(),
+      newRent: z.number(),
+    })).optional(),
+    marketingStrategy: z.array(z.string()),
+  }),
+  createdAt: z.date(),
+  validUntil: z.date(),
+});
+
+export const investmentTimingAdviceSchema = z.object({
+  id: z.string().optional(),
+  propertyId: z.string(),
+  action: z.enum(['buy', 'hold', 'sell', 'refinance', 'improve']),
+  urgency: z.enum(['immediate', 'within_3_months', 'within_6_months', 'within_1_year', 'monitor']),
+  reasoning: z.array(z.string()),
+  marketFactors: z.object({
+    interestRateOutlook: z.string(),
+    marketCyclePhase: z.enum(['recovery', 'expansion', 'peak', 'recession']),
+    localMarketTrends: z.array(z.string()),
+    seasonalConsiderations: z.array(z.string()),
+  }),
+  financialImplications: z.object({
+    potentialGainLoss: z.number(),
+    taxConsiderations: z.array(z.string()),
+    cashFlowImpact: z.number(),
+    equityPosition: z.number().optional(),
+  }),
+  riskFactors: z.array(z.string()),
+  actionPlan: z.array(z.object({
+    step: z.string(),
+    timeline: z.string(),
+    priority: z.enum(['high', 'medium', 'low']),
+  })),
+  createdAt: z.date(),
+  expiresAt: z.date(),
+});
+
+// Template & Preset schemas
+export const analysisTemplateSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  description: z.string(),
+  propertyType: z.string(),
+  criteriaPreset: z.object({
+    strategy: z.enum(['conservative', 'aggressive', 'brrrr', 'fix_and_flip', 'short_term_rental']),
+    targetCoCReturn: z.number(),
+    targetCapRate: z.number(),
+    maxLoanToValue: z.number(),
+    vacancyRate: z.number(),
+    maintenanceRate: z.number(),
+    managementRate: z.number(),
+    expectedAppreciation: z.number(),
+  }),
+  scenarios: z.object({
+    bestCase: z.object({
+      rentIncrease: z.number(),
+      appreciation: z.number(),
+      vacancy: z.number(),
+      maintenance: z.number(),
+    }),
+    realistic: z.object({
+      rentIncrease: z.number(),
+      appreciation: z.number(),
+      vacancy: z.number(),
+      maintenance: z.number(),
+    }),
+    worstCase: z.object({
+      rentIncrease: z.number(),
+      appreciation: z.number(),
+      vacancy: z.number(),
+      maintenance: z.number(),
+    }),
+  }),
+  createdAt: z.date(),
+  isDefault: z.boolean().default(false),
+});
+
 // Insert schemas
 export const insertPropertySchema = propertySchema.omit({ id: true });
 export const insertDealAnalysisSchema = dealAnalysisSchema.omit({ id: true, analysisDate: true });
@@ -402,6 +513,10 @@ export const insertMarketHeatMapDataSchema = marketHeatMapDataSchema.omit({ id: 
 export const insertSavedFilterSchema = savedFilterSchema.omit({ id: true, createdAt: true, updatedAt: true });
 export const insertNaturalLanguageSearchSchema = naturalLanguageSearchSchema.omit({ id: true });
 export const insertPropertyClassificationSchema = propertyClassificationSchema.omit({});
+export const insertSmartPropertyRecommendationSchema = smartPropertyRecommendationSchema.omit({ id: true, createdAt: true });
+export const insertRentPricingRecommendationSchema = rentPricingRecommendationSchema.omit({ id: true, createdAt: true });
+export const insertInvestmentTimingAdviceSchema = investmentTimingAdviceSchema.omit({ id: true, createdAt: true });
+export const insertAnalysisTemplateSchema = analysisTemplateSchema.omit({ id: true, createdAt: true });
 
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type InsertDealAnalysis = z.infer<typeof insertDealAnalysisSchema>;
@@ -411,9 +526,17 @@ export type MarketHeatMapData = z.infer<typeof marketHeatMapDataSchema>;
 export type SavedFilter = z.infer<typeof savedFilterSchema>;
 export type NaturalLanguageSearch = z.infer<typeof naturalLanguageSearchSchema>;
 export type PropertyClassification = z.infer<typeof propertyClassificationSchema>;
+export type SmartPropertyRecommendation = z.infer<typeof smartPropertyRecommendationSchema>;
+export type RentPricingRecommendation = z.infer<typeof rentPricingRecommendationSchema>;
+export type InvestmentTimingAdvice = z.infer<typeof investmentTimingAdviceSchema>;
+export type AnalysisTemplate = z.infer<typeof analysisTemplateSchema>;
 export type InsertNeighborhoodTrend = z.infer<typeof insertNeighborhoodTrendSchema>;
 export type InsertComparableSale = z.infer<typeof insertComparableSaleSchema>;
 export type InsertMarketHeatMapData = z.infer<typeof insertMarketHeatMapDataSchema>;
 export type InsertSavedFilter = z.infer<typeof insertSavedFilterSchema>;
 export type InsertNaturalLanguageSearch = z.infer<typeof insertNaturalLanguageSearchSchema>;
 export type InsertPropertyClassification = z.infer<typeof insertPropertyClassificationSchema>;
+export type InsertSmartPropertyRecommendation = z.infer<typeof insertSmartPropertyRecommendationSchema>;
+export type InsertRentPricingRecommendation = z.infer<typeof insertRentPricingRecommendationSchema>;
+export type InsertInvestmentTimingAdvice = z.infer<typeof insertInvestmentTimingAdviceSchema>;
+export type InsertAnalysisTemplate = z.infer<typeof insertAnalysisTemplateSchema>;
