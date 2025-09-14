@@ -60,14 +60,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       fileSize: 50 * 1024 * 1024, // 50MB limit
     },
     fileFilter: (req, file, cb) => {
-      // Only allow CSV and Excel files for imports
-      const allowedTypes = ['.csv', '.xlsx', '.xls'];
+      // Allow CSV, Excel, and PDF files for property analysis
+      const allowedTypes = ['.csv', '.xlsx', '.xls', '.pdf'];
       const fileExtension = path.extname(file.originalname).toLowerCase();
       
       if (allowedTypes.includes(fileExtension)) {
         cb(null, true);
       } else {
-        cb(new Error('Invalid file type. Only CSV and Excel files are allowed for imports.'));
+        cb(new Error('Invalid file type. Only CSV, Excel, and PDF files are allowed for property analysis.'));
       }
     },
   });
