@@ -80,7 +80,7 @@ def parse_pdf_file(file_path: str) -> Property:
         return parse_email_alert(text_content)
         
     except Exception as e:
-        print(f"Error parsing PDF: {e}")
+        # Don't print error messages, just return error property
         return Property(
             address="PDF Parse Error",
             city="Unknown",
@@ -161,7 +161,7 @@ def parse_csv_file(file_path: str) -> Property:
         )
         
     except Exception as e:
-        print(f"Error parsing CSV: {e}")
+        # Don't print error messages, just return error property
         return Property(
             address="CSV Parse Error",
             city="Unknown",
@@ -201,7 +201,7 @@ def parse_excel_file(file_path: str) -> Property:
         return result
         
     except Exception as e:
-        print(f"Error parsing Excel: {e}")
+        # Don't print error messages, just return error property
         return Property(
             address="Excel Parse Error",
             city="Unknown",
@@ -228,7 +228,7 @@ def parse_text_file(file_path: str) -> Property:
         return parse_email_alert(content)
         
     except Exception as e:
-        print(f"Error parsing text file: {e}")
+        # Don't print error messages, just return error property
         return Property(
             address="Text Parse Error",
             city="Unknown",
@@ -279,4 +279,21 @@ if __name__ == "__main__":
             property_data = parse_file_content(file_path, file_ext)
             print(property_data.to_dict())
         except Exception as e:
-            print(f"Error: {e}")
+            # Output error as valid JSON so Node.js can parse it
+            import json
+            error_result = {
+                "address": "File Parse Error",
+                "city": "Unknown",
+                "state": "Unknown",
+                "zip_code": "00000",
+                "property_type": "unknown",
+                "purchase_price": 0.0,
+                "monthly_rent": 0.0,
+                "bedrooms": 0,
+                "bathrooms": 0.0,
+                "square_footage": 0,
+                "year_built": 0,
+                "description": f"File parsing error: {str(e)}",
+                "listing_url": "N/A"
+            }
+            print(json.dumps(error_result))

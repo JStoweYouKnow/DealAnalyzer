@@ -1683,7 +1683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (allowedMimes.includes(file.mimetype)) {
         cb(null, true);
       } else {
-        cb(new Error('Only JPEG, PNG, WebP, and GIF images are allowed'), false);
+        cb(new Error('Only JPEG, PNG, WebP, and GIF images are allowed'));
       }
     }
   });
