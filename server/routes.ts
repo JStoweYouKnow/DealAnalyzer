@@ -29,7 +29,15 @@ import {
   type RentPricingRecommendation,
   type InvestmentTimingAdvice,
   type AnalysisTemplate,
-  type Property
+  type Property,
+  excelExportRequestSchema,
+  csvExportRequestSchema,
+  type ExcelExportRequest,
+  type CsvExportRequest,
+  type ImportResult,
+  insertApiIntegrationSchema,
+  type ApiIntegration,
+  type InsertApiIntegration
 } from "@shared/schema";
 import { spawn } from "child_process";
 import path from "path";
@@ -38,6 +46,8 @@ import { generateReport, type ReportOptions, type ReportData } from "./report-ge
 import { aiAnalysisService } from "./ai-service";
 import { emailMonitoringService } from "./email-service";
 import { rentalCompsService } from "./rental-comps-service";
+import { importExportService } from "./import-export-service";
+import { apiIntegrationService } from "./api-integration-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -45,16 +55,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const upload = multer({
     dest: 'temp_uploads/',
     limits: {
-      fileSize: 50 * 1024 * 1024, // 50MB limit (increased from 10MB)
+      fileSize: 50 * 1024 * 1024, // 50MB limit
     },
     fileFilter: (req, file, cb) => {
-      const allowedTypes = ['.pdf', '.csv', '.txt', '.xlsx', '.xls'];
+      // Only allow CSV and Excel files for imports
+      const allowedTypes = ['.csv', '.xlsx', '.xls'];
       const fileExtension = path.extname(file.originalname).toLowerCase();
       
       if (allowedTypes.includes(fileExtension)) {
         cb(null, true);
       } else {
-        cb(new Error('Invalid file type. Only PDF, CSV, TXT, and Excel files are allowed.'));
+        cb(new Error('Invalid file type. Only CSV and Excel files are allowed for imports.'));
       }
     },
   });
@@ -1227,6 +1238,247 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to fetch default templates"
+      });
+    }
+  });
+
+  // Import/Export & BiggerPockets Integration endpoints
+  
+  // Import properties from BiggerPockets format (CSV/Excel)
+  app.post("/api/import/biggerpockets", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          error: "No file uploaded"
+        });
+        return;
+      }
+      
+      const fileExtension = path.extname(req.file.originalname).toLowerCase();
+      const fileType = fileExtension === '.xlsx' || fileExtension === '.xls' ? 'xlsx' : 'csv';
+      
+      const result = await importExportService.importFromBiggerPockets(req.file.path, fileType);
+      
+      // Clean up uploaded file
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.error("Error deleting uploaded file:", err);
+      });
+      
+      res.json({ success: true, data: result });
+    } catch (error) {
+      console.error("Error importing BiggerPockets data:", error);
+      
+      // Clean up uploaded file on error too
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          if (err) console.error("Error deleting uploaded file on error:", err);
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        error: "Failed to import BiggerPockets data"
+      });
+    }
+  });
+
+  // Export properties to Excel
+  app.post("/api/export/excel", async (req, res) => {
+    try {
+      const validated = excelExportRequestSchema.parse(req.body);
+      const buffer = await importExportService.exportToExcel(validated);
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="property-analysis.xlsx"');
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to export to Excel"
+      });
+    }
+  });
+
+  // Export properties to CSV
+  app.post("/api/export/csv", async (req, res) => {
+    try {
+      const validated = csvExportRequestSchema.parse(req.body);
+      const csvData = await importExportService.exportToCsv(validated);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="property-analysis.csv"');
+      res.send(csvData);
+    } catch (error) {
+      console.error("Error exporting to CSV:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to export to CSV"
+      });
+    }
+  });
+
+  // Download BiggerPockets import template
+  app.get("/api/templates/biggerpockets", async (req, res) => {
+    try {
+      const buffer = importExportService.generateBiggerPocketsTemplate();
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="biggerpockets-import-template.xlsx"');
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error generating BiggerPockets template:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to generate BiggerPockets template"
+      });
+    }
+  });
+
+  // API Integration endpoints
+  
+  // Create new API integration
+  app.post("/api/integrations", async (req, res) => {
+    try {
+      const validated = insertApiIntegrationSchema.parse(req.body);
+      const integration = await apiIntegrationService.createIntegration(validated);
+      
+      res.json({ success: true, data: integration });
+    } catch (error) {
+      console.error("Error creating API integration:", error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to create API integration"
+      });
+    }
+  });
+
+  // Get user's API integrations
+  app.get("/api/integrations", async (req, res) => {
+    try {
+      const userId = "default"; // In real app, get from auth
+      const integrations = await apiIntegrationService.getUserIntegrations(userId);
+      
+      res.json({ success: true, data: integrations });
+    } catch (error) {
+      console.error("Error fetching API integrations:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch API integrations"
+      });
+    }
+  });
+
+  // Get specific API integration
+  app.get("/api/integrations/:id", async (req, res) => {
+    try {
+      const integration = await apiIntegrationService.getIntegration(req.params.id);
+      
+      if (!integration) {
+        res.status(404).json({
+          success: false,
+          error: "API integration not found"
+        });
+        return;
+      }
+      
+      res.json({ success: true, data: integration });
+    } catch (error) {
+      console.error("Error fetching API integration:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch API integration"
+      });
+    }
+  });
+
+  // Update API integration
+  app.put("/api/integrations/:id", async (req, res) => {
+    try {
+      const updates = req.body;
+      const integration = await apiIntegrationService.updateIntegration(req.params.id, updates);
+      
+      if (!integration) {
+        res.status(404).json({
+          success: false,
+          error: "API integration not found"
+        });
+        return;
+      }
+      
+      res.json({ success: true, data: integration });
+    } catch (error) {
+      console.error("Error updating API integration:", error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update API integration"
+      });
+    }
+  });
+
+  // Delete API integration
+  app.delete("/api/integrations/:id", async (req, res) => {
+    try {
+      const deleted = await apiIntegrationService.deleteIntegration(req.params.id);
+      
+      if (!deleted) {
+        res.status(404).json({
+          success: false,
+          error: "API integration not found"
+        });
+        return;
+      }
+      
+      res.json({ success: true, message: "API integration deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting API integration:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to delete API integration"
+      });
+    }
+  });
+
+  // Test API integration connection
+  app.post("/api/integrations/:id/test", async (req, res) => {
+    try {
+      const result = await apiIntegrationService.testIntegration(req.params.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      console.error("Error testing API integration:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to test API integration"
+      });
+    }
+  });
+
+  // Sync data from API integration
+  app.post("/api/integrations/:id/sync", async (req, res) => {
+    try {
+      const result = await apiIntegrationService.syncIntegrationData(req.params.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      console.error("Error syncing API integration data:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to sync API integration data"
+      });
+    }
+  });
+
+  // Send data to API integration
+  app.post("/api/integrations/:id/send", async (req, res) => {
+    try {
+      const { data: sendData, endpoint } = req.body;
+      const result = await apiIntegrationService.sendData(req.params.id, sendData, endpoint);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      console.error("Error sending data to API integration:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to send data to API integration"
       });
     }
   });

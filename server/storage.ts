@@ -1,4 +1,4 @@
-import { type Property, type DealAnalysis, type InsertProperty, type InsertDealAnalysis, type PropertyComparison, type EmailDeal, type NeighborhoodTrend, type ComparableSale, type MarketHeatMapData, type SavedFilter, type NaturalLanguageSearch, type PropertyClassification, type SmartPropertyRecommendation, type RentPricingRecommendation, type InvestmentTimingAdvice, type AnalysisTemplate, type InsertNeighborhoodTrend, type InsertComparableSale, type InsertMarketHeatMapData, type InsertSavedFilter, type InsertNaturalLanguageSearch, type InsertPropertyClassification, type InsertSmartPropertyRecommendation, type InsertRentPricingRecommendation, type InsertInvestmentTimingAdvice, type InsertAnalysisTemplate } from "@shared/schema";
+import { type Property, type DealAnalysis, type InsertProperty, type InsertDealAnalysis, type PropertyComparison, type EmailDeal, type NeighborhoodTrend, type ComparableSale, type MarketHeatMapData, type SavedFilter, type NaturalLanguageSearch, type PropertyClassification, type SmartPropertyRecommendation, type RentPricingRecommendation, type InvestmentTimingAdvice, type AnalysisTemplate, type ApiIntegration, type InsertNeighborhoodTrend, type InsertComparableSale, type InsertMarketHeatMapData, type InsertSavedFilter, type InsertNaturalLanguageSearch, type InsertPropertyClassification, type InsertSmartPropertyRecommendation, type InsertRentPricingRecommendation, type InsertInvestmentTimingAdvice, type InsertAnalysisTemplate, type InsertApiIntegration } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -79,6 +79,13 @@ export interface IStorage {
   updateAnalysisTemplate(id: string, updates: Partial<InsertAnalysisTemplate>): Promise<AnalysisTemplate | undefined>;
   deleteAnalysisTemplate(id: string): Promise<boolean>;
   getDefaultTemplates(): Promise<AnalysisTemplate[]>;
+
+  // API Integration management
+  createApiIntegration(integration: InsertApiIntegration): Promise<ApiIntegration>;
+  getUserApiIntegrations(userId: string): Promise<ApiIntegration[]>;
+  getApiIntegration(id: string): Promise<ApiIntegration | undefined>;
+  updateApiIntegration(id: string, updates: Partial<InsertApiIntegration>): Promise<ApiIntegration | undefined>;
+  deleteApiIntegration(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -96,6 +103,7 @@ export class MemStorage implements IStorage {
   private rentPricingRecommendations: Map<string, RentPricingRecommendation>;
   private investmentTimingAdvice: Map<string, InvestmentTimingAdvice>;
   private analysisTemplates: Map<string, AnalysisTemplate>;
+  private apiIntegrations: Map<string, ApiIntegration>;
 
   constructor() {
     this.properties = new Map();
@@ -112,6 +120,7 @@ export class MemStorage implements IStorage {
     this.rentPricingRecommendations = new Map();
     this.investmentTimingAdvice = new Map();
     this.analysisTemplates = new Map();
+    this.apiIntegrations = new Map();
     
     // Initialize with some default system filters and templates
     this.initializeSystemFilters();
@@ -818,6 +827,49 @@ export class MemStorage implements IStorage {
       };
       this.savedFilters.set(id, savedFilter);
     });
+  }
+
+  // API Integration methods implementation
+  async createApiIntegration(integration: InsertApiIntegration): Promise<ApiIntegration> {
+    const id = randomUUID();
+    const now = new Date();
+    const apiIntegration: ApiIntegration = {
+      ...integration,
+      id,
+      createdAt: now,
+      lastUsed: undefined
+    };
+    this.apiIntegrations.set(id, apiIntegration);
+    return apiIntegration;
+  }
+
+  async getUserApiIntegrations(userId: string): Promise<ApiIntegration[]> {
+    // For now, return all integrations since we don't have user separation in mem storage
+    // In a real implementation, you'd filter by userId
+    return Array.from(this.apiIntegrations.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getApiIntegration(id: string): Promise<ApiIntegration | undefined> {
+    return this.apiIntegrations.get(id);
+  }
+
+  async updateApiIntegration(id: string, updates: Partial<InsertApiIntegration>): Promise<ApiIntegration | undefined> {
+    const existing = this.apiIntegrations.get(id);
+    if (!existing) return undefined;
+
+    const updated: ApiIntegration = {
+      ...existing,
+      ...updates,
+      id, // Keep the same ID
+      createdAt: existing.createdAt, // Keep original creation time
+    };
+    this.apiIntegrations.set(id, updated);
+    return updated;
+  }
+
+  async deleteApiIntegration(id: string): Promise<boolean> {
+    return this.apiIntegrations.delete(id);
   }
 }
 
