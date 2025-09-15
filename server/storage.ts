@@ -130,9 +130,10 @@ export class MemStorage implements IStorage {
     this.apiIntegrations = new Map();
     this.photoAnalyses = new Map();
     
-    // Initialize with some default system filters and templates
+    // Initialize with some default system filters, templates, and market data
     this.initializeSystemFilters();
     this.initializeDefaultTemplates();
+    this.initializeMarketIntelligenceData();
   }
 
   async getProperty(id: string): Promise<Property | undefined> {
@@ -693,6 +694,382 @@ export class MemStorage implements IStorage {
 
   async getDefaultTemplates(): Promise<AnalysisTemplate[]> {
     return Array.from(this.analysisTemplates.values()).filter(template => template.isDefault);
+  }
+
+  private initializeMarketIntelligenceData() {
+    // Initialize neighborhood trends with realistic sample data
+    const neighborhoodTrendsData = [
+      {
+        neighborhood: "Downtown",
+        city: "Los Angeles",
+        state: "California",
+        averagePrice: 850000,
+        priceChangePercent3Month: 2.1,
+        priceChangePercent6Month: 5.3,
+        priceChangePercent1Year: 8.5,
+        averageRent: 3200,
+        rentChangePercent3Month: 3.8,
+        rentChangePercent6Month: 8.1,
+        rentChangePercent1Year: 12.3,
+        daysOnMarket: 25,
+        pricePerSqft: 650,
+        rentYield: 0.045,
+        marketHeat: "hot" as const
+      },
+      {
+        neighborhood: "Westside",
+        city: "Austin",
+        state: "Texas", 
+        averagePrice: 485000,
+        priceChangePercent3Month: 4.2,
+        priceChangePercent6Month: 9.8,
+        priceChangePercent1Year: 15.2,
+        averageRent: 2100,
+        rentChangePercent3Month: 5.1,
+        rentChangePercent6Month: 11.3,
+        rentChangePercent1Year: 18.7,
+        daysOnMarket: 18,
+        pricePerSqft: 425,
+        rentYield: 0.052,
+        marketHeat: "hot" as const
+      },
+      {
+        neighborhood: "South Beach",
+        city: "Miami",
+        state: "Florida",
+        averagePrice: 620000,
+        priceChangePercent3Month: 1.8,
+        priceChangePercent6Month: 4.2,
+        priceChangePercent1Year: 6.8,
+        averageRent: 2800,
+        rentChangePercent3Month: 2.3,
+        rentChangePercent6Month: 5.8,
+        rentChangePercent1Year: 9.4,
+        daysOnMarket: 35,
+        pricePerSqft: 580,
+        rentYield: 0.054,
+        marketHeat: "warm" as const
+      },
+      {
+        neighborhood: "Brooklyn Heights",
+        city: "New York",
+        state: "New York",
+        averagePrice: 1200000,
+        priceChangePercent3Month: 0.8,
+        priceChangePercent6Month: 2.1,
+        priceChangePercent1Year: 3.2,
+        averageRent: 4500,
+        rentChangePercent3Month: 1.2,
+        rentChangePercent6Month: 3.1,
+        rentChangePercent1Year: 5.1,
+        daysOnMarket: 45,
+        pricePerSqft: 950,
+        rentYield: 0.045,
+        marketHeat: "balanced" as const
+      },
+      {
+        neighborhood: "Mission District",
+        city: "San Francisco",
+        state: "California",
+        averagePrice: 1100000,
+        priceChangePercent3Month: 0.5,
+        priceChangePercent6Month: 1.3,
+        priceChangePercent1Year: 2.1,
+        averageRent: 3800,
+        rentChangePercent3Month: 0.9,
+        rentChangePercent6Month: 2.2,
+        rentChangePercent1Year: 3.8,
+        daysOnMarket: 55,
+        pricePerSqft: 850,
+        rentYield: 0.041,
+        marketHeat: "cool" as const
+      },
+      {
+        neighborhood: "The Gulch",
+        city: "Nashville",
+        state: "Tennessee",
+        averagePrice: 425000,
+        priceChangePercent3Month: 3.5,
+        priceChangePercent6Month: 7.8,
+        priceChangePercent1Year: 11.8,
+        averageRent: 1950,
+        rentChangePercent3Month: 4.1,
+        rentChangePercent6Month: 9.2,
+        rentChangePercent1Year: 14.2,
+        daysOnMarket: 22,
+        pricePerSqft: 380,
+        rentYield: 0.055,
+        marketHeat: "hot" as const
+      }
+    ];
+
+    neighborhoodTrendsData.forEach(data => {
+      const id = randomUUID();
+      const trend: NeighborhoodTrend = {
+        ...data,
+        id,
+        lastUpdated: new Date()
+      };
+      this.neighborhoodTrends.set(id, trend);
+    });
+
+    // Initialize comparable sales with realistic sample data
+    const comparableSalesData = [
+      {
+        address: "123 Main St",
+        city: "Los Angeles",
+        state: "California",
+        zipCode: "90210",
+        salePrice: 825000,
+        pricePerSqft: 645,
+        bedrooms: 3,
+        bathrooms: 2.5,
+        squareFootage: 1280,
+        yearBuilt: 2018,
+        propertyType: "single-family",
+        saleDate: new Date(2024, 7, 15),
+        distance: 0.3
+      },
+      {
+        address: "456 Oak Ave",
+        city: "Austin",
+        state: "Texas",
+        zipCode: "78701",
+        salePrice: 495000,
+        pricePerSqft: 432,
+        bedrooms: 2,
+        bathrooms: 2,
+        squareFootage: 1146,
+        yearBuilt: 2020,
+        propertyType: "townhouse",
+        saleDate: new Date(2024, 8, 3),
+        distance: 0.8
+      },
+      {
+        address: "789 Pine Dr",
+        city: "Miami",
+        state: "Florida",
+        zipCode: "33139",
+        salePrice: 635000,
+        pricePerSqft: 590,
+        bedrooms: 2,
+        bathrooms: 2,
+        squareFootage: 1076,
+        yearBuilt: 2019,
+        propertyType: "condo",
+        saleDate: new Date(2024, 6, 22),
+        distance: 1.2
+      },
+      {
+        address: "321 Elm St",
+        city: "New York",
+        state: "New York",
+        zipCode: "10001",
+        salePrice: 1150000,
+        pricePerSqft: 920,
+        bedrooms: 1,
+        bathrooms: 1,
+        squareFootage: 1250,
+        yearBuilt: 2015,
+        propertyType: "condo",
+        saleDate: new Date(2024, 5, 10),
+        distance: 0.5
+      },
+      {
+        address: "654 Birch Ln",
+        city: "San Francisco",
+        state: "California",
+        zipCode: "94110",
+        salePrice: 1080000,
+        pricePerSqft: 810,
+        bedrooms: 2,
+        bathrooms: 1,
+        squareFootage: 1333,
+        yearBuilt: 1985,
+        propertyType: "single-family",
+        saleDate: new Date(2024, 4, 28),
+        distance: 0.7
+      },
+      {
+        address: "987 Cedar Way",
+        city: "Nashville",
+        state: "Tennessee",
+        zipCode: "37203",
+        salePrice: 445000,
+        pricePerSqft: 385,
+        bedrooms: 3,
+        bathrooms: 2.5,
+        squareFootage: 1156,
+        yearBuilt: 2021,
+        propertyType: "townhouse",
+        saleDate: new Date(2024, 8, 18),
+        distance: 1.1
+      }
+    ];
+
+    comparableSalesData.forEach(data => {
+      const id = randomUUID();
+      const sale: ComparableSale = {
+        ...data,
+        id,
+        createdAt: new Date()
+      };
+      this.comparableSales.set(id, sale);
+    });
+
+    // Initialize market heat map data with realistic sample data
+    const heatMapData = [
+      {
+        zipCode: "90210",
+        city: "Beverly Hills",
+        state: "California",
+        latitude: 34.0901,
+        longitude: -118.4065,
+        heatLevel: "very_hot" as const,
+        averagePrice: 2100000,
+        priceChangePercent: 12.5,
+        averageRent: 8500,
+        rentChangePercent: 15.2,
+        investmentScore: 89,
+        dealVolume: 45
+      },
+      {
+        zipCode: "78701",
+        city: "Austin",
+        state: "Texas",
+        latitude: 30.2672,
+        longitude: -97.7431,
+        heatLevel: "very_hot" as const,
+        averagePrice: 650000,
+        priceChangePercent: 18.3,
+        averageRent: 2800,
+        rentChangePercent: 22.1,
+        investmentScore: 94,
+        dealVolume: 78
+      },
+      {
+        zipCode: "33139",
+        city: "Miami Beach",
+        state: "Florida",
+        latitude: 25.7617,
+        longitude: -80.1918,
+        heatLevel: "hot" as const,
+        averagePrice: 850000,
+        priceChangePercent: 9.7,
+        averageRent: 3900,
+        rentChangePercent: 11.4,
+        investmentScore: 82,
+        dealVolume: 52
+      },
+      {
+        zipCode: "10001",
+        city: "New York",
+        state: "New York",
+        latitude: 40.7589,
+        longitude: -73.9851,
+        heatLevel: "warm" as const,
+        averagePrice: 1450000,
+        priceChangePercent: 4.2,
+        averageRent: 5200,
+        rentChangePercent: 6.8,
+        investmentScore: 75,
+        dealVolume: 38
+      },
+      {
+        zipCode: "94110",
+        city: "San Francisco",
+        state: "California",
+        latitude: 37.7478,
+        longitude: -122.4148,
+        heatLevel: "balanced" as const,
+        averagePrice: 1320000,
+        priceChangePercent: 2.8,
+        averageRent: 4100,
+        rentChangePercent: 3.9,
+        investmentScore: 68,
+        dealVolume: 29
+      },
+      {
+        zipCode: "37203",
+        city: "Nashville",
+        state: "Tennessee",
+        latitude: 36.1467,
+        longitude: -86.8073,
+        heatLevel: "hot" as const,
+        averagePrice: 525000,
+        priceChangePercent: 14.6,
+        averageRent: 2200,
+        rentChangePercent: 16.8,
+        investmentScore: 87,
+        dealVolume: 63
+      },
+      {
+        zipCode: "85001",
+        city: "Phoenix",
+        state: "Arizona",
+        latitude: 33.4484,
+        longitude: -112.0740,
+        heatLevel: "hot" as const,
+        averagePrice: 425000,
+        priceChangePercent: 11.2,
+        averageRent: 1800,
+        rentChangePercent: 13.5,
+        investmentScore: 79,
+        dealVolume: 56
+      },
+      {
+        zipCode: "30309",
+        city: "Atlanta",
+        state: "Georgia",
+        latitude: 33.7730,
+        longitude: -84.3776,
+        heatLevel: "warm" as const,
+        averagePrice: 385000,
+        priceChangePercent: 8.9,
+        averageRent: 1650,
+        rentChangePercent: 10.2,
+        investmentScore: 73,
+        dealVolume: 41
+      },
+      {
+        zipCode: "80202",
+        city: "Denver",
+        state: "Colorado",
+        latitude: 39.7392,
+        longitude: -104.9903,
+        heatLevel: "hot" as const,
+        averagePrice: 575000,
+        priceChangePercent: 10.8,
+        averageRent: 2350,
+        rentChangePercent: 12.9,
+        investmentScore: 81,
+        dealVolume: 47
+      },
+      {
+        zipCode: "02101",
+        city: "Boston",
+        state: "Massachusetts",
+        latitude: 42.3601,
+        longitude: -71.0589,
+        heatLevel: "balanced" as const,
+        averagePrice: 875000,
+        priceChangePercent: 5.1,
+        averageRent: 3100,
+        rentChangePercent: 7.3,
+        investmentScore: 71,
+        dealVolume: 34
+      }
+    ];
+
+    heatMapData.forEach(data => {
+      const id = randomUUID();
+      const heatMap: MarketHeatMapData = {
+        ...data,
+        id,
+        lastUpdated: new Date()
+      };
+      this.marketHeatMapData.set(id, heatMap);
+    });
   }
 
   private initializeDefaultTemplates(): void {
