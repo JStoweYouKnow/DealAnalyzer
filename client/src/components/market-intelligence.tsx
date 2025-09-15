@@ -14,14 +14,16 @@ export function MarketIntelligence() {
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [selectedState, setSelectedState] = useState<string>("all");
   const [searchAddress, setSearchAddress] = useState<string>("");
+  const [useLiveData, setUseLiveData] = useState<boolean>(false);
 
   // Fetch neighborhood trends
   const { data: neighborhoodTrends = [], isLoading: trendsLoading, error: trendsError } = useQuery<NeighborhoodTrend[]>({
-    queryKey: ['/api/market/neighborhood-trends', selectedCity, selectedState],
+    queryKey: ['/api/market/neighborhood-trends', selectedCity, selectedState, useLiveData],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedCity !== "all") params.append('city', selectedCity);
       if (selectedState !== "all") params.append('state', selectedState);
+      if (useLiveData) params.append('live', 'true');
       
       const response = await apiRequest('GET', `/api/market/neighborhood-trends?${params}`);
       const data = await response.json();
@@ -31,11 +33,16 @@ export function MarketIntelligence() {
 
   // Fetch comparable sales
   const { data: comparableSales = [], isLoading: salesLoading, error: salesError } = useQuery<ComparableSale[]>({
-    queryKey: ['/api/market/comparable-sales', searchAddress],
+    queryKey: ['/api/market/comparable-sales', searchAddress, useLiveData],
     queryFn: async () => {
       if (!searchAddress) return [];
       
-      const response = await apiRequest('GET', `/api/market/comparable-sales?address=${encodeURIComponent(searchAddress)}&radius=2`);
+      const params = new URLSearchParams();
+      params.append('address', searchAddress);
+      params.append('radius', '2');
+      if (useLiveData) params.append('live', 'true');
+      
+      const response = await apiRequest('GET', `/api/market/comparable-sales?${params}`);
       const data = await response.json();
       return data.data || [];
     },
@@ -44,9 +51,12 @@ export function MarketIntelligence() {
 
   // Fetch market heat map data
   const { data: heatMapData = [], isLoading: heatMapLoading, error: heatMapError } = useQuery<MarketHeatMapData[]>({
-    queryKey: ['/api/market/heat-map'],
+    queryKey: ['/api/market/heat-map', useLiveData],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/market/heat-map');
+      const params = new URLSearchParams();
+      if (useLiveData) params.append('live', 'true');
+      
+      const response = await apiRequest('GET', `/api/market/heat-map?${params}`);
       const data = await response.json();
       return data.data || [];
     }
@@ -85,10 +95,32 @@ export function MarketIntelligence() {
   return (
     <div className="space-y-6" data-testid="market-intelligence">
       <div className="flex flex-col space-y-4">
-        <h1 className="text-3xl font-bold">Market Intelligence</h1>
-        <p className="text-muted-foreground">
-          Analyze neighborhood trends, comparable sales, and market conditions to make informed investment decisions.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Market Intelligence</h1>
+            <p className="text-muted-foreground">
+              Analyze neighborhood trends, comparable sales, and market conditions to make informed investment decisions.
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <label htmlFor="live-data-toggle" className="text-sm font-medium">
+              Live Data
+            </label>
+            <input
+              id="live-data-toggle"
+              type="checkbox"
+              checked={useLiveData}
+              onChange={(e) => setUseLiveData(e.target.checked)}
+              className="rounded border-gray-300"
+              data-testid="toggle-live-data"
+            />
+            {useLiveData && (
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                Live
+              </Badge>
+            )}
+          </div>
+        </div>
       </div>
 
       <Tabs defaultValue="trends" className="w-full">
