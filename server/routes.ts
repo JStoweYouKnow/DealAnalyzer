@@ -50,6 +50,7 @@ import { importExportService } from "./import-export-service";
 import { apiIntegrationService } from "./api-integration-service";
 import { aiAnalysisService as photoAnalysisService } from "./services/ai-analysis-service";
 import { geocodingService } from "./services/geocoding-service";
+import { rentCastAPI } from "./services/rentcast-api";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -669,11 +670,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get neighborhood trends
   app.get("/api/market/neighborhood-trends", async (req, res) => {
     try {
-      const { city, state } = req.query;
-      const trends = await storage.getNeighborhoodTrends(
-        city as string | undefined, 
-        state as string | undefined
-      );
+      const { city, state, live } = req.query;
+      let trends;
+      
+      // Try to get live data first if requested
+      if (live === 'true' && city && state) {
+        try {
+          trends = await rentCastAPI.getNeighborhoodTrends(city as string, state as string);
+          if (trends.length === 0) {
+            // Fall back to stored data if API returns no results
+            trends = await storage.getNeighborhoodTrends(city as string, state as string);
+          }
+        } catch (apiError) {
+          console.warn("RentCast API failed, falling back to stored data:", apiError);
+          trends = await storage.getNeighborhoodTrends(city as string, state as string);
+        }
+      } else {
+        // Use stored data by default
+        trends = await storage.getNeighborhoodTrends(
+          city as string | undefined, 
+          state as string | undefined
+        );
+      }
+      
       res.json({ success: true, data: trends });
     } catch (error) {
       console.error("Error fetching neighborhood trends:", error);
@@ -687,7 +706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get comparable sales
   app.get("/api/market/comparable-sales", async (req, res) => {
     try {
-      const { address, radius } = req.query;
+      const { address, radius, live } = req.query;
       if (!address) {
         res.status(400).json({
           success: false,
@@ -696,10 +715,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      const sales = await storage.getComparableSales(
-        address as string, 
-        radius ? Number(radius) : undefined
-      );
+      let sales;
+      
+      // Try to get live data first if requested
+      if (live === 'true') {
+        try {
+          sales = await rentCastAPI.getComparableSales(
+            address as string, 
+            radius ? Number(radius) : 1
+          );
+          if (sales.length === 0) {
+            // Fall back to stored data if API returns no results
+            sales = await storage.getComparableSales(
+              address as string, 
+              radius ? Number(radius) : undefined
+            );
+          }
+        } catch (apiError) {
+          console.warn("RentCast API failed, falling back to stored data:", apiError);
+          sales = await storage.getComparableSales(
+            address as string, 
+            radius ? Number(radius) : undefined
+          );
+        }
+      } else {
+        // Use stored data by default
+        sales = await storage.getComparableSales(
+          address as string, 
+          radius ? Number(radius) : undefined
+        );
+      }
+      
       res.json({ success: true, data: sales });
     } catch (error) {
       console.error("Error fetching comparable sales:", error);
@@ -713,7 +759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get market heat map data
   app.get("/api/market/heat-map", async (req, res) => {
     try {
-      const { north, south, east, west } = req.query;
+      const { north, south, east, west, live } = req.query;
       const bounds = (north && south && east && west) ? {
         north: Number(north),
         south: Number(south),
@@ -721,7 +767,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         west: Number(west)
       } : undefined;
       
-      const heatMapData = await storage.getMarketHeatMapData(bounds);
+      let heatMapData;
+      
+      // Try to get live data first if requested
+      if (live === 'true') {
+        try {
+          // Get popular zip codes for live data
+          const popularZipCodes = ['90210', '78701', '33139', '10001', '94110', '37203', '85001', '30309', '80202', '02101'];
+          heatMapData = await rentCastAPI.getMarketHeatMapData(popularZipCodes);
+          if (heatMapData.length === 0) {
+            // Fall back to stored data if API returns no results
+            heatMapData = await storage.getMarketHeatMapData(bounds);
+          }
+        } catch (apiError) {
+          console.warn("RentCast API failed, falling back to stored data:", apiError);
+          heatMapData = await storage.getMarketHeatMapData(bounds);
+        }
+      } else {
+        // Use stored data by default
+        heatMapData = await storage.getMarketHeatMapData(bounds);
+      }
       res.json({ success: true, data: heatMapData });
     } catch (error) {
       console.error("Error fetching heat map data:", error);
