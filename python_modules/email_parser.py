@@ -45,6 +45,41 @@ def parse_email_alert(email_content: str) -> Property:
                 return match.group(1).strip()
         return default
 
+    def clean_address(raw_address):
+        """Clean address by removing property details and extra information"""
+        if not raw_address or raw_address == "N/A":
+            return raw_address
+        
+        # Remove common property details that get mixed in with addresses
+        cleaned = raw_address
+        
+        # Remove bedroom/bathroom info (e.g., "2 Beds Baths 1.00")
+        cleaned = re.sub(r'\b\d+\s+Beds?\s+Baths?\s+[\d.]+\b', '', cleaned, flags=re.IGNORECASE)
+        
+        # Remove square footage info (e.g., "768 Sqft", "1200 sq ft")
+        cleaned = re.sub(r'\b\d+\s+(?:sqft?|sq\.?\s*ft\.?|square feet)\b', '', cleaned, flags=re.IGNORECASE)
+        
+        # Remove assessor info
+        cleaned = re.sub(r'\bAssessor\b', '', cleaned, flags=re.IGNORECASE)
+        
+        # Remove property type at end (e.g., "Single Family", "Multi Family")
+        cleaned = re.sub(r'\b(?:Single|Multi)[-\s]*Family\s*$', '', cleaned, flags=re.IGNORECASE)
+        
+        # Remove floor/level info (e.g., "Ground Level w/steps")
+        cleaned = re.sub(r'\b(?:Ground\s+Level|Floor\s+\d+|Level\s+\d+)(?:\s+w/\w+)?\b', '', cleaned, flags=re.IGNORECASE)
+        
+        # Remove parenthetical info like "(0F 1T 0H 0Q)"
+        cleaned = re.sub(r'\([^)]*\)', '', cleaned)
+        
+        # Remove extra whitespace and clean up
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        
+        # If the cleaned address doesn't look like a real address, return original
+        if len(cleaned) < 10 or not re.search(r'\d+.*(?:St|Ave|Rd|Dr|Ln|Blvd|Way|Ct|Circle|Place|Road|Street|Avenue|Drive|Lane|Boulevard)', cleaned, re.IGNORECASE):
+            return raw_address
+        
+        return cleaned
+
     def extract_price(patterns, content, default=0.0):
         """Extract price and convert to float"""
         for pattern in patterns:
@@ -240,7 +275,8 @@ def parse_email_alert(email_content: str) -> Property:
         return links[:3]
 
     # Extract all fields using patterns
-    address = extract_field(address_patterns, email_content)
+    raw_address = extract_field(address_patterns, email_content)
+    address = clean_address(raw_address)
     property_type = extract_field(property_type_patterns, email_content)
     purchase_price = extract_price(price_patterns, email_content)
     monthly_rent = extract_price(rent_patterns, email_content, 0.0)  # Default to 0 since most listings don't include rent
