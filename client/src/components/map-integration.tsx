@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -359,6 +359,19 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
     }
   };
 
+  // Component to update map center when state changes
+  const MapUpdater = () => {
+    const map = useMap();
+    
+    useEffect(() => {
+      if (mapCenter.lat !== 39.8283 || mapCenter.lng !== -98.5795) { // Not default center
+        map.setView([mapCenter.lat, mapCenter.lng], zoomLevel);
+      }
+    }, [map, mapCenter.lat, mapCenter.lng, zoomLevel]);
+    
+    return null;
+  };
+
   return (
     <div className="space-y-6" data-testid="map-integration">
       <div className="flex flex-col space-y-4">
@@ -433,6 +446,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
                   style={{ height: '100%', width: '100%' }}
                   className="rounded-lg"
                 >
+                  <MapUpdater />
                   <TileLayer
                     url={
                       mapLayer === 'satellite' 
