@@ -95,20 +95,20 @@ async function generateCSVReport(data: ReportData, options: ReportOptions, baseF
   // Prepare CSV data
   const csvData = data.analyses.map((analysis, index) => ({
     'Property #': index + 1,
-    'Address': analysis.property.address,
-    'City': analysis.property.city,
-    'State': analysis.property.state,
-    'Property Type': analysis.property.propertyType,
-    'Purchase Price': analysis.property.purchasePrice,
-    'Monthly Rent': analysis.property.monthlyRent,
-    'Bedrooms': analysis.property.bedrooms,
-    'Bathrooms': analysis.property.bathrooms,
-    'Square Footage': analysis.property.squareFootage,
-    'Year Built': analysis.property.yearBuilt,
-    'Total Cash Needed': analysis.totalCashNeeded,
-    'Monthly Cash Flow': analysis.cashFlow,
-    'Cash-on-Cash Return (%)': (analysis.cocReturn * 100).toFixed(2),
-    'Cap Rate (%)': (analysis.capRate * 100).toFixed(2),
+    'Address': analysis.property.address || 'N/A',
+    'City': analysis.property.city || 'N/A',
+    'State': analysis.property.state || 'N/A',
+    'Property Type': analysis.property.propertyType || 'N/A',
+    'Purchase Price': analysis.property.purchasePrice || 0,
+    'Monthly Rent': analysis.property.monthlyRent || 0,
+    'Bedrooms': analysis.property.bedrooms || 'N/A',
+    'Bathrooms': analysis.property.bathrooms || 'N/A',
+    'Square Footage': analysis.property.squareFootage || 'N/A',
+    'Year Built': analysis.property.yearBuilt || 'N/A',
+    'Total Cash Needed': analysis.totalCashNeeded || 0,
+    'Monthly Cash Flow': analysis.cashFlow || 0,
+    'Cash-on-Cash Return (%)': ((analysis.cocReturn || 0) * 100).toFixed(2),
+    'Cap Rate (%)': ((analysis.capRate || 0) * 100).toFixed(2),
     'Passes 1% Rule': analysis.passes1PercentRule ? 'Yes' : 'No',
     'Meets Criteria': analysis.meetsCriteria ? 'Yes' : 'No',
     'Analysis Date': analysis.analysisDate ? new Date(analysis.analysisDate).toLocaleDateString() : 'N/A'
@@ -167,13 +167,13 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
         <div class="property-details">
           <h4>Property Details</h4>
           <table>
-            <tr><td>Address:</td><td>${analysis.property.address}</td></tr>
-            <tr><td>City, State:</td><td>${analysis.property.city}, ${analysis.property.state}</td></tr>
-            <tr><td>Property Type:</td><td>${analysis.property.propertyType}</td></tr>
-            <tr><td>Purchase Price:</td><td>${formatCurrency(analysis.property.purchasePrice)}</td></tr>
-            <tr><td>Monthly Rent:</td><td>${formatCurrency(analysis.property.monthlyRent)}</td></tr>
-            <tr><td>Bedrooms:</td><td>${analysis.property.bedrooms}</td></tr>
-            <tr><td>Bathrooms:</td><td>${analysis.property.bathrooms}</td></tr>
+            <tr><td>Address:</td><td>${analysis.property.address || 'N/A'}</td></tr>
+            <tr><td>City, State:</td><td>${analysis.property.city || 'N/A'}, ${analysis.property.state || 'N/A'}</td></tr>
+            <tr><td>Property Type:</td><td>${analysis.property.propertyType || 'N/A'}</td></tr>
+            <tr><td>Purchase Price:</td><td>${formatCurrency(analysis.property.purchasePrice || 0)}</td></tr>
+            <tr><td>Monthly Rent:</td><td>${formatCurrency(analysis.property.monthlyRent || 0)}</td></tr>
+            <tr><td>Bedrooms:</td><td>${analysis.property.bedrooms || 'N/A'}</td></tr>
+            <tr><td>Bathrooms:</td><td>${analysis.property.bathrooms || 'N/A'}</td></tr>
             <tr><td>Square Footage:</td><td>${analysis.property.squareFootage?.toLocaleString() || 'N/A'}</td></tr>
             <tr><td>Year Built:</td><td>${analysis.property.yearBuilt || 'N/A'}</td></tr>
           </table>
@@ -182,10 +182,10 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
         <div class="financial-analysis">
           <h4>Financial Analysis</h4>
           <table>
-            <tr><td>Total Cash Needed:</td><td>${formatCurrency(analysis.totalCashNeeded)}</td></tr>
-            <tr><td>Monthly Cash Flow:</td><td class="${analysis.cashFlow >= 0 ? 'positive' : 'negative'}">${formatCurrency(analysis.cashFlow)}</td></tr>
-            <tr><td>Cash-on-Cash Return:</td><td>${formatPercent(analysis.cocReturn)}</td></tr>
-            <tr><td>Cap Rate:</td><td>${formatPercent(analysis.capRate)}</td></tr>
+            <tr><td>Total Cash Needed:</td><td>${formatCurrency(analysis.totalCashNeeded || 0)}</td></tr>
+            <tr><td>Monthly Cash Flow:</td><td class="${(analysis.cashFlow || 0) >= 0 ? 'positive' : 'negative'}">${formatCurrency(analysis.cashFlow || 0)}</td></tr>
+            <tr><td>Cash-on-Cash Return:</td><td>${formatPercent(analysis.cocReturn || 0)}</td></tr>
+            <tr><td>Cap Rate:</td><td>${formatPercent(analysis.capRate || 0)}</td></tr>
             <tr><td>Passes 1% Rule:</td><td class="${analysis.passes1PercentRule ? 'pass' : 'fail'}">${analysis.passes1PercentRule ? 'Yes' : 'No'}</td></tr>
             <tr><td>Meets Criteria:</td><td class="${analysis.meetsCriteria ? 'pass' : 'fail'}">${analysis.meetsCriteria ? 'Yes' : 'No'}</td></tr>
           </table>

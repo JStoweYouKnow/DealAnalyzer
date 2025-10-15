@@ -130,6 +130,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         propertyType: property.propertyType
       };
 
+      console.log("Updating property with data:", JSON.stringify(analysisProperty, null, 2));
+      
       const analysisResult = await runPythonPropertyUpdate(analysisProperty);
       
       if (!analysisResult.success) {
@@ -2078,6 +2080,7 @@ async function runPythonPropertyUpdate(
 
       if (code !== 0) {
         console.error("Python property update failed:", stderr);
+        console.error("Python stdout:", stdout);
         resolve({
           success: false,
           error: "Python analysis failed: " + stderr
@@ -2086,13 +2089,16 @@ async function runPythonPropertyUpdate(
       }
 
       try {
+        console.log("Python update output:", stdout);
         const result = JSON.parse(stdout);
+        console.log("Parsed Python result:", JSON.stringify(result, null, 2));
         resolve({
           success: true,
           data: result
         });
       } catch (e) {
         console.error("Failed to parse Python output:", e);
+        console.error("Raw Python output:", stdout);
         resolve({
           success: false,
           error: "Failed to parse analysis results"
