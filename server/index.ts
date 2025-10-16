@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import Redis from "ioredis";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -7,16 +8,36 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Configure session middleware
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key-here',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { 
-    secure: false, // Set to true in production with HTTPS
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
+// Configure session middleware using Redis as a production-ready store
+const redisUrl = process.env.REDIS_URL || "redis://127.0.0.1:6379";
+const redisClient = new Redis(redisUrl);
+
+// connect-redis v7+ may use ESM; load dynamically to remain compatible
+(async () => {
+  // Use the modern connect-redis API which exports RedisStore
+  const connectRedisMod = await import('connect-redis');
+  const RedisStore = (connectRedisMod as any).RedisStore || (connectRedisMod as any).default;
+
+  // handle Redis errors gracefully (prevents unhandled exceptions)
+  redisClient.on('error', (err: any) => {
+    log(`Redis client error: ${err?.message || err}`);
+  });
+
+  const store = RedisStore ? new RedisStore({ client: redisClient, ttl: 60 * 60 * 24 }) : undefined;
+
+  app.use(session({
+    store: store as any,
+    secret: process.env.SESSION_SECRET || 'your-secret-key-here',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production', // ensure HTTPS in prod
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
+})();
 
 app.use((req, res, next) => {
   const start = Date.now();
