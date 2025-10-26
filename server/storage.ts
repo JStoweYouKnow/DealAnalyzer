@@ -16,7 +16,7 @@ export interface IStorage {
   // Email deal methods
   getEmailDeals(): Promise<EmailDeal[]>;
   getEmailDeal(id: string): Promise<EmailDeal | undefined>;
-  createEmailDeal(deal: Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
+  createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
   updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>): Promise<EmailDeal | undefined>;
   deleteEmailDeal(id: string): Promise<boolean>;
   findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | undefined>;
@@ -236,8 +236,10 @@ export class MemStorage implements IStorage {
     return this.emailDeals.get(id);
   }
 
-  async createEmailDeal(deal: Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal> {
-    const id = randomUUID();
+  async createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal> {
+    // Use the provided ID if it exists (for email deals from Gmail), otherwise generate a UUID
+    const id = 'id' in deal ? deal.id : randomUUID();
+    
     const now = new Date();
     const emailDeal: EmailDeal = {
       ...deal,
@@ -1287,4 +1289,16 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Singleton pattern to ensure storage persists across requests and HMR reloads
+// Use globalThis to persist across Next.js hot module replacement
+const globalForStorage = globalThis as unknown as {
+  storageInstance: MemStorage | undefined;
+};
+
+export const storage = (() => {
+  if (!globalForStorage.storageInstance) {
+    console.log('Creating new MemStorage instance');
+    globalForStorage.storageInstance = new MemStorage();
+  }
+  return globalForStorage.storageInstance;
+})();

@@ -1,0 +1,42 @@
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { Providers } from "./providers";
+import { Navigation } from "./components/navigation";
+
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "The Comfort Finder - Real Estate Analyzer",
+  description: "Advanced real estate deal analysis and property intelligence platform",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        <Providers>
+          <div className="min-h-screen relative">
+            {/* Subtle background pattern */}
+            <div className="absolute inset-0 opacity-30">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+              <div className="absolute inset-0" style={{
+                backgroundImage: `radial-gradient(circle at 1px 1px, rgba(var(--primary), 0.15) 1px, transparent 0)`,
+                backgroundSize: '20px 20px'
+              }} />
+            </div>
+            <Navigation />
+            <main className="relative z-10">
+              {children}
+            </main>
+          </div>
+        </Providers>
+      </body>
+    </html>
+  );
+}
+
