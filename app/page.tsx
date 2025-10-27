@@ -2,10 +2,6 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Authenticated, Unauthenticated } from 'convex/react';
-import { SignInButton, UserButton } from '@clerk/nextjs';
-import { useQuery as useConvexQuery } from 'convex/react';
-import { api } from '../convex/_generated/api';
 import { apiRequest } from "@/lib/queryClient";
 import { AnalyzerForm } from "@/components/analyzer-form";
 import { AnalysisResults } from "@/components/analysis-results";
@@ -19,35 +15,10 @@ import { useComparison } from "@/hooks/use-comparison";
 import type { AnalyzePropertyResponse, DealAnalysis, CriteriaResponse } from "@shared/schema";
 
 export default function HomePage() {
-  return (
-    <>
-      <Authenticated>
-        <AuthenticatedContent />
-      </Authenticated>
-      <Unauthenticated>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center space-y-4">
-            <h1 className="text-3xl font-bold">Welcome to The Comfort Finder</h1>
-            <p className="text-muted-foreground">Sign in to start analyzing real estate deals</p>
-            <SignInButton>
-              <button className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors">
-                Sign In to Get Started
-              </button>
-            </SignInButton>
-          </div>
-        </div>
-      </Unauthenticated>
-    </>
-  );
-}
-
-function AuthenticatedContent() {
   const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(null);
   const [recentAnalyses, setRecentAnalyses] = useState<DealAnalysis[]>([]);
   const { toast } = useToast();
-  
-  // Get user's email deals from Convex
-  const emailDeals = useConvexQuery(api.emailDeals.list, {});
+
   const { 
     comparisonList, 
     addToComparison, 
@@ -239,26 +210,11 @@ function AuthenticatedContent() {
       {/* Reports Section */}
       <div className="section-divider"></div>
       <div className="mt-8">
-        <Reports 
+        <Reports
           analyses={analysisResult ? [analysisResult, ...recentAnalyses.filter(a => a.propertyId !== analysisResult.propertyId)] : recentAnalyses}
           comparisonList={comparisonList}
         />
       </div>
-
-      {/* Email Deals from Convex */}
-      {emailDeals && emailDeals.length > 0 && (
-        <>
-          <div className="section-divider"></div>
-          <div className="mt-8">
-            <div className="bg-card rounded-lg p-6 border">
-              <h3 className="text-lg font-semibold mb-4">Your Email Deals ({emailDeals.length})</h3>
-              <p className="text-muted-foreground">
-                You have {emailDeals.length} email deals synced from your Gmail account.
-              </p>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
