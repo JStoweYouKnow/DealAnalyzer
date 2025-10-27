@@ -27,7 +27,6 @@ export class AIAnalysisService {
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.3,
       });
 
       const analysisResult = JSON.parse(response.choices[0].message.content || "{}");

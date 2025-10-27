@@ -9,6 +9,16 @@ export async function runPythonAnalysis(
   monthlyExpenses?: any
 ): Promise<AnalyzePropertyResponse> {
   return new Promise((resolve) => {
+    // Check if we're in a serverless environment without Python
+    if (process.env.VERCEL || process.env.VERCEL_ENV) {
+      console.error("Python not available in Vercel environment. Please ensure Python is configured in your deployment.");
+      resolve({
+        success: false,
+        error: "Python analysis not available in Vercel environment. Please configure Python support or use alternative deployment."
+      });
+      return;
+    }
+
     const pythonPath = path.join(process.cwd(), "python_modules");
     const tempFile = path.join(pythonPath, `temp_email_${Date.now()}.txt`);
     const tempDataFile = path.join(pythonPath, `temp_data_${Date.now()}.json`);
@@ -102,6 +112,16 @@ export async function runPythonFileAnalysis(
   monthlyExpenses?: any
 ): Promise<AnalyzePropertyResponse> {
   return new Promise((resolve) => {
+    // Check if we're in a serverless environment without Python
+    if (process.env.VERCEL || process.env.VERCEL_ENV) {
+      console.error("Python not available in Vercel environment. Please use text-based analysis instead of file upload.");
+      resolve({
+        success: false,
+        error: "File upload analysis is not supported on Vercel deployment. Please use text-based analysis or deploy to an environment with Python support."
+      });
+      return;
+    }
+
     const pythonPath = path.join(process.cwd(), "python_modules");
     const tempDataFile = path.join(pythonPath, `temp_data_${Date.now()}.json`);
     
