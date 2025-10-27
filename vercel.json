@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "buildCommand": "npm install --legacy-peer-deps && npm run build:next",
+  "buildCommand": "npm ci --legacy-peer-deps && npm run build:next",
   "devCommand": "npm run dev:next",
   "installCommand": "npm install --legacy-peer-deps",
   "functions": {
