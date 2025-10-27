@@ -52,19 +52,19 @@ export function InteractiveCharts({ analysis, criteria, comparisonAnalyses = [] 
     {
       name: 'Monthly Cash Flow',
       value: analysis.cashFlow,
-      target: criteria?.minCashFlow || 0,
+      target: (criteria as any)?.minCashFlow || 0,
       status: analysis.cashFlowPositive ? 'positive' : 'negative'
     },
     {
       name: 'COC Return',
       value: analysis.cocReturn * 100,
-      target: (criteria?.minCocReturn || 0) * 100,
+      target: ((criteria as any)?.minCocReturn || 0) * 100,
       status: analysis.cocMeetsBenchmark ? 'meets' : 'below'
     },
     {
       name: 'Cap Rate',
       value: analysis.capRate * 100,
-      target: (criteria?.minCapRate || 0) * 100,
+      target: ((criteria as any)?.minCapRate || 0) * 100,
       status: analysis.capMeetsBenchmark ? 'meets' : 'below'
     },
     {

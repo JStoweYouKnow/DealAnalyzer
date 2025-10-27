@@ -236,6 +236,13 @@ export const bulkCreate = mutation({
     })),
   },
   handler: async (ctx, args) => {
+    // Temporarily use hardcoded userId until auth is fully configured
+    const userId = "temp-user-id";
+    // const userId = await getAuthUserId(ctx);
+    // if (!userId) {
+    //   throw new Error("Not authenticated");
+    // }
+    
     const results = [];
     
     for (const deal of args.deals) {
@@ -264,6 +271,7 @@ export const bulkCreate = mutation({
       }
 
       const emailDealId = await ctx.db.insert("emailDeals", {
+        userId,
         gmailId: deal.gmailId,
         subject: deal.subject,
         sender: deal.sender,

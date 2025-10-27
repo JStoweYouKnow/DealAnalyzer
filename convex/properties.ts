@@ -68,8 +68,16 @@ export const createAnalysis = mutation({
     })),
   },
   handler: async (ctx, args) => {
+    // Temporarily use hardcoded userId until auth is fully configured
+    const userId = "temp-user-id";
+    // const userId = await getAuthUserId(ctx);
+    // if (!userId) {
+    //   throw new Error("Not authenticated");
+    // }
+    
     const analysisId = await ctx.db.insert("dealAnalyses", {
       ...args,
+      userId,
       analysisDate: Date.now(),
     });
 
@@ -84,17 +92,21 @@ export const listAnalyses = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    let query = ctx.db.query("dealAnalyses");
+    let analyses;
 
     if (args.meetsCriteria !== undefined) {
-      query = query.withIndex("by_meets_criteria", (q) => q.eq("meetsCriteria", args.meetsCriteria));
+      analyses = await ctx.db
+        .query("dealAnalyses")
+        .withIndex("by_meets_criteria", (q) => q.eq("meetsCriteria", args.meetsCriteria!))
+        .order("desc")
+        .take(args.limit || 50);
     } else {
-      query = query.withIndex("by_analysis_date");
+      analyses = await ctx.db
+        .query("dealAnalyses")
+        .withIndex("by_analysis_date")
+        .order("desc")
+        .take(args.limit || 50);
     }
-
-    const analyses = await query
-      .order("desc")
-      .take(args.limit || 50);
 
     return analyses;
   },

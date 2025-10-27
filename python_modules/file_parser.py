@@ -67,17 +67,60 @@ def parse_pdf_file(file_path: str) -> Property:
                 listing_url="N/A"
             )
         
+        # Extract property description from PDF content
+        # Look for common property description patterns
+        description = ""
+        lines = text_content.split('\n')
+        
+        # Find description section (usually after "Description", "Details", etc.)
+        description_started = False
+        description_keywords = ['description', 'details', 'property description', 'about this property', 'listing details']
+        
+        for i, line in enumerate(lines):
+            line_lower = line.lower().strip()
+            # Check if this line starts a description section
+            if any(keyword in line_lower for keyword in description_keywords) and not description_started:
+                description_started = True
+                # Get text after the keyword
+                for keyword in description_keywords:
+                    if keyword in line_lower:
+                        description_text = line.split(':', 1)
+                        if len(description_text) > 1:
+                            description += description_text[1].strip() + " "
+                continue
+            
+            # Collect description content (stop at obvious end markers)
+            if description_started:
+                end_markers = ['price', 'purchase', 'listing', 'contact', 'agent', 'features', 'specifications']
+                if any(marker in line_lower for marker in end_markers) and len(line.strip()) < 50:
+                    break
+                if line.strip():
+                    description += line.strip() + " "
+                    # Limit description length to avoid including too much
+                    if len(description) > 1000:
+                        break
+        
+        # Clean up description (remove extra spaces, trim)
+        description = ' '.join(description.split())
+        if len(description) > 500:
+            description = description[:500] + "..."
+        
         # Try PDF-specific parsing first, fall back to email parser
         try:
             result = parse_pdf_content(text_content)
+            # Set the extracted description
+            result.description = description if description else "Property details extracted from PDF"
             # Use PDF result if it extracted meaningful data
             if result.purchase_price > 0 or result.address != "Unknown Address":
                 return result
         except Exception:
             pass
         
-        # Fall back to email parser
-        return parse_email_alert(text_content)
+        # Fall back to email parser but use extracted description
+        result = parse_email_alert(text_content)
+        if description:
+            result.description = description
+        return result
         
     except Exception as e:
         # Don't print error messages, just return error property

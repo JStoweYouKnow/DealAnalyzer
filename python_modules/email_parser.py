@@ -341,8 +341,39 @@ def parse_email_alert(email_content: str) -> Property:
         r"\*\*Description:\*\*\s*([\s\S]*?)(?=\n\n\*\*|Contact us|Sincerely|Best regards|$)",
         r"Description[:：]\s*([\s\S]*?)(?=\n\n|Contact|Sincerely|Best regards|$)",
         r"Details[:：]\s*([\s\S]*?)(?=\n\n|Contact|Sincerely|Best regards|$)",
+        r"Property Description[:：]\s*([\s\S]*?)(?=\n\n|Contact|Sincerely|Best regards|$)",
     ]
     description = extract_field(description_patterns, email_content, "Property listing details")
+    
+    # Clean up description - remove signatures, headers, and extra metadata
+    if description and description != "Property listing details":
+        # Remove common email signatures and footer text
+        signature_patterns = [
+            r"Contact us.*?$",
+            r"Sincerely.*?$",
+            r"Best regards.*?$",
+            r"Regards.*?$",
+            r"Thank you.*?$",
+            r"Reply to this email.*?$",
+            r"Unsubscribe.*?$",
+            r"Manage preferences.*?$",
+            r"Privacy policy.*?$",
+            r"View this email.*?$",
+            r"Click here.*?$",
+            r"Powered by.*?$",
+        ]
+        
+        for pattern in signature_patterns:
+            description = re.sub(pattern, "", description, flags=re.IGNORECASE | re.MULTILINE | re.DOTALL)
+        
+        # Remove URLs that aren't listing URLs
+        description = re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', description)
+        
+        # Remove email addresses from description
+        description = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '', description)
+        
+        # Clean up extra whitespace
+        description = re.sub(r'\s+', ' ', description).strip()
     
     # Clean up description
     if len(description) > 500:

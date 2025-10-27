@@ -6,13 +6,29 @@ import { IStorage } from "./storage";
 let api: any = null;
 let Id: any = null;
 
-// Only try to import if Convex URL is set
-if (process.env.NEXT_PUBLIC_CONVEX_URL) {
+// Use dynamic imports to avoid Webpack resolution issues
+let convexInitialized = false;
+
+async function initializeConvex() {
+  if (convexInitialized || !process.env.NEXT_PUBLIC_CONVEX_URL) {
+    return convexInitialized;
+  }
+
   try {
-    api = require("../convex/_generated/api").api;
-    Id = require("../convex/_generated/dataModel").Id;
+    // Use dynamic imports with webpack magic comments to make them optional
+    const [apiModule, dataModelModule] = await Promise.all([
+      import(/* webpackIgnore: true */ "../convex/_generated/api"),
+      import(/* webpackIgnore: true */ "../convex/_generated/dataModel")
+    ]);
+    
+    api = apiModule.api;
+    Id = (dataModelModule as any).Id;
+    convexInitialized = true;
+    console.log("Convex API initialized successfully");
+    return true;
   } catch (error) {
-    console.warn("Convex generated files not found. Run 'npx convex dev' to generate them.");
+    console.warn("Convex generated files not found. Using fallback storage.", error);
+    return false;
   }
 }
 
@@ -43,24 +59,33 @@ export interface ConvexStorage {
 
 class ConvexStorageImpl implements ConvexStorage {
   private convex: ConvexHttpClient;
+  private initPromise: Promise<boolean>;
 
   constructor() {
     if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
       throw new Error("NEXT_PUBLIC_CONVEX_URL is required for Convex storage");
     }
-    if (!api) {
-      throw new Error("Convex API not available. Run 'npx convex dev' to generate API files.");
-    }
+    
     this.convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+    this.initPromise = initializeConvex();
+  }
+
+  private async ensureInitialized() {
+    const initialized = await this.initPromise;
+    if (!initialized || !api) {
+      throw new Error("Convex API not available. Using fallback storage.");
+    }
   }
 
   // Email Deals Implementation
   async getEmailDeals(): Promise<EmailDeal[]> {
+    await this.ensureInitialized();
     const deals = await this.convex.query(api.emailDeals.list, {});
     return deals.map(this.mapConvexEmailDealToEmailDeal);
   }
 
   async getEmailDeal(id: string): Promise<EmailDeal | null> {
+    await this.ensureInitialized();
     // First try to get by Gmail ID (for backward compatibility)
     let deal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
     
@@ -73,6 +98,7 @@ class ConvexStorageImpl implements ConvexStorage {
   }
 
   async createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal> {
+    await this.ensureInitialized();
     const gmailId = 'id' in deal ? deal.id : `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const convexDeal = {

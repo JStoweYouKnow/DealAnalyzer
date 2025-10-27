@@ -3,10 +3,10 @@ import { storage } from "../../../../../../server/storage";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { propertyId: string; photoId: string } }
+  { params }: { params: Promise<{ propertyId: string; photoId: string }> }
 ) {
   try {
-    const { photoId } = params;
+    const { photoId } = await params;
     const deleted = await storage.deletePhotoAnalysis(photoId);
     
     if (!deleted) {
