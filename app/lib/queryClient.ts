@@ -32,9 +32,14 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Ensure API routes start with /api
-    let url = "/" + queryKey.join("/");
-    if (!url.startsWith("/api")) {
+    // Build URL from query key
+    let url = queryKey.join("/");
+    // If it doesn't start with /, add it
+    if (!url.startsWith("/")) {
+      url = "/" + url;
+    }
+    // Ensure API routes start with /api (but don't double-add it)
+    if (!url.startsWith("/api/") && !url.startsWith("/api")) {
       url = `/api${url}`;
     }
     
