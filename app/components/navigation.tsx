@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Home as HomeIcon, Mail, TrendingUp, Search } from "lucide-react";
 import Image from "next/image";
 import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
+import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 
 const navItems = [
   { path: "/", icon: HomeIcon, label: "Analyzer", testId: "nav-home" },
@@ -69,6 +70,26 @@ export function Navigation() {
                 </Link>
               );
             })}
+            
+            {/* Authentication */}
+            <div className="ml-4 flex items-center space-x-2">
+              <SignedOut>
+                <SignInButton>
+                  <Button variant="outline" size="sm" className="font-medium">
+                    Sign In
+                  </Button>
+                </SignInButton>
+              </SignedOut>
+              <SignedIn>
+                <UserButton 
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-8 h-8"
+                    }
+                  }}
+                />
+              </SignedIn>
+            </div>
           </div>
         </div>
       </div>

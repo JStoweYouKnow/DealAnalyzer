@@ -4,3 +4,43 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment files
+.env
+.env.*
+.env.local
+
+# Logs
+server.log
+*.log
+
+# Next.js
+.next/
+next-env.d.ts
+out/
+
+# Firebase
+.firebaserc.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Build artifacts
+tsconfig-backup.json
+tsconfig-next.json
+package-next.json
+
+# Convex
+.convex/
+
+# Documentation (generated)
+*-SUMMARY.md
+*-COMPLETE.md
+*-SETUP.md
+*-MIGRATION.md
+*-FIX.md
+QUICK-START.md
+TESTING-GUIDE.md
+README-NEXTJS.md

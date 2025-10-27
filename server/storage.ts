@@ -1289,16 +1289,157 @@ export class MemStorage implements IStorage {
   }
 }
 
+// Import Convex storage
+import { convexStorage } from "./convex-storage";
+
 // Singleton pattern to ensure storage persists across requests and HMR reloads
 // Use globalThis to persist across Next.js hot module replacement
 const globalForStorage = globalThis as unknown as {
   storageInstance: MemStorage | undefined;
+  useConvex: boolean;
 };
 
 export const storage = (() => {
+  // Check if we should use Convex (when NEXT_PUBLIC_CONVEX_URL is set)
+  const useConvex = !!process.env.NEXT_PUBLIC_CONVEX_URL;
+  
+  if (useConvex) {
+    try {
+      console.log('Attempting to use Convex storage backend');
+      // Return a wrapper that implements IStorage interface but uses Convex
+      return createConvexStorageWrapper();
+    } catch (error) {
+      console.warn('Convex storage not available, falling back to in-memory storage:', error.message);
+      // Fall through to in-memory storage
+    }
+  }
+  
+  // Fallback to in-memory storage
   if (!globalForStorage.storageInstance) {
-    console.log('Creating new MemStorage instance');
+    console.log('Creating new MemStorage instance (fallback)');
     globalForStorage.storageInstance = new MemStorage();
   }
   return globalForStorage.storageInstance;
 })();
+
+// Create a wrapper that implements IStorage interface using Convex
+function createConvexStorageWrapper(): IStorage {
+  return {
+    // Email deal methods - delegate to Convex
+    async getEmailDeals() {
+      return await convexStorage.getEmailDeals();
+    },
+    
+    async getEmailDeal(id: string) {
+      return await convexStorage.getEmailDeal(id);
+    },
+    
+    async createEmailDeal(deal: any) {
+      return await convexStorage.createEmailDeal(deal);
+    },
+    
+    async updateEmailDeal(id: string, updates: any) {
+      const result = await convexStorage.updateEmailDeal(id, updates);
+      return result || undefined;
+    },
+    
+    async deleteEmailDeal(id: string) {
+      try {
+        await convexStorage.deleteEmailDeal(id);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    
+    async findEmailDealByContentHash(contentHash: string) {
+      return await convexStorage.findEmailDealByContentHash(contentHash);
+    },
+
+    // For now, delegate other methods to a fallback MemStorage instance
+    // TODO: Implement these in Convex as needed
+    ...createFallbackMethods()
+  };
+}
+
+// Create fallback methods for features not yet implemented in Convex
+function createFallbackMethods() {
+  const fallbackStorage = new MemStorage();
+  
+  return {
+    // Property methods
+    getProperty: fallbackStorage.getProperty.bind(fallbackStorage),
+    createProperty: fallbackStorage.createProperty.bind(fallbackStorage),
+    
+    // Deal analysis methods  
+    getDealAnalysis: fallbackStorage.getDealAnalysis.bind(fallbackStorage),
+    createDealAnalysis: fallbackStorage.createDealAnalysis.bind(fallbackStorage),
+    updateDealAnalysis: fallbackStorage.updateDealAnalysis.bind(fallbackStorage),
+    findAnalysisByPropertyAddress: fallbackStorage.findAnalysisByPropertyAddress.bind(fallbackStorage),
+    getAnalysisHistory: fallbackStorage.getAnalysisHistory.bind(fallbackStorage),
+    
+    // Comparison methods
+    createComparison: fallbackStorage.createComparison.bind(fallbackStorage),
+    getComparison: fallbackStorage.getComparison.bind(fallbackStorage),
+    getComparisons: fallbackStorage.getComparisons.bind(fallbackStorage),
+    deleteComparison: fallbackStorage.deleteComparison.bind(fallbackStorage),
+    
+    // Market Intelligence methods
+    getNeighborhoodTrends: fallbackStorage.getNeighborhoodTrends.bind(fallbackStorage),
+    getNeighborhoodTrend: fallbackStorage.getNeighborhoodTrend.bind(fallbackStorage),
+    createNeighborhoodTrend: fallbackStorage.createNeighborhoodTrend.bind(fallbackStorage),
+    updateNeighborhoodTrend: fallbackStorage.updateNeighborhoodTrend.bind(fallbackStorage),
+    getComparableSales: fallbackStorage.getComparableSales.bind(fallbackStorage),
+    getComparableSale: fallbackStorage.getComparableSale.bind(fallbackStorage),
+    createComparableSale: fallbackStorage.createComparableSale.bind(fallbackStorage),
+    getMarketHeatMapData: fallbackStorage.getMarketHeatMapData.bind(fallbackStorage),
+    getMarketHeatMapDataByZip: fallbackStorage.getMarketHeatMapDataByZip.bind(fallbackStorage),
+    createMarketHeatMapData: fallbackStorage.createMarketHeatMapData.bind(fallbackStorage),
+    updateMarketHeatMapData: fallbackStorage.updateMarketHeatMapData.bind(fallbackStorage),
+    
+    // Advanced Filtering & Search methods
+    getSavedFilters: fallbackStorage.getSavedFilters.bind(fallbackStorage),
+    getSavedFilter: fallbackStorage.getSavedFilter.bind(fallbackStorage),
+    createSavedFilter: fallbackStorage.createSavedFilter.bind(fallbackStorage),
+    updateSavedFilter: fallbackStorage.updateSavedFilter.bind(fallbackStorage),
+    deleteSavedFilter: fallbackStorage.deleteSavedFilter.bind(fallbackStorage),
+    incrementFilterUsage: fallbackStorage.incrementFilterUsage.bind(fallbackStorage),
+    searchNaturalLanguage: fallbackStorage.searchNaturalLanguage.bind(fallbackStorage),
+    getSearchHistory: fallbackStorage.getSearchHistory.bind(fallbackStorage),
+    getPropertyClassification: fallbackStorage.getPropertyClassification.bind(fallbackStorage),
+    createPropertyClassification: fallbackStorage.createPropertyClassification.bind(fallbackStorage),
+    updatePropertyClassification: fallbackStorage.updatePropertyClassification.bind(fallbackStorage),
+    searchProperties: fallbackStorage.searchProperties.bind(fallbackStorage),
+    
+    // AI Recommendations methods
+    getSmartPropertyRecommendations: fallbackStorage.getSmartPropertyRecommendations.bind(fallbackStorage),
+    createSmartPropertyRecommendation: fallbackStorage.createSmartPropertyRecommendation.bind(fallbackStorage),
+    getRentPricingRecommendation: fallbackStorage.getRentPricingRecommendation.bind(fallbackStorage),
+    createRentPricingRecommendation: fallbackStorage.createRentPricingRecommendation.bind(fallbackStorage),
+    updateRentPricingRecommendation: fallbackStorage.updateRentPricingRecommendation.bind(fallbackStorage),
+    getInvestmentTimingAdvice: fallbackStorage.getInvestmentTimingAdvice.bind(fallbackStorage),
+    createInvestmentTimingAdvice: fallbackStorage.createInvestmentTimingAdvice.bind(fallbackStorage),
+    updateInvestmentTimingAdvice: fallbackStorage.updateInvestmentTimingAdvice.bind(fallbackStorage),
+    
+    // Templates & Presets methods
+    getAnalysisTemplates: fallbackStorage.getAnalysisTemplates.bind(fallbackStorage),
+    getAnalysisTemplate: fallbackStorage.getAnalysisTemplate.bind(fallbackStorage),
+    createAnalysisTemplate: fallbackStorage.createAnalysisTemplate.bind(fallbackStorage),
+    updateAnalysisTemplate: fallbackStorage.updateAnalysisTemplate.bind(fallbackStorage),
+    deleteAnalysisTemplate: fallbackStorage.deleteAnalysisTemplate.bind(fallbackStorage),
+    getDefaultTemplates: fallbackStorage.getDefaultTemplates.bind(fallbackStorage),
+    
+    // API Integration methods
+    createApiIntegration: fallbackStorage.createApiIntegration.bind(fallbackStorage),
+    getUserApiIntegrations: fallbackStorage.getUserApiIntegrations.bind(fallbackStorage),
+    getApiIntegration: fallbackStorage.getApiIntegration.bind(fallbackStorage),
+    updateApiIntegration: fallbackStorage.updateApiIntegration.bind(fallbackStorage),
+    deleteApiIntegration: fallbackStorage.deleteApiIntegration.bind(fallbackStorage),
+    
+    // Photo Analysis methods
+    getPhotoAnalyses: fallbackStorage.getPhotoAnalyses.bind(fallbackStorage),
+    getPhotoAnalysis: fallbackStorage.getPhotoAnalysis.bind(fallbackStorage),
+    createPhotoAnalysis: fallbackStorage.createPhotoAnalysis.bind(fallbackStorage),
+    deletePhotoAnalysis: fallbackStorage.deletePhotoAnalysis.bind(fallbackStorage),
+  };
+}
