@@ -273,13 +273,7 @@ class ConvexStorageImpl implements ConvexStorage {
   async updatePhotoAnalysis(id: string, updates: Partial<PhotoAnalysis>): Promise<PhotoAnalysis> {
     const updatedAnalysis = await this.convex.mutation(api.properties.updatePhotoAnalysis, {
       id: id as any,
-      updates: {
-        aiScore: updates.aiScore,
-        aiCategory: (updates as any).aiCategory,
-        aiReasoning: (updates as any).aiReasoning,
-        features: (updates as any).features,
-        issues: (updates as any).issues,
-      },
+      updates: updates as any,
     });
 
     return this.mapConvexPhotoAnalysisToPhotoAnalysis(updatedAnalysis!);
