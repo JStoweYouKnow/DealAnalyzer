@@ -1309,7 +1309,7 @@ export const storage = (() => {
       // Return a wrapper that implements IStorage interface but uses Convex
       return createConvexStorageWrapper();
     } catch (error) {
-      console.warn('Convex storage not available, falling back to in-memory storage:', error.message);
+      console.warn('Convex storage not available, falling back to in-memory storage:', error instanceof Error ? error.message : 'Unknown error');
       // Fall through to in-memory storage
     }
   }
@@ -1331,7 +1331,8 @@ function createConvexStorageWrapper(): IStorage {
     },
     
     async getEmailDeal(id: string) {
-      return await convexStorage.getEmailDeal(id);
+      const result = await convexStorage.getEmailDeal(id);
+      return result ?? undefined;
     },
     
     async createEmailDeal(deal: any) {
@@ -1353,7 +1354,8 @@ function createConvexStorageWrapper(): IStorage {
     },
     
     async findEmailDealByContentHash(contentHash: string) {
-      return await convexStorage.findEmailDealByContentHash(contentHash);
+      const result = await convexStorage.findEmailDealByContentHash(contentHash);
+      return result ?? undefined;
     },
 
     // For now, delegate other methods to a fallback MemStorage instance

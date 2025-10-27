@@ -261,7 +261,7 @@ class ConvexStorageImpl implements ConvexStorage {
     });
 
     const createdAnalysis = await this.convex.query(api.properties.getPhotoAnalyses, { propertyId: analysis.propertyId });
-    const newAnalysis = createdAnalysis.find((a) => a._id === analysisId);
+    const newAnalysis = createdAnalysis.find((a: any) => a._id === analysisId);
     
     if (!newAnalysis) {
       throw new Error("Failed to create photo analysis");
@@ -275,10 +275,10 @@ class ConvexStorageImpl implements ConvexStorage {
       id: id as any,
       updates: {
         aiScore: updates.aiScore,
-        aiCategory: updates.aiCategory as any,
-        aiReasoning: updates.aiReasoning,
-        features: updates.features,
-        issues: updates.issues,
+        aiCategory: (updates as any).aiCategory,
+        aiReasoning: (updates as any).aiReasoning,
+        features: (updates as any).features,
+        issues: (updates as any).issues,
       },
     });
 

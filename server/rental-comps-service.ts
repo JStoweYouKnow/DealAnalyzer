@@ -69,9 +69,9 @@ export class RentalCompsService {
       // Calculate averages
       const averageDailyRate = this.calculateAverageDailyRate(filteredProperties);
       const occupancyRate = this.calculateAverageOccupancyRate(filteredProperties);
-      
+
       // Determine confidence level
-      const confidence = this.assessConfidence(filteredProperties);
+      const confidence = this.assessConfidence(filteredProperties as any);
       
       return {
         averageDailyRate,
