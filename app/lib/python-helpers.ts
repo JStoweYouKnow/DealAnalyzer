@@ -34,7 +34,11 @@ export async function runPythonAnalysis(
       "--data-file",
       tempDataFile
     ], {
-      cwd: pythonPath
+      cwd: pythonPath,
+      env: {
+        ...process.env,
+        PYTHONPATH: pythonPath
+      }
     });
 
     let stdout = "";
@@ -121,7 +125,11 @@ export async function runPythonFileAnalysis(
       "--data-file",
       tempDataFile
     ], {
-      cwd: pythonPath
+      cwd: pythonPath,
+      env: {
+        ...process.env,
+        PYTHONPATH: pythonPath
+      }
     });
 
     let stdout = "";

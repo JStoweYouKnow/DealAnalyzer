@@ -58,7 +58,7 @@ function AuthenticatedContent() {
 
   // Get investment criteria
   const { data: criteria } = useQuery<CriteriaResponse>({
-    queryKey: ["api", "criteria"],
+    queryKey: ["/api/criteria"],
   });
 
   // Analysis mutation
