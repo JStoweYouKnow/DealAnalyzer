@@ -1,6 +1,14 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+// Authentication disabled - to re-enable, uncomment the lines below
+// import { clerkMiddleware } from "@clerk/nextjs/server";
+// export default clerkMiddleware();
 
-export default clerkMiddleware();
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+// No-op middleware - allows all requests through without authentication
+export function middleware(request: NextRequest) {
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
