@@ -24,6 +24,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if we're on Vercel and format is PDF
+    if ((process.env.VERCEL || process.env.VERCEL_ENV) && format === 'pdf') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: "PDF generation is not available on Vercel. Please use CSV format or try again locally." 
+        },
+        { status: 503 }
+      );
+    }
+
     // Get analyses from storage
     const analyses: any[] = [];
     for (const id of analysisIds) {
@@ -68,6 +79,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error generating report:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Error stack:", errorStack);
     
     // Clean up file after sending
     if (tempReportPath) {
@@ -79,7 +93,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { success: false, error: "Failed to generate report" },
+      { success: false, error: `Failed to generate report: ${errorMessage}` },
       { status: 500 }
     );
   }
