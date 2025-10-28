@@ -587,7 +587,7 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Square Feet:</span>
                 <span className="font-medium" data-testid="text-square-footage">
-                  {property.squareFootage.toLocaleString()}
+                  {property.squareFootage?.toLocaleString() || 'N/A'}
                 </span>
               </div>
               
@@ -683,7 +683,7 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Lot Size:</span>
                   <span className="font-medium" data-testid="text-lot-size">
-                    {property.lotSize.toLocaleString()} sq ft
+                    {property.lotSize?.toLocaleString() || 'N/A'} sq ft
                   </span>
                 </div>
               )}
