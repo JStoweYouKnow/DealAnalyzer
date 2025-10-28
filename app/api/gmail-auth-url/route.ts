@@ -15,10 +15,16 @@ export async function GET(request: Request) {
     // Extract just the main domain (remove preview deployment suffixes)
     // e.g., "comfort-finder-analyzer-9vh7byfjs-james-stowes-projects.vercel.app" -> "comfort-finder-analyzer.vercel.app"
     if (host.includes('vercel.app')) {
-      const mainDomainMatch = host.match(/^(comfort-finder-analyzer)\.(vercel\.app|com)$/);
+      // Match any Vercel subdomain pattern and extract just the base project name
+      const mainDomainMatch = host.match(/(comfort-finder-analyzer)[^.]*\.(vercel\.app)$/);
       if (mainDomainMatch) {
         host = `${mainDomainMatch[1]}.${mainDomainMatch[2]}`;
       }
+    }
+    
+    // Fallback to main production domain if we're on Vercel
+    if (host.includes('vercel.app') && !host.match(/^comfort-finder-analyzer\.vercel\.app$/)) {
+      host = 'comfort-finder-analyzer.vercel.app';
     }
     
     const redirectUri = `${protocol}://${host}/api/gmail-callback`;
