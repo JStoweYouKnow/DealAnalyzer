@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     let analysisWithAI = analysisData;
     try {
       if (process.env.OPENAI_API_KEY) {
-        const aiAnalysis = await coreAiService.analyzeProperty(analysisData.property);
+        const aiAnalysis = await coreAiService.analyzeProperty(analysisData.property as any);
         analysisWithAI = {
           ...analysisData,
           aiAnalysis
@@ -42,13 +42,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the analysis
-    const storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
+    const storedAnalysis = await storage.createDealAnalysis(analysisWithAI as any);
 
     // Update the email deal with the analysis
     await storage.updateEmailDeal(dealId, {
-      analysis: storedAnalysis,
+      analysis: storedAnalysis as any,
       status: 'analyzed'
-    });
+    } as any);
 
     return NextResponse.json({
       success: true,
