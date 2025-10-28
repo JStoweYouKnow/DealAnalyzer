@@ -79,10 +79,11 @@ export class EmailMonitoringService {
     );
 
     const scopes = ['https://www.googleapis.com/auth/gmail.readonly'];
-    
+
     return auth.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
+      prompt: 'select_account', // Force account selection every time
     });
   }
 
