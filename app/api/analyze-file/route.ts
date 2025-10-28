@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import fs from "fs";
-import { runPythonFileAnalysis } from "../../lib/python-helpers";
+import { parseFileContent } from "../../lib/file-parser";
+import { analyzeProperty } from "../../lib/property-analyzer";
 import { storage } from "../../../server/storage";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 
@@ -50,11 +51,17 @@ export async function POST(request: NextRequest) {
     const originalName = file.name;
     const fileExtension = originalName.substring(originalName.lastIndexOf('.')).toLowerCase();
 
-    // Run Python file analysis
-    console.log(`Running Python file analysis for: ${tempFilePath}, extension: ${fileExtension}`);
-    const analysisResult = await runPythonFileAnalysis(tempFilePath, fileExtension, strMetrics, monthlyExpenses);
+    // Read and parse file content
+    const fileContent = await fs.promises.readFile(tempFilePath, 'utf-8');
+    console.log(`Running TypeScript file analysis for: ${originalName}, extension: ${fileExtension}`);
     
-    console.log("Analysis result:", analysisResult.success ? "Success" : "Failed", analysisResult.error);
+    // Parse file content
+    const propertyData = await parseFileContent(fileContent, fileExtension, strMetrics, monthlyExpenses);
+    
+    // Run analysis
+    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses);
+    
+    console.log("Analysis result: Success");
     
     // Clean up uploaded file
     if (tempFilePath) {
@@ -64,22 +71,14 @@ export async function POST(request: NextRequest) {
         console.warn("Failed to clean up uploaded file:", e);
       }
     }
-    
-    if (!analysisResult.success) {
-      console.error("File analysis failed:", analysisResult.error);
-      return NextResponse.json(
-        { success: false, error: analysisResult.error || "File analysis failed" },
-        { status: 400 }
-      );
-    }
 
     // Run AI analysis if available
-    let analysisWithAI = analysisResult.data!;
+    let analysisWithAI = analysisData;
     try {
       if (process.env.OPENAI_API_KEY) {
-        const aiAnalysis = await coreAiService.analyzeProperty(analysisResult.data!.property);
+        const aiAnalysis = await coreAiService.analyzeProperty(analysisData.property as any);
         analysisWithAI = {
-          ...analysisResult.data!,
+          ...analysisData,
           aiAnalysis
         };
       }
@@ -88,7 +87,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the analysis in memory
-    const storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
+    const storedAnalysis = await storage.createDealAnalysis(analysisWithAI as any);
 
     return NextResponse.json({
       success: true,

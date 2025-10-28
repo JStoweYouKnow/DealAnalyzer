@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzePropertyRequestSchema } from "../../../shared/schema";
-import { runPythonAnalysis } from "../../lib/python-helpers";
+import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
 import { storage } from "../../../server/storage";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 
@@ -21,32 +21,28 @@ export async function POST(request: NextRequest) {
 
     const { emailContent, strMetrics, monthlyExpenses } = validation.data;
     
-    // Run Python analysis
-    const analysisResult = await runPythonAnalysis(emailContent, strMetrics, monthlyExpenses);
+    // Parse email content to extract property data
+    const propertyData = parseEmailContent(emailContent);
     
-    if (!analysisResult.success) {
-      return NextResponse.json(
-        { success: false, error: analysisResult.error || "Analysis failed" },
-        { status: 400 }
-      );
-    }
-
+    // Run TypeScript analysis
+    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses);
+    
     // Run AI analysis if available
-    let analysisWithAI = analysisResult.data!;
+    let analysisWithAI = analysisData;
     try {
       if (process.env.OPENAI_API_KEY) {
-        const aiAnalysis = await coreAiService.analyzeProperty(analysisResult.data!.property);
+        const aiAnalysis = await coreAiService.analyzeProperty(analysisData.property as any);
         analysisWithAI = {
-          ...analysisResult.data!,
+          ...analysisData,
           aiAnalysis
-        };
+        } as any;
       }
     } catch (error) {
       console.warn("AI analysis failed, continuing without AI insights:", error);
     }
 
     // Store the analysis in memory
-    const storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
+    const storedAnalysis = await storage.createDealAnalysis(analysisWithAI as any);
 
     return NextResponse.json({
       success: true,
