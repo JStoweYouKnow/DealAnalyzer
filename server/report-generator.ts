@@ -1,13 +1,9 @@
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium-min';
 import { createObjectCsvWriter } from 'csv-writer';
 import path from 'path';
 import fs from 'fs';
 import type { DealAnalysis, PropertyComparison } from '@shared/schema';
 import { aiAnalysisService } from './ai-service';
-
-// Determine if we're running on Vercel
-const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+import type { Browser } from 'puppeteer-core';
 
 export interface ReportOptions {
   format: 'pdf' | 'csv';
@@ -49,43 +45,67 @@ async function generatePDFReport(data: ReportData, options: ReportOptions, baseF
   // Generate HTML content for PDF
   const htmlContent = await generateHTMLReport(data, options);
   
-  // Launch puppeteer and generate PDF
-  const browser = await puppeteer.launch({
-    executablePath: isVercel ? await chromium.executablePath() : undefined,
-    headless: true,
-    args: isVercel ? chromium.args : [
-      '--no-sandbox', 
-      '--disable-setuid-sandbox', 
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--disable-web-security',
-      '--disable-extensions',
-      '--disable-features=VizDisplayCompositor',
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding'
-    ]
-  });
+  // Get PDF buffer
+  const pdfBuffer = await makePDF(htmlContent);
   
-  try {
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    await page.pdf({
-      path: filePath,
-      format: 'A4',
-      margin: {
-        top: '20mm',
-        right: '15mm',
-        bottom: '20mm',
-        left: '15mm'
-      },
-      printBackground: true
-    });
-  } finally {
-    await browser.close();
+  if (!pdfBuffer) {
+    throw new Error('Failed to generate PDF');
   }
   
+  // Write buffer to file
+  fs.writeFileSync(filePath, pdfBuffer);
+  
   return { filePath, fileName };
+}
+
+async function makePDF(html: string): Promise<Buffer | null> {
+  // Initiate the browser instance
+  let browser: Browser | undefined | null;
+
+  // Check if the environment is development
+  if (process.env.NODE_ENV !== "development") {
+    // Import the packages required on production
+    const chromium = require("@sparticuz/chromium-min");
+    const puppeteer = require("puppeteer-core");
+
+    // Assign the browser instance
+    browser = await puppeteer.launch({
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
+      defaultViewport: chromium.defaultViewport,
+      args: [...chromium.args, "--hide-scrollbars", "--disable-web-security"],
+    });
+  } else {
+    // Else, use the full version of puppeteer
+    const puppeteer = require("puppeteer");
+    browser = await puppeteer.launch({
+      headless: "new",
+    });
+  }
+
+  // Create a PDF
+  if (browser) {
+    const page = await browser.newPage();
+    await page.setContent(html);
+
+    const pdfBuffer = await page.pdf({
+      format: "a4",
+      printBackground: true,
+      margin: {
+        top: 80,
+        bottom: 80,
+        left: 80,
+        right: 80,
+      },
+    });
+
+    await browser.close();
+
+    return pdfBuffer as Buffer;
+  }
+
+  return null;
 }
 
 async function generateCSVReport(data: ReportData, options: ReportOptions, baseFileName: string): Promise<{ filePath: string; fileName: string }> {
