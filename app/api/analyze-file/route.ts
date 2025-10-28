@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         analysisWithAI = {
           ...analysisData,
           aiAnalysis
-        };
+        } as any;
       }
     } catch (error) {
       console.warn("AI analysis failed, continuing without AI insights:", error);

@@ -137,7 +137,7 @@ export async function parseFileContent(
   // Merge additional data if provided
   if (strMetrics) {
     if (strMetrics.adr) property.monthly_rent = strMetrics.adr * 30 * (strMetrics.occupancyRate || 0.65);
-    property.occupancy_rate = strMetrics.occupancyRate;
+    // Note: occupancy_rate is stored in strMetrics, not in the property object
   }
 
   if (monthlyExpenses) {
