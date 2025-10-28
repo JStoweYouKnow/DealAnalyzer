@@ -1289,14 +1289,11 @@ export class MemStorage implements IStorage {
   }
 }
 
-// Import Convex storage
-import { convexStorage } from "./convex-storage";
-
 // Singleton pattern to ensure storage persists across requests and HMR reloads
 // Use globalThis to persist across Next.js hot module replacement
 const globalForStorage = globalThis as unknown as {
   storageInstance: MemStorage | undefined;
-  useConvex: boolean;
+  convexStorage: any | undefined;
 };
 
 export const storage = (() => {
@@ -1322,30 +1319,44 @@ export const storage = (() => {
   return globalForStorage.storageInstance;
 })();
 
+// Lazy import Convex storage to avoid errors when not configured
+async function getConvexStorage() {
+  if (!globalForStorage.convexStorage) {
+    const { convexStorage } = await import("./convex-storage");
+    globalForStorage.convexStorage = convexStorage;
+  }
+  return globalForStorage.convexStorage;
+}
+
 // Create a wrapper that implements IStorage interface using Convex
 function createConvexStorageWrapper(): IStorage {
   return {
     // Email deal methods - delegate to Convex
     async getEmailDeals() {
+      const convexStorage = await getConvexStorage();
       return await convexStorage.getEmailDeals();
     },
     
     async getEmailDeal(id: string) {
+      const convexStorage = await getConvexStorage();
       const result = await convexStorage.getEmailDeal(id);
       return result ?? undefined;
     },
     
     async createEmailDeal(deal: any) {
+      const convexStorage = await getConvexStorage();
       return await convexStorage.createEmailDeal(deal);
     },
     
     async updateEmailDeal(id: string, updates: any) {
+      const convexStorage = await getConvexStorage();
       const result = await convexStorage.updateEmailDeal(id, updates);
       return result || undefined;
     },
     
     async deleteEmailDeal(id: string) {
       try {
+        const convexStorage = await getConvexStorage();
         await convexStorage.deleteEmailDeal(id);
         return true;
       } catch {
@@ -1354,6 +1365,7 @@ function createConvexStorageWrapper(): IStorage {
     },
     
     async findEmailDealByContentHash(contentHash: string) {
+      const convexStorage = await getConvexStorage();
       const result = await convexStorage.findEmailDealByContentHash(contentHash);
       return result ?? undefined;
     },
