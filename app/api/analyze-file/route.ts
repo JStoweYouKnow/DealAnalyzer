@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, unlink } from "fs/promises";
-import { join } from "path";
-import fs from "fs";
 import { parseFileContent } from "../../lib/file-parser";
 import { analyzeProperty } from "../../lib/property-analyzer";
 import { storage } from "../../../server/storage";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 
 export async function POST(request: NextRequest) {
-  let tempFilePath: string | null = null;
-  
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -21,18 +16,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Save file to temp directory
-    const tempDir = join(process.cwd(), 'temp_uploads');
-    
-    // Ensure temp directory exists
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-    
-    const buffer = Buffer.from(await file.arrayBuffer());
-    tempFilePath = join(tempDir, `${Date.now()}_${file.name}`);
-    
-    await writeFile(tempFilePath, buffer);
+    // Read file content directly into memory (no temp files needed for Vercel)
+    const fileContent = await file.text();
 
     // Parse additional form data
     let strMetrics, monthlyExpenses;
@@ -51,8 +36,6 @@ export async function POST(request: NextRequest) {
     const originalName = file.name;
     const fileExtension = originalName.substring(originalName.lastIndexOf('.')).toLowerCase();
 
-    // Read and parse file content
-    const fileContent = await fs.promises.readFile(tempFilePath, 'utf-8');
     console.log(`Running TypeScript file analysis for: ${originalName}, extension: ${fileExtension}`);
     
     // Parse file content
@@ -62,15 +45,6 @@ export async function POST(request: NextRequest) {
     const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses);
     
     console.log("Analysis result: Success");
-    
-    // Clean up uploaded file
-    if (tempFilePath) {
-      try {
-        await unlink(tempFilePath);
-      } catch (e) {
-        console.warn("Failed to clean up uploaded file:", e);
-      }
-    }
 
     // Run AI analysis if available
     let analysisWithAI = analysisData;
@@ -96,17 +70,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error in analyze-file endpoint:", error);
     
-    // Clean up uploaded file on error too
-    if (tempFilePath) {
-      try {
-        await unlink(tempFilePath);
-      } catch (e) {
-        console.error("Error deleting uploaded file on error:", e);
-      }
-    }
-    
     return NextResponse.json(
-      { success: false, error: "Internal server error during file analysis" },
+      { success: false, error: `Internal server error during file analysis: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     );
   }
