@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     const authUrl = auth.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
-      prompt: 'consent', // Show account selection when needed
+      // No prompt parameter - let Google handle it naturally
     });
     
     console.log("Generated auth URL:", authUrl);
