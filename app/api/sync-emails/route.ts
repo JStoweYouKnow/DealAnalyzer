@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { emailMonitoringService } from "../../../server/email-service";
 import { storage } from "../../../server/storage";
 import { cookies } from "next/headers";
 import type { EmailMonitoringResponse } from "../../../shared/schema";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // Check if user has Gmail tokens
     const cookieStore = await cookies();
@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
       gmailTokens.refresh_token
     );
 
-    // Search for real estate emails
-    const emailDeals = await emailMonitoringService.searchRealEstateEmails();
+    // Search for real estate emails (limit to 25 to avoid timeouts)
+    const emailDeals = await emailMonitoringService.searchRealEstateEmails(25);
     
     // Store new deals in storage, checking for duplicates
     const storedDeals = [];
