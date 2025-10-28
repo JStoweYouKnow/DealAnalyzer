@@ -56,8 +56,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error analyzing email deal:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { success: false, error: "Failed to analyze email deal" },
+      { success: false, error: `Failed to analyze email deal: ${errorMessage}` },
       { status: 500 }
     );
   }
