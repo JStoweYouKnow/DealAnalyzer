@@ -3,9 +3,12 @@ import { google } from "googleapis";
 
 export async function GET(request: Request) {
   try {
+    // Check for a "clear" parameter to force account selection
+    const url = new URL(request.url);
+    const clearSession = url.searchParams.get('clear') === 'true';
+    
     // Dynamically construct the redirect URI based on the request
     // Use the main production domain for consistency
-    const url = new URL(request.url);
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
     let host = request.headers.get('host') || url.hostname;
     
@@ -29,14 +32,21 @@ export async function GET(request: Request) {
 
     const scopes = ['https://www.googleapis.com/auth/gmail.readonly'];
 
-    const authUrl = auth.generateAuthUrl({
+    const authUrlConfig: any = {
       access_type: 'offline',
       scope: scopes,
-      // No prompt parameter - let Google handle it naturally
-    });
+    };
+    
+    // Force account selection if clear parameter is present
+    if (clearSession) {
+      authUrlConfig.prompt = 'select_account';
+    }
+
+    const authUrl = auth.generateAuthUrl(authUrlConfig);
     
     console.log("Generated auth URL:", authUrl);
     console.log("Redirect URI in use:", redirectUri);
+    console.log("Request URL:", request.url);
     
     return NextResponse.json({
       success: true,
