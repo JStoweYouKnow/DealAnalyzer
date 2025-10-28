@@ -63,8 +63,9 @@ export async function POST() {
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error syncing emails:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { success: false, error: "Failed to sync emails" },
+      { success: false, error: `Failed to sync emails: ${errorMessage}` },
       { status: 500 }
     );
   }
