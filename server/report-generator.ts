@@ -185,35 +185,38 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
   };
 
   const analysesHtml = data.analyses.map((analysis, index) => `
-    <div class="property-section">
-      <h3>Property ${index + 1}: ${analysis.property.address}</h3>
+    <div class="mb-8 p-2 border-b border-gray-200">
+      <p class="text-xs font-semibold leading-7 text-indigo-600">
+        Property Analysis ${index + 1}
+      </p>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-gray-900">${analysis.property.address}</h1>
       
-      <div class="property-grid">
-        <div class="property-details">
-          <h4>Property Details</h4>
-          <table>
-            <tr><td>Address:</td><td>${analysis.property.address || 'N/A'}</td></tr>
-            <tr><td>City, State:</td><td>${analysis.property.city || 'N/A'}, ${analysis.property.state || 'N/A'}</td></tr>
-            <tr><td>Property Type:</td><td>${analysis.property.propertyType || 'N/A'}</td></tr>
-            <tr><td>Purchase Price:</td><td>${formatCurrency(analysis.property.purchasePrice || 0)}</td></tr>
-            <tr><td>Monthly Rent:</td><td>${formatCurrency(analysis.property.monthlyRent || 0)}</td></tr>
-            <tr><td>Bedrooms:</td><td>${analysis.property.bedrooms || 'N/A'}</td></tr>
-            <tr><td>Bathrooms:</td><td>${analysis.property.bathrooms || 'N/A'}</td></tr>
-            <tr><td>Square Footage:</td><td>${analysis.property.squareFootage?.toLocaleString() || 'N/A'}</td></tr>
-            <tr><td>Year Built:</td><td>${analysis.property.yearBuilt || 'N/A'}</td></tr>
-          </table>
+      <div class="mt-6 grid grid-cols-2 gap-6">
+        <div class="p-4 border border-gray-200 rounded-lg">
+          <h3 class="text-sm font-semibold text-indigo-600 mb-4">Property Details</h3>
+          <dl class="space-y-2 text-sm">
+            <div class="flex justify-between"><dt class="font-medium">Address:</dt><dd>${analysis.property.address || 'N/A'}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">City, State:</dt><dd>${analysis.property.city || 'N/A'}, ${analysis.property.state || 'N/A'}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Property Type:</dt><dd>${analysis.property.propertyType || 'N/A'}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Purchase Price:</dt><dd class="font-semibold">${formatCurrency(analysis.property.purchasePrice || 0)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Monthly Rent:</dt><dd class="font-semibold">${formatCurrency(analysis.property.monthlyRent || 0)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Bedrooms:</dt><dd>${analysis.property.bedrooms || 'N/A'}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Bathrooms:</dt><dd>${analysis.property.bathrooms || 'N/A'}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Square Footage:</dt><dd>${analysis.property.squareFootage?.toLocaleString() || 'N/A'}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Year Built:</dt><dd>${analysis.property.yearBuilt || 'N/A'}</dd></div>
+          </dl>
         </div>
         
-        <div class="financial-analysis">
-          <h4>Financial Analysis</h4>
-          <table>
-            <tr><td>Total Cash Needed:</td><td>${formatCurrency(analysis.totalCashNeeded || 0)}</td></tr>
-            <tr><td>Monthly Cash Flow:</td><td class="${(analysis.cashFlow || 0) >= 0 ? 'positive' : 'negative'}">${formatCurrency(analysis.cashFlow || 0)}</td></tr>
-            <tr><td>Cash-on-Cash Return:</td><td>${formatPercent(analysis.cocReturn || 0)}</td></tr>
-            <tr><td>Cap Rate:</td><td>${formatPercent(analysis.capRate || 0)}</td></tr>
-            <tr><td>Passes 1% Rule:</td><td class="${analysis.passes1PercentRule ? 'pass' : 'fail'}">${analysis.passes1PercentRule ? 'Yes' : 'No'}</td></tr>
-            <tr><td>Meets Criteria:</td><td class="${analysis.meetsCriteria ? 'pass' : 'fail'}">${analysis.meetsCriteria ? 'Yes' : 'No'}</td></tr>
-          </table>
+        <div class="p-4 border border-gray-200 rounded-lg">
+          <h3 class="text-sm font-semibold text-indigo-600 mb-4">Financial Analysis</h3>
+          <dl class="space-y-2 text-sm">
+            <div class="flex justify-between"><dt class="font-medium">Total Cash Needed:</dt><dd class="font-semibold">${formatCurrency(analysis.totalCashNeeded || 0)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Monthly Cash Flow:</dt><dd class="font-semibold ${(analysis.cashFlow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}">${formatCurrency(analysis.cashFlow || 0)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Cash-on-Cash Return:</dt><dd class="font-semibold">${formatPercent(analysis.cocReturn || 0)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Cap Rate:</dt><dd class="font-semibold">${formatPercent(analysis.capRate || 0)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Passes 1% Rule:</dt><dd class="font-semibold ${analysis.passes1PercentRule ? 'text-green-600' : 'text-red-600'}">${analysis.passes1PercentRule ? 'Yes' : 'No'}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Meets Criteria:</dt><dd class="font-semibold ${analysis.meetsCriteria ? 'text-green-600' : 'text-red-600'}">${analysis.meetsCriteria ? 'Yes' : 'No'}</dd></div>
+          </dl>
         </div>
       </div>
     </div>
@@ -225,103 +228,30 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
     <head>
       <meta charset="utf-8">
       <title>${options.title}</title>
+      <script src="https://cdn.tailwindcss.com"></script>
       <style>
-        body {
-          font-family: Arial, sans-serif;
-          margin: 0;
-          padding: 20px;
-          color: #333;
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 30px;
-          border-bottom: 2px solid #0070f3;
-          padding-bottom: 20px;
-        }
-        .header h1 {
-          color: #0070f3;
-          margin: 0;
-        }
-        .header p {
-          color: #666;
-          margin: 10px 0 0 0;
-        }
-        .property-section {
-          margin-bottom: 40px;
-          page-break-inside: avoid;
-        }
-        .property-section h3 {
-          background: #f8f9fa;
-          padding: 10px;
-          border-left: 4px solid #0070f3;
-          margin: 0 0 20px 0;
-        }
-        .property-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 30px;
-        }
-        .property-details, .financial-analysis {
-          background: #fff;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
-          padding: 20px;
-        }
-        .property-details h4, .financial-analysis h4 {
-          margin: 0 0 15px 0;
-          color: #0070f3;
-          border-bottom: 1px solid #e0e0e0;
-          padding-bottom: 10px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        td {
-          padding: 8px 0;
-          border-bottom: 1px solid #f0f0f0;
-        }
-        td:first-child {
-          font-weight: bold;
-          width: 40%;
-        }
-        .positive { color: #28a745; font-weight: bold; }
-        .negative { color: #dc3545; font-weight: bold; }
-        .pass { color: #28a745; font-weight: bold; }
-        .fail { color: #dc3545; font-weight: bold; }
-        .summary {
-          background: #f8f9fa;
-          border: 1px solid #dee2e6;
-          border-radius: 8px;
-          padding: 20px;
-          margin-top: 30px;
-        }
-        .summary h3 {
-          color: #0070f3;
-          margin: 0 0 15px 0;
-        }
         @media print {
-          .property-section {
-            page-break-after: auto;
-          }
+          .page-break { page-break-after: always; }
         }
       </style>
     </head>
-    <body>
-      <div class="header">
-        <h1>${options.title}</h1>
-        <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
-        <p>Real Estate Investment Analysis Report</p>
+    <body class="p-6 bg-white">
+      <div class="text-center mb-8 pb-6 border-b-2 border-indigo-600">
+        <p class="text-xs font-semibold leading-7 text-indigo-600">Real Estate Investment Report</p>
+        <h1 class="mt-2 text-4xl font-bold tracking-tight text-gray-900">${options.title}</h1>
+        <p class="mt-2 text-sm text-gray-600">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
       </div>
       
       ${analysesHtml}
       
-      <div class="summary">
-        <h3>Summary</h3>
-        <p><strong>Total Properties Analyzed:</strong> ${data.analyses.length}</p>
-        <p><strong>Properties Meeting Criteria:</strong> ${data.analyses.filter(a => a.meetsCriteria).length}</p>
-        <p><strong>Average Cash Flow:</strong> ${formatCurrency(data.analyses.reduce((sum, a) => sum + a.cashFlow, 0) / data.analyses.length)}</p>
-        <p><strong>Average COC Return:</strong> ${formatPercent(data.analyses.reduce((sum, a) => sum + a.cocReturn, 0) / data.analyses.length)}</p>
+      <div class="mt-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
+        <h3 class="text-lg font-semibold text-indigo-600 mb-4">Summary</h3>
+        <dl class="space-y-2 text-sm">
+          <div class="flex justify-between"><dt class="font-medium">Total Properties Analyzed:</dt><dd class="font-semibold">${data.analyses.length}</dd></div>
+          <div class="flex justify-between"><dt class="font-medium">Properties Meeting Criteria:</dt><dd class="font-semibold text-green-600">${data.analyses.filter(a => a.meetsCriteria).length}</dd></div>
+          <div class="flex justify-between"><dt class="font-medium">Average Cash Flow:</dt><dd class="font-semibold">${formatCurrency(data.analyses.reduce((sum, a) => sum + a.cashFlow, 0) / data.analyses.length)}</dd></div>
+          <div class="flex justify-between"><dt class="font-medium">Average COC Return:</dt><dd class="font-semibold">${formatPercent(data.analyses.reduce((sum, a) => sum + a.cocReturn, 0) / data.analyses.length)}</dd></div>
+        </dl>
       </div>
     </body>
     </html>
