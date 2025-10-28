@@ -1,9 +1,13 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium-min';
 import { createObjectCsvWriter } from 'csv-writer';
 import path from 'path';
 import fs from 'fs';
 import type { DealAnalysis, PropertyComparison } from '@shared/schema';
 import { aiAnalysisService } from './ai-service';
+
+// Determine if we're running on Vercel
+const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
 
 export interface ReportOptions {
   format: 'pdf' | 'csv';
@@ -47,8 +51,9 @@ async function generatePDFReport(data: ReportData, options: ReportOptions, baseF
   
   // Launch puppeteer and generate PDF
   const browser = await puppeteer.launch({
+    executablePath: isVercel ? await chromium.executablePath() : undefined,
     headless: true,
-    args: [
+    args: isVercel ? chromium.args : [
       '--no-sandbox', 
       '--disable-setuid-sandbox', 
       '--disable-dev-shm-usage',

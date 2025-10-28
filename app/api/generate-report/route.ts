@@ -24,17 +24,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if we're on Vercel and format is PDF
-    if ((process.env.VERCEL || process.env.VERCEL_ENV) && format === 'pdf') {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: "PDF generation is not available on Vercel. Please use CSV format or try again locally." 
-        },
-        { status: 503 }
-      );
-    }
-
     // Get analyses from storage
     const analyses: any[] = [];
     for (const id of analysisIds) {
