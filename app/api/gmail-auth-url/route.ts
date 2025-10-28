@@ -4,9 +4,20 @@ import { google } from "googleapis";
 export async function GET(request: Request) {
   try {
     // Dynamically construct the redirect URI based on the request
+    // Use the main production domain for consistency
     const url = new URL(request.url);
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
-    const host = request.headers.get('host') || url.hostname;
+    let host = request.headers.get('host') || url.hostname;
+    
+    // Extract just the main domain (remove preview deployment suffixes)
+    // e.g., "comfort-finder-analyzer-9vh7byfjs-james-stowes-projects.vercel.app" -> "comfort-finder-analyzer.vercel.app"
+    if (host.includes('vercel.app')) {
+      const mainDomainMatch = host.match(/^(comfort-finder-analyzer)\.(vercel\.app|com)$/);
+      if (mainDomainMatch) {
+        host = `${mainDomainMatch[1]}.${mainDomainMatch[2]}`;
+      }
+    }
+    
     const redirectUri = `${protocol}://${host}/api/gmail-callback`;
     
     // Create auth URL with dynamic redirect URI
