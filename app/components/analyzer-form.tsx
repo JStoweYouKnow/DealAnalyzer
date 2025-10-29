@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { FundingSource } from "../../shared/schema";
 
 interface STRMetrics {
   adr?: number;
@@ -27,7 +29,7 @@ interface MonthlyExpenses {
 }
 
 interface AnalyzerFormProps {
-  onAnalyze: (data: { file?: File; strMetrics?: STRMetrics; ltrMetrics?: LTRMetrics; monthlyExpenses?: MonthlyExpenses }) => void;
+  onAnalyze: (data: { file?: File; strMetrics?: STRMetrics; ltrMetrics?: LTRMetrics; monthlyExpenses?: MonthlyExpenses; fundingSource?: FundingSource }) => void;
   isLoading: boolean;
 }
 
@@ -36,6 +38,7 @@ export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
   const [strMetrics, setSTRMetrics] = useState<STRMetrics>({});
   const [ltrMetrics, setLTRMetrics] = useState<LTRMetrics>({});
   const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpenses>({});
+  const [fundingSource, setFundingSource] = useState<FundingSource>('conventional');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -44,8 +47,8 @@ export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
       alert("Please select a file first");
       return;
     }
-    
-    onAnalyze({ file: selectedFile, strMetrics, ltrMetrics, monthlyExpenses });
+
+    onAnalyze({ file: selectedFile, strMetrics, ltrMetrics, monthlyExpenses, fundingSource });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,7 +113,7 @@ export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
                         data-testid="input-file-upload"
                       />
                     </div>
-                    
+
                     {selectedFile && (
                       <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3 flex items-center space-x-2">
                         <i className="fas fa-file text-green-600"></i>
@@ -120,6 +123,32 @@ export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
                       </div>
                     )}
                   </div>
+                </div>
+
+                <div className="pt-4">
+                  <Label htmlFor="funding-source" className="text-base font-semibold mb-3 block">Funding Source</Label>
+                  <Select
+                    value={fundingSource}
+                    onValueChange={(value) => setFundingSource(value as FundingSource)}
+                  >
+                    <SelectTrigger id="funding-source" className="h-10" data-testid="select-funding-source">
+                      <SelectValue placeholder="Select funding source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="conventional">Conventional (5% down)</SelectItem>
+                      <SelectItem value="fha">FHA (3.5% down)</SelectItem>
+                      <SelectItem value="va">VA (0% down)</SelectItem>
+                      <SelectItem value="dscr">DSCR (20% down)</SelectItem>
+                      <SelectItem value="cash">Cash (100% down)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {fundingSource === 'conventional' && 'Conventional loans require 5% down payment'}
+                    {fundingSource === 'fha' && 'FHA loans require 3.5% down payment'}
+                    {fundingSource === 'va' && 'VA loans require 0% down payment (for qualified veterans)'}
+                    {fundingSource === 'dscr' && 'DSCR (Debt Service Coverage Ratio) loans require 20% down payment'}
+                    {fundingSource === 'cash' && 'Cash purchase - no mortgage payment'}
+                  </p>
                 </div>
               </TabsContent>
               

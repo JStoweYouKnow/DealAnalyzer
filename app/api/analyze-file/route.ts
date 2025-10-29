@@ -3,6 +3,7 @@ import { parseFileContent } from "../../lib/file-parser";
 import { analyzeProperty } from "../../lib/property-analyzer";
 import { storage } from "../../../server/storage";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
+import { getMortgageRate } from "../../../server/mortgage-rate-service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,12 +22,17 @@ export async function POST(request: NextRequest) {
 
     // Parse additional form data
     let strMetrics, monthlyExpenses;
+    let fundingSource: 'conventional' | 'fha' | 'va' | 'dscr' | 'cash' | undefined = undefined;
     try {
       if (formData.get('strMetrics')) {
         strMetrics = JSON.parse(formData.get('strMetrics') as string);
       }
       if (formData.get('monthlyExpenses')) {
         monthlyExpenses = JSON.parse(formData.get('monthlyExpenses') as string);
+      }
+      const fundingSourceStr = formData.get('fundingSource') as string | null;
+      if (fundingSourceStr && ['conventional', 'fha', 'va', 'dscr', 'cash'].includes(fundingSourceStr)) {
+        fundingSource = fundingSourceStr as 'conventional' | 'fha' | 'va' | 'dscr' | 'cash';
       }
     } catch (e) {
       console.warn("Failed to parse form data:", e);
@@ -37,12 +43,22 @@ export async function POST(request: NextRequest) {
     const fileExtension = originalName.substring(originalName.lastIndexOf('.')).toLowerCase();
 
     console.log(`Running TypeScript file analysis for: ${originalName}, extension: ${fileExtension}`);
-    
+
     // Parse file content
     const propertyData = await parseFileContent(fileContent, fileExtension, strMetrics, monthlyExpenses);
-    
+
+    // Fetch current mortgage rate (fallback to 7% on error)
+    const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
+    const downpayment = purchasePrice * 0.2; // Approximate for rate lookup
+    const loanAmount = purchasePrice - downpayment;
+    const mortgageRate = await getMortgageRate({
+      loan_term: 30,
+      loan_amount: loanAmount,
+      zip_code: propertyData.zip_code || propertyData.zipCode,
+    });
+
     // Run analysis
-    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses);
+    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, fundingSource, mortgageRate);
     
     console.log("Analysis result: Success");
 

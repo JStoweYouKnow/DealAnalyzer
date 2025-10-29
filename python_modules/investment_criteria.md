@@ -7,6 +7,7 @@
 **Max Purchase Price:** $300,000
 
 **Financials:**
+*   **Default Funding Source:** Conventional (5% down)
 *   **Downpayment:** Anticipate 20-25% for a rental property
 *   **Closing Costs:** Estimate 5% to 7%
 *   **Initial Fixed Costs:** Estimate an additional 1%

@@ -1,11 +1,12 @@
-from real_estate_data import Property, DealAnalysis
+from real_estate_data import Property, DealAnalysis, FUNDING_SOURCE_DOWN_PAYMENTS
 from criteria_manager import load_investment_criteria
 
 def analyze_deal(property: Property) -> DealAnalysis:
     criteria = load_investment_criteria()
 
     # Financial Calculations
-    downpayment_percentage = criteria["downpayment_percentage_min"]  # Use minimum (20%) instead of average
+    # Use funding source to determine down payment percentage
+    downpayment_percentage = FUNDING_SOURCE_DOWN_PAYMENTS.get(property.funding_source, 0.20)  # Default to 20% if not found
     closing_costs_percentage = (criteria["closing_costs_percentage_min"] + criteria["closing_costs_percentage_max"]) / 2
     initial_fixed_costs_percentage = criteria["initial_fixed_costs_percentage"]
     maintenance_reserve_percentage = criteria["maintenance_reserve_percentage"]
@@ -21,16 +22,20 @@ def analyze_deal(property: Property) -> DealAnalysis:
     passes_1_percent_rule = property.monthly_rent >= (property.purchase_price * 0.01)
 
     # Calculate estimated monthly mortgage payment (Principal & Interest) first.
-    # Assuming a 30-year fixed mortgage at 7% interest rate.
-    loan_amount = property.purchase_price - calculated_downpayment
-    annual_interest_rate = 0.07
-    monthly_interest_rate = annual_interest_rate / 12
-    number_of_payments = 30 * 12
-
-    if monthly_interest_rate > 0:
-        monthly_mortgage_payment = loan_amount * (monthly_interest_rate * (1 + monthly_interest_rate)**number_of_payments) / ((1 + monthly_interest_rate)**number_of_payments - 1)
+    # For cash purchases, there is no mortgage payment.
+    # For financed purchases, assume a 30-year fixed mortgage at 7% interest rate.
+    if property.funding_source == 'cash':
+        monthly_mortgage_payment = 0.0
     else:
-        monthly_mortgage_payment = loan_amount / number_of_payments # Simple division if interest rate is 0
+        loan_amount = property.purchase_price - calculated_downpayment
+        annual_interest_rate = 0.07
+        monthly_interest_rate = annual_interest_rate / 12
+        number_of_payments = 30 * 12
+
+        if monthly_interest_rate > 0 and loan_amount > 0:
+            monthly_mortgage_payment = loan_amount * (monthly_interest_rate * (1 + monthly_interest_rate)**number_of_payments) / ((1 + monthly_interest_rate)**number_of_payments - 1)
+        else:
+            monthly_mortgage_payment = loan_amount / number_of_payments if number_of_payments > 0 else 0.0
 
     # Estimated Monthly Expenses
     estimated_property_tax = property.purchase_price * 0.012 / 12  # 1.2% annually

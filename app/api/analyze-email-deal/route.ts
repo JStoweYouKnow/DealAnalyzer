@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../server/storage";
 import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
+import { getMortgageRate } from "../../../server/mortgage-rate-service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,7 +48,18 @@ export async function POST(request: NextRequest) {
         }
       : undefined;
     
-    const analysisData = analyzeProperty(propertyData, strMetrics);
+    // Fetch current mortgage rate (fallback to 7% on error)
+    const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || emailDeal.extractedProperty?.price || 0;
+    const fundingSource = emailDeal.extractedProperty?.fundingSource || 'conventional';
+    const downpayment = purchasePrice * 0.2; // Approximate for rate lookup
+    const loanAmount = purchasePrice - downpayment;
+    const mortgageRate = await getMortgageRate({
+      loan_term: 30,
+      loan_amount: loanAmount,
+      zip_code: propertyData.zip_code || propertyData.zipCode || emailDeal.extractedProperty?.zipCode,
+    });
+
+    const analysisData = analyzeProperty(propertyData, strMetrics, undefined, fundingSource, mortgageRate);
 
     // Run AI analysis if available
     let analysisWithAI = analysisData;

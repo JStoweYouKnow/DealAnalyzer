@@ -1,6 +1,17 @@
 from dataclasses import dataclass, asdict, field
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Literal
 import json
+
+# Funding source type and down payment mappings
+FundingSource = Literal['conventional', 'fha', 'va', 'dscr', 'cash']
+
+FUNDING_SOURCE_DOWN_PAYMENTS = {
+    'conventional': 0.05,  # 5%
+    'fha': 0.035,          # 3.5%
+    'va': 0.00,            # 0%
+    'dscr': 0.20,          # 20%
+    'cash': 0.00,          # 0% (no mortgage)
+}
 
 @dataclass
 class Property:
@@ -22,6 +33,8 @@ class Property:
     lot_size: Optional[int] = None  # Lot size in square feet
     image_urls: List[str] = field(default_factory=list)
     source_links: List[Dict[str, str]] = field(default_factory=list)
+    # Funding source
+    funding_source: str = 'conventional'  # conventional, fha, va, dscr, cash
     # Financials (calculated or estimated)
     downpayment_percentage: float = 0.20 # Default to 20%
     closing_costs_percentage: float = 0.05 # Default to 5%

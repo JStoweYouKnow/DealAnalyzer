@@ -34,7 +34,7 @@ export default function HomePage() {
 
   // Analysis mutation
   const analysisMutation = useMutation({
-    mutationFn: async (data: { emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any }) => {
+    mutationFn: async (data: { emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any }) => {
       if (data.file) {
         // Handle file upload
         const formData = new FormData();
@@ -47,6 +47,9 @@ export default function HomePage() {
         }
         if (data.monthlyExpenses) {
           formData.append('monthlyExpenses', JSON.stringify(data.monthlyExpenses));
+        }
+        if (data.fundingSource) {
+          formData.append('fundingSource', data.fundingSource);
         }
         
         const response = await fetch('/api/analyze-file', {
@@ -66,6 +69,7 @@ export default function HomePage() {
           strMetrics: data.strMetrics,
           ltrMetrics: data.ltrMetrics,
           monthlyExpenses: data.monthlyExpenses,
+          fundingSource: data.fundingSource,
         });
         return response.json() as Promise<AnalyzePropertyResponse>;
       }
@@ -102,7 +106,7 @@ export default function HomePage() {
     },
   });
 
-  const handleAnalyze = (data: { emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any }) => {
+  const handleAnalyze = (data: { emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any }) => {
     analysisMutation.mutate(data);
   };
 

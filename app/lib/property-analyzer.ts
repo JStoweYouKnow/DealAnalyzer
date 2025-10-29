@@ -1,5 +1,6 @@
 // TypeScript property analyzer to replace Python backend for Vercel deployment
-import type { Property } from "../../shared/schema";
+import type { Property, FundingSource } from "../../shared/schema";
+import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../shared/schema";
 
 export interface PropertyAnalysis {
   propertyId: string;
@@ -129,12 +130,17 @@ export function parseEmailContent(emailContent: string): any {
 export function analyzeProperty(
   propertyData: any,
   strMetrics?: { adr?: number; occupancyRate?: number; monthlyRent?: number },
-  monthlyExpenses?: any
+  monthlyExpenses?: any,
+  fundingSource?: FundingSource,
+  mortgageRate?: number // Annual interest rate as decimal (e.g., 0.07 for 7%)
 ): PropertyAnalysis {
   const criteria = loadInvestmentCriteria();
 
   // Use provided data or default values
   const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
+
+  // Get funding source (from parameter, property data, or default to 'conventional')
+  const propertyFundingSource: FundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
   
   // Calculate monthly rent: if STR metrics are provided, calculate from ADR and occupancy
   let monthlyRent = strMetrics?.monthlyRent || propertyData.monthly_rent || propertyData.monthlyRent || 0;
@@ -167,7 +173,8 @@ export function analyzeProperty(
   }
 
   // Financial Calculations
-  const downpaymentPercentage = criteria.downpayment_percentage_min;
+  // Use funding source to determine down payment percentage
+  const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource];
   const closingCostsPercentage = (criteria.closing_costs_percentage_min + criteria.closing_costs_percentage_max) / 2;
   const initialFixedCostsPercentage = criteria.initial_fixed_costs_percentage;
   const maintenanceReservePercentage = criteria.maintenance_reserve_percentage;
@@ -183,16 +190,22 @@ export function analyzeProperty(
   const passes1PercentRule = monthlyRent >= (purchasePrice * 0.01);
 
   // Calculate estimated monthly mortgage payment (Principal & Interest)
-  const loanAmount = purchasePrice - calculatedDownpayment;
-  const annualInterestRate = 0.07;
-  const monthlyInterestRate = annualInterestRate / 12;
-  const numberOfPayments = 30 * 12;
-
+  // For cash purchases, there is no mortgage payment
   let monthlyMortgagePayment = 0;
-  if (monthlyInterestRate > 0) {
-    monthlyMortgagePayment = loanAmount * (monthlyInterestRate * (1 + monthlyInterestRate)**numberOfPayments) / ((1 + monthlyInterestRate)**numberOfPayments - 1);
+  if (propertyFundingSource === 'cash') {
+    monthlyMortgagePayment = 0;
   } else {
-    monthlyMortgagePayment = loanAmount / numberOfPayments;
+    const loanAmount = purchasePrice - calculatedDownpayment;
+    // Use provided mortgage rate or default to 7% (0.07)
+    const annualInterestRate = mortgageRate ?? 0.07;
+    const monthlyInterestRate = annualInterestRate / 12;
+    const numberOfPayments = 30 * 12;
+
+    if (monthlyInterestRate > 0 && loanAmount > 0) {
+      monthlyMortgagePayment = loanAmount * (monthlyInterestRate * (1 + monthlyInterestRate)**numberOfPayments) / ((1 + monthlyInterestRate)**numberOfPayments - 1);
+    } else if (loanAmount > 0 && numberOfPayments > 0) {
+      monthlyMortgagePayment = loanAmount / numberOfPayments;
+    }
   }
 
   // Estimated Monthly Expenses

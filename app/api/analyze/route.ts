@@ -3,6 +3,7 @@ import { analyzePropertyRequestSchema } from "../../../shared/schema";
 import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
 import { storage } from "../../../server/storage";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
+import { getMortgageRate } from "../../../server/mortgage-rate-service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,13 +20,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { emailContent, strMetrics, monthlyExpenses } = validation.data;
-    
+    const { emailContent, strMetrics, monthlyExpenses, fundingSource } = validation.data;
+
     // Parse email content to extract property data
     const propertyData = parseEmailContent(emailContent);
-    
+
+    // Fetch current mortgage rate (fallback to 7% on error)
+    const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
+    const downpayment = purchasePrice * 0.2; // Approximate for rate lookup
+    const loanAmount = purchasePrice - downpayment;
+    const mortgageRate = await getMortgageRate({
+      loan_term: 30,
+      loan_amount: loanAmount,
+      zip_code: propertyData.zip_code || propertyData.zipCode,
+    });
+
     // Run TypeScript analysis
-    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses);
+    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, fundingSource, mortgageRate);
     
     // Run AI analysis if available
     let analysisWithAI = analysisData;

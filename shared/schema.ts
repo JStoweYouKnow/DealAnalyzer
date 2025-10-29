@@ -1,6 +1,17 @@
 import { z } from "zod";
 import { createInsertSchema } from "drizzle-zod";
 
+// Funding source types with associated down payment percentages
+export const fundingSourceSchema = z.enum(['conventional', 'fha', 'va', 'dscr', 'cash']);
+
+export const FUNDING_SOURCE_DOWN_PAYMENTS = {
+  conventional: 0.05,  // 5%
+  fha: 0.035,          // 3.5%
+  va: 0.00,            // 0%
+  dscr: 0.20,          // 20%
+  cash: 0.00,          // 0% (no mortgage)
+} as const;
+
 // Property data schema
 export const propertySchema = z.object({
   id: z.string().optional(),
@@ -24,6 +35,8 @@ export const propertySchema = z.object({
     type: z.enum(['listing', 'company', 'external', 'other']),
     description: z.string().optional(),
   })).optional(),
+  // Funding source
+  fundingSource: fundingSourceSchema.optional().default('conventional'),
   // Short-term rental metrics
   adr: z.number().optional(), // Average Daily Rate
   occupancyRate: z.number().optional(), // As decimal (0.75 = 75%)
@@ -104,6 +117,7 @@ export const dealAnalysisSchema = z.object({
 // API request/response schemas
 export const analyzePropertyRequestSchema = z.object({
   emailContent: z.string().min(1, "Email content is required"),
+  fundingSource: fundingSourceSchema.optional().default('conventional'),
   strMetrics: z.object({
     adr: z.number().optional(),
     occupancyRate: z.number().optional(),
@@ -249,6 +263,7 @@ export const emailMonitoringResponseSchema = z.object({
 });
 
 // Export types
+export type FundingSource = z.infer<typeof fundingSourceSchema>;
 export type Property = z.infer<typeof propertySchema>;
 export type AIAnalysis = z.infer<typeof aiAnalysisSchema>;
 export type DealAnalysis = z.infer<typeof dealAnalysisSchema>;
