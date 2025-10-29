@@ -10,6 +10,7 @@ import { QuickCompare } from "@/components/quick-compare";
 import { RecentAnalyses } from "@/components/recent-analyses";
 import { Reports } from "@/components/reports";
 import { LoadingState } from "@/components/loading-state";
+import { MortgageCalculator } from "@/components/mortgage-calculator";
 import { useToast } from "@/hooks/use-toast";
 import { useComparison } from "@/hooks/use-comparison";
 import type { AnalyzePropertyResponse, DealAnalysis, CriteriaResponse } from "@shared/schema";
@@ -146,13 +147,14 @@ export default function HomePage() {
       <div className="section-divider"></div>
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
-        {/* Left Panel - File Upload */}
-        <div className="xl:col-span-2">
+        {/* Left Panel - File Upload & Tools */}
+        <div className="xl:col-span-2 space-y-6">
           <AnalyzerForm 
             onAnalyze={handleAnalyze}
             isLoading={analysisMutation.isPending}
             data-testid="analyzer-form"
           />
+          <MortgageCalculator />
         </div>
 
         {/* Right Panel - Analysis Results */}

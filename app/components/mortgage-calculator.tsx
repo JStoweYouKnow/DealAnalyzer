@@ -1,0 +1,273 @@
+"use client";
+
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
+
+interface MortgageCalculatorResult {
+  monthly_payment: number;
+  total_interest_paid: number;
+  total_paid: number;
+  payback_period_years?: number;
+  payback_period_months?: number;
+}
+
+export function MortgageCalculator() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<MortgageCalculatorResult | null>(null);
+  
+  const [loanAmount, setLoanAmount] = useState("");
+  const [interestRate, setInterestRate] = useState("");
+  const [durationYears, setDurationYears] = useState("30");
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  const handleCalculate = async () => {
+    if (!loanAmount || !interestRate || !durationYears) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const loan = parseFloat(loanAmount);
+    const rate = parseFloat(interestRate);
+    const years = parseFloat(durationYears);
+
+    if (isNaN(loan) || loan <= 0) {
+      toast({
+        title: "Invalid Loan Amount",
+        description: "Loan amount must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(rate) || rate < 0) {
+      toast({
+        title: "Invalid Interest Rate",
+        description: "Interest rate must be 0 or greater",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(years) || years <= 0) {
+      toast({
+        title: "Invalid Duration",
+        description: "Duration must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/mortgage-calculator', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          loan_amount: loan,
+          interest_rate: rate,
+          duration_years: years,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to calculate mortgage');
+      }
+
+      if (data.success) {
+        setResult(data.data);
+      } else {
+        throw new Error(data.error || 'Calculation failed');
+      }
+    } catch (error) {
+      console.error('Error calculating mortgage:', error);
+      toast({
+        title: "Calculation Error",
+        description: error instanceof Error ? error.message : "Failed to calculate mortgage payment",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setLoanAmount("");
+    setInterestRate("");
+    setDurationYears("30");
+    setResult(null);
+  };
+
+  return (
+    <Card className="analysis-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <i className="fas fa-calculator"></i>
+          Mortgage Calculator
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="loan-amount">Loan Amount ($)</Label>
+            <Input
+              id="loan-amount"
+              type="number"
+              placeholder="e.g., 200000"
+              value={loanAmount}
+              onChange={(e) => setLoanAmount(e.target.value)}
+              min="0"
+              step="1000"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="interest-rate">Interest Rate (%)</Label>
+            <Input
+              id="interest-rate"
+              type="number"
+              placeholder="e.g., 3.5"
+              value={interestRate}
+              onChange={(e) => setInterestRate(e.target.value)}
+              min="0"
+              step="0.1"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="duration">Loan Term (years)</Label>
+            <Input
+              id="duration"
+              type="number"
+              placeholder="e.g., 30"
+              value={durationYears}
+              onChange={(e) => setDurationYears(e.target.value)}
+              min="1"
+              step="1"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            onClick={handleCalculate}
+            disabled={loading}
+            className="flex-1"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Calculating...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-calculator mr-2"></i>
+                Calculate
+              </>
+            )}
+          </Button>
+          {result && (
+            <Button
+              onClick={handleReset}
+              variant="outline"
+            >
+              Reset
+            </Button>
+          )}
+        </div>
+
+        {result && (
+          <div className="mt-6 p-4 bg-muted rounded-lg space-y-3">
+            <h4 className="font-semibold text-lg mb-4">Payment Breakdown</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Monthly Payment</p>
+                <p className="text-2xl font-bold text-primary">
+                  {formatCurrency(result.monthly_payment)}
+                </p>
+              </div>
+              
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Total Interest Paid</p>
+                <p className="text-xl font-semibold">
+                  {formatCurrency(result.total_interest_paid)}
+                </p>
+              </div>
+              
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Total Amount Paid</p>
+                <p className="text-xl font-semibold">
+                  {formatCurrency(result.total_paid)}
+                </p>
+              </div>
+              
+              {result.payback_period_years && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Loan Term</p>
+                  <p className="text-xl font-semibold">
+                    {result.payback_period_years} years
+                    {result.payback_period_months && (
+                      <span className="text-sm text-muted-foreground ml-1">
+                        ({result.payback_period_months} months)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Interest vs Principal Visualization */}
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground mb-2">Payment Breakdown</p>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Principal</span>
+                  <span className="font-semibold">{formatCurrency(result.total_paid - result.total_interest_paid)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Interest</span>
+                  <span className="font-semibold">{formatCurrency(result.total_interest_paid)}</span>
+                </div>
+                <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-primary h-full transition-all"
+                    style={{
+                      width: `${((result.total_paid - result.total_interest_paid) / result.total_paid) * 100}%`
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Principal: {(((result.total_paid - result.total_interest_paid) / result.total_paid) * 100).toFixed(1)}%</span>
+                  <span>Interest: {((result.total_interest_paid / result.total_paid) * 100).toFixed(1)}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
