@@ -171,7 +171,8 @@ export class ImportExportService {
       purchasePrice: data.purchasePrice,
       monthlyRent: data.monthlyRent,
       description: data.notes || 'Imported from BiggerPockets',
-      listingUrl: ''
+      listingUrl: '',
+      fundingSource: 'conventional' // Default to conventional for BiggerPockets imports
     };
   }
   
