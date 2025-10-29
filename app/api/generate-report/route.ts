@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
             const mortgageRate = await getMortgageRate({
               loan_term: 30,
               loan_amount: loanAmount,
-              zip_code: propertyData.zip_code || propertyData.zipCode || emailDeal.extractedProperty?.zipCode,
+              zip_code: propertyData.zip_code || propertyData.zipCode,
             });
             
             // Create analysis
