@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../server/storage";
 import { generateReportBuffer } from "../../../server/report-generator";
+import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,8 +81,10 @@ export async function POST(request: NextRequest) {
             // Fetch mortgage rate
             const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || emailDeal.extractedProperty?.price || 0;
             // fundingSource is in propertyData after merge, or default to 'conventional'
-            const fundingSource = propertyData.fundingSource || propertyData.funding_source || 'conventional';
-            const downpayment = purchasePrice * 0.2;
+            const propertyFundingSource = propertyData.fundingSource || propertyData.funding_source || 'conventional';
+            // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
+            const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS];
+            const downpayment = purchasePrice * downpaymentPercentage;
             const loanAmount = purchasePrice - downpayment;
             const mortgageRate = await getMortgageRate({
               loan_term: 30,
@@ -90,7 +93,7 @@ export async function POST(request: NextRequest) {
             });
             
             // Create analysis
-            const analysis = analyzeProperty(propertyData, strMetrics, undefined, fundingSource, mortgageRate);
+            const analysis = analyzeProperty(propertyData, strMetrics, undefined, propertyFundingSource, mortgageRate);
             
             // Add deal identifier
             analysis.propertyId = dealId;

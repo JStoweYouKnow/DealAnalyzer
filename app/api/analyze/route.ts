@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzePropertyRequestSchema } from "../../../shared/schema";
+import { analyzePropertyRequestSchema, FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
 import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
 import { storage } from "../../../server/storage";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
 
     // Fetch current mortgage rate (fallback to 7% on error)
     const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
-    const downpayment = purchasePrice * 0.2; // Approximate for rate lookup
+    // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
+    const propertyFundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
+    const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS];
+    const downpayment = purchasePrice * downpaymentPercentage;
     const loanAmount = purchasePrice - downpayment;
     const mortgageRate = await getMortgageRate({
       loan_term: 30,
@@ -36,7 +39,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Run TypeScript analysis
-    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, fundingSource, mortgageRate);
+    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, propertyFundingSource, mortgageRate);
     
     // Run AI analysis if available
     let analysisWithAI = analysisData;
