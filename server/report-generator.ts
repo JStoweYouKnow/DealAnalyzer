@@ -174,7 +174,7 @@ async function generateCSVBuffer(data: ReportData, options: ReportOptions): Prom
   const headers = Object.keys(csvData[0] || {});
   const csvRows = [
     headers.join(','), // Header row
-    ...csvData.map(row => headers.map(header => JSON.stringify(row[header])).join(','))
+    ...csvData.map(row => headers.map(header => JSON.stringify(row[header as keyof typeof row])).join(','))
   ];
   const csvContent = csvRows.join('\n');
   
