@@ -98,53 +98,81 @@ async function generatePDFReport(data: ReportData, options: ReportOptions, baseF
 }
 
 async function makePDF(html: string): Promise<Buffer | null> {
+  console.log("Starting PDF generation, NODE_ENV:", process.env.NODE_ENV);
+  
   // Initiate the browser instance
   let browser: Browser | undefined | null;
 
   // Check if the environment is development
   if (process.env.NODE_ENV !== "development") {
-    // Import the packages required on production
-    const chromium = require("@sparticuz/chromium-min");
-    const puppeteer = require("puppeteer-core");
+    console.log("Using Vercel-compatible Puppeteer");
+    try {
+      // Import the packages required on production
+      const chromium = require("@sparticuz/chromium-min");
+      const puppeteer = require("puppeteer-core");
 
-    // Assign the browser instance
-    browser = await puppeteer.launch({
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true,
-      defaultViewport: chromium.defaultViewport,
-      args: [...chromium.args, "--hide-scrollbars", "--disable-web-security"],
-    });
+      // Assign the browser instance
+      browser = await puppeteer.launch({
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+        ignoreHTTPSErrors: true,
+        defaultViewport: chromium.defaultViewport,
+        args: [...chromium.args, "--hide-scrollbars", "--disable-web-security"],
+      });
+      console.log("Browser launched successfully");
+    } catch (error) {
+      console.error("Error launching browser:", error);
+      throw error;
+    }
   } else {
-    // Else, use the full version of puppeteer
-    const puppeteer = require("puppeteer");
-    browser = await puppeteer.launch({
-      headless: "new",
-    });
+    console.log("Using local Puppeteer");
+    try {
+      // Else, use the full version of puppeteer
+      const puppeteer = require("puppeteer");
+      browser = await puppeteer.launch({
+        headless: "new",
+      });
+      console.log("Browser launched successfully");
+    } catch (error) {
+      console.error("Error launching browser:", error);
+      throw error;
+    }
   }
 
-  // Create a PDF
-  if (browser) {
-    const page = await browser.newPage();
-    await page.setContent(html);
+  try {
+    // Create a PDF
+    if (browser) {
+      console.log("Creating new page");
+      const page = await browser.newPage();
+      console.log("Setting page content");
+      await page.setContent(html);
 
-    const pdfBuffer = await page.pdf({
-      format: "a4",
-      printBackground: true,
-      margin: {
-        top: 80,
-        bottom: 80,
-        left: 80,
-        right: 80,
-      },
-    });
+      console.log("Generating PDF");
+      const pdfBuffer = await page.pdf({
+        format: "a4",
+        printBackground: true,
+        margin: {
+          top: 80,
+          bottom: 80,
+          left: 80,
+          right: 80,
+        },
+      });
 
-    await browser.close();
+      console.log("PDF generated, buffer size:", pdfBuffer.length);
+      await browser.close();
 
-    return pdfBuffer as Buffer;
+      return pdfBuffer as Buffer;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error during PDF generation:", error);
+    if (browser) {
+      await browser.close();
+    }
+    throw error;
   }
-
-  return null;
 }
 
 async function generateCSVBuffer(data: ReportData, options: ReportOptions): Promise<Buffer> {

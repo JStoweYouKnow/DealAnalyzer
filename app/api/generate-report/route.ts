@@ -52,12 +52,16 @@ export async function POST(request: NextRequest) {
     };
 
     // Generate the report buffer (no file system needed)
+    console.log("Generating report with format:", options.format);
     const result = await generateReportBuffer(reportData, options);
+    console.log("Report generated, buffer size:", result.buffer.length);
     
     return new NextResponse(result.buffer, {
+      status: 200,
       headers: {
         'Content-Disposition': `attachment; filename="${result.fileName}"`,
         'Content-Type': result.contentType,
+        'Content-Length': result.buffer.length.toString(),
       },
     });
   } catch (error) {
