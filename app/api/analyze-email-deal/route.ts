@@ -25,7 +25,29 @@ export async function POST(request: NextRequest) {
 
     // Parse and analyze the email content using TypeScript
     const propertyData = parseEmailContent(emailContent);
-    const analysisData = analyzeProperty(propertyData);
+    
+    // Merge extracted property data from emailDeal
+    if (emailDeal.extractedProperty) {
+      Object.assign(propertyData, emailDeal.extractedProperty);
+    }
+    
+    // Prepare STR metrics if available
+    // Convert occupancy rate from percentage (0-100) to decimal (0-1) if needed
+    let occupancyRate = emailDeal.extractedProperty?.occupancyRate;
+    if (occupancyRate !== undefined && occupancyRate > 1) {
+      // If it's stored as percentage (e.g., 74), convert to decimal (0.74)
+      occupancyRate = occupancyRate / 100;
+    }
+    
+    const strMetrics = emailDeal.extractedProperty?.adr || occupancyRate
+      ? {
+          adr: emailDeal.extractedProperty?.adr,
+          occupancyRate: occupancyRate,
+          monthlyRent: emailDeal.extractedProperty?.monthlyRent
+        }
+      : undefined;
+    
+    const analysisData = analyzeProperty(propertyData, strMetrics);
 
     // Run AI analysis if available
     let analysisWithAI = analysisData;

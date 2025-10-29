@@ -135,7 +135,36 @@ export function analyzeProperty(
 
   // Use provided data or default values
   const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
-  const monthlyRent = strMetrics?.monthlyRent || propertyData.monthly_rent || propertyData.monthlyRent || 0;
+  
+  // Calculate monthly rent: if STR metrics are provided, calculate from ADR and occupancy
+  let monthlyRent = strMetrics?.monthlyRent || propertyData.monthly_rent || propertyData.monthlyRent || 0;
+  
+  // Normalize occupancy rate from strMetrics (convert percentage to decimal if needed)
+  let strOccupancyRate = strMetrics?.occupancyRate;
+  if (strOccupancyRate !== undefined && strOccupancyRate > 1) {
+    strOccupancyRate = strOccupancyRate / 100;
+  }
+  
+  const hasSTRData = strMetrics?.adr && strOccupancyRate;
+  
+  // If STR data is available, calculate monthly income from ADR and occupancy
+  if (hasSTRData && (!monthlyRent || monthlyRent === 0)) {
+    monthlyRent = (strMetrics.adr! * 30 * (strOccupancyRate || 0));
+  }
+  
+  // Also use ADR and occupancy from propertyData if available
+  const adr = strMetrics?.adr || propertyData.adr || 0;
+  // Use normalized strOccupancyRate if available, otherwise get from propertyData
+  let occupancyRate = strOccupancyRate !== undefined ? strOccupancyRate : (propertyData.occupancyRate || propertyData.occupancy_rate || 0);
+  
+  // Convert occupancy rate from percentage to decimal if needed (if from propertyData)
+  if (occupancyRate > 1) {
+    occupancyRate = occupancyRate / 100;
+  }
+  
+  if (adr > 0 && occupancyRate > 0 && (!monthlyRent || monthlyRent === 0)) {
+    monthlyRent = adr * 30 * occupancyRate;
+  }
 
   // Financial Calculations
   const downpaymentPercentage = criteria.downpayment_percentage_min;
@@ -196,8 +225,52 @@ export function analyzeProperty(
   const capMeetsBenchmark = capRate >= criteria.cap_benchmark_min;
   const capMeetsMinimum = capRate >= criteria.cap_minimum;
 
+  // STR (Short-Term Rental) Calculations
+  let projectedAnnualRevenue: number | undefined = undefined;
+  let projectedGrossYield: number | undefined = undefined;
+  let strNetIncome: number | undefined = undefined;
+  let strMeetsCriteria: boolean | undefined = undefined;
+  
+  if (adr > 0 && occupancyRate > 0) {
+    // Calculate projected annual revenue from ADR and occupancy
+    projectedAnnualRevenue = adr * 30 * 12 * occupancyRate;
+    
+    // Calculate projected gross yield (annual revenue / purchase price)
+    projectedGrossYield = purchasePrice > 0 ? projectedAnnualRevenue / purchasePrice : 0;
+    
+    // Calculate STR net income (monthly revenue - monthly expenses)
+    strNetIncome = (projectedAnnualRevenue / 12) - totalMonthlyExpenses;
+    
+    // Check STR criteria
+    strMeetsCriteria = true;
+    if (criteria.str_adr_minimum && adr < criteria.str_adr_minimum) {
+      strMeetsCriteria = false;
+    }
+    if (criteria.str_occupancy_rate_minimum && occupancyRate < criteria.str_occupancy_rate_minimum) {
+      strMeetsCriteria = false;
+    }
+    if (criteria.str_gross_yield_minimum && projectedGrossYield < criteria.str_gross_yield_minimum) {
+      strMeetsCriteria = false;
+    }
+    if (criteria.str_annual_revenue_minimum && projectedAnnualRevenue < criteria.str_annual_revenue_minimum) {
+      strMeetsCriteria = false;
+    }
+  }
+
   // Determine if meets criteria
-  const meetsCriteria = cocMeetsBenchmark && capMeetsBenchmark && cashFlowPositive;
+  // Base criteria check
+  let meetsCriteria = (
+    purchasePrice <= criteria.max_purchase_price &&
+    passes1PercentRule &&
+    cashFlowPositive &&
+    cocMeetsMinimum &&
+    capMeetsMinimum
+  );
+  
+  // If STR data is available, also check STR criteria
+  if (strMeetsCriteria !== undefined) {
+    meetsCriteria = meetsCriteria && strMeetsCriteria;
+  }
 
   return {
     propertyId: propertyData.id || `temp-${Date.now()}`,
@@ -215,8 +288,8 @@ export function analyzeProperty(
       yearBuilt: propertyData.year_built || propertyData.yearBuilt,
       description: propertyData.description,
       listingUrl: propertyData.listing_url || propertyData.listingUrl,
-      adr: strMetrics?.adr,
-      occupancyRate: strMetrics?.occupancyRate,
+      adr: adr || strMetrics?.adr || propertyData.adr,
+      occupancyRate: occupancyRate || strMetrics?.occupancyRate || propertyData.occupancyRate || propertyData.occupancy_rate,
     },
     calculatedDownpayment,
     calculatedClosingCosts,
@@ -232,11 +305,11 @@ export function analyzeProperty(
     capRate,
     capMeetsBenchmark,
     capMeetsMinimum,
-    projectedAnnualRevenue: undefined,
-    projectedGrossYield: undefined,
+    projectedAnnualRevenue,
+    projectedGrossYield,
     totalMonthlyExpenses,
-    strNetIncome: undefined,
-    strMeetsCriteria: undefined,
+    strNetIncome,
+    strMeetsCriteria,
     meetsCriteria,
   };
 }
