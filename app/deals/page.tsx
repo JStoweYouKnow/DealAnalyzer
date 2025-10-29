@@ -257,14 +257,47 @@ export default function DealsPage() {
   // Generate report mutation
   const generateReportMutation = useMutation({
     mutationFn: async ({ analysisId, format = 'pdf' }: { analysisId: string; format?: 'pdf' | 'csv' }) => {
-      const response = await apiRequest('POST', '/api/generate-report', {
-        analysisIds: [analysisId],
-        format,
-        title: 'Property Analysis Report'
+      const response = await fetch('/api/generate-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          analysisIds: [analysisId],
+          format,
+          title: 'Property Analysis Report'
+        }),
       });
+      
+      // Check if response is OK
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Failed to generate report: ${response.status}`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      // Verify content type is correct
+      const contentType = response.headers.get('Content-Type');
+      const expectedContentType = format === 'pdf' ? 'application/pdf' : 'text/csv';
+      if (contentType && !contentType.includes(expectedContentType)) {
+        const errorText = await response.text();
+        throw new Error(`Unexpected response type: ${contentType}. Error: ${errorText}`);
+      }
       
       // Handle file download
       const blob = await response.blob();
+      
+      // Verify blob is not empty and has correct size
+      if (blob.size === 0) {
+        throw new Error('Generated report is empty');
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

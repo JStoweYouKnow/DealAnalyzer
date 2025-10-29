@@ -56,6 +56,26 @@ export async function POST(request: NextRequest) {
     const result = await generateReportBuffer(reportData, options);
     console.log("Report generated, buffer size:", result.buffer.length);
     
+    // Validate buffer is not empty
+    if (!result.buffer || result.buffer.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Generated report is empty" },
+        { status: 500 }
+      );
+    }
+    
+    // Validate PDF buffer starts with PDF magic bytes
+    if (options.format === 'pdf') {
+      const pdfHeader = result.buffer.slice(0, 4).toString('ascii');
+      if (pdfHeader !== '%PDF') {
+        console.error("Invalid PDF buffer, header:", pdfHeader);
+        return NextResponse.json(
+          { success: false, error: "Generated PDF is invalid" },
+          { status: 500 }
+        );
+      }
+    }
+    
     return new NextResponse(result.buffer, {
       status: 200,
       headers: {
