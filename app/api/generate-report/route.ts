@@ -79,7 +79,8 @@ export async function POST(request: NextRequest) {
             
             // Fetch mortgage rate
             const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || emailDeal.extractedProperty?.price || 0;
-            const fundingSource = emailDeal.extractedProperty?.fundingSource || 'conventional';
+            // fundingSource is in propertyData after merge, or default to 'conventional'
+            const fundingSource = propertyData.fundingSource || propertyData.funding_source || 'conventional';
             const downpayment = purchasePrice * 0.2;
             const loanAmount = purchasePrice - downpayment;
             const mortgageRate = await getMortgageRate({
