@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../server/storage";
-import { generateReport } from "../../../server/report-generator";
-import { writeFileSync, unlinkSync } from "fs";
+import { generateReportBuffer } from "../../../server/report-generator";
 
 export async function POST(request: NextRequest) {
-  let tempReportPath: string | null = null;
-  
   try {
     const body = await request.json();
     const { analysisIds, format, title, includeComparison } = body;
@@ -50,20 +47,13 @@ export async function POST(request: NextRequest) {
       includeComparison
     };
 
-    // Generate the report
-    const result = await generateReport(reportData, options);
-    tempReportPath = result.filePath;
-
-    // Read file and return as download
-    const fileBuffer = writeFileSync as any;
-    const fs = await import('fs');
-    const fileStream = fs.createReadStream(result.filePath);
-    const chunks: any[] = [];
+    // Generate the report buffer (no file system needed)
+    const result = await generateReportBuffer(reportData, options);
     
-    return new NextResponse(fileStream as any, {
+    return new NextResponse(result.buffer, {
       headers: {
         'Content-Disposition': `attachment; filename="${result.fileName}"`,
-        'Content-Type': format === 'pdf' ? 'application/pdf' : 'text/csv',
+        'Content-Type': result.contentType,
       },
     });
   } catch (error) {
@@ -71,15 +61,6 @@ export async function POST(request: NextRequest) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
     console.error("Error stack:", errorStack);
-    
-    // Clean up file after sending
-    if (tempReportPath) {
-      try {
-        unlinkSync(tempReportPath);
-      } catch (e) {
-        console.warn('Failed to clean up report file:', e);
-      }
-    }
     
     return NextResponse.json(
       { success: false, error: `Failed to generate report: ${errorMessage}` },

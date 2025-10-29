@@ -33,6 +33,45 @@ export async function generateReport(data: ReportData, options: ReportOptions): 
   }
 }
 
+// New function that returns buffer instead of file path (for Vercel)
+export async function generateReportBuffer(data: ReportData, options: ReportOptions): Promise<{ buffer: Buffer; fileName: string; contentType: string }> {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const baseFileName = `${options.title.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}`;
+  
+  if (options.format === 'pdf') {
+    try {
+      const htmlContent = generateHTMLReport(data, options);
+      const pdfBuffer = await makePDF(htmlContent);
+      
+      if (!pdfBuffer) {
+        throw new Error('Failed to generate PDF');
+      }
+      
+      return {
+        buffer: pdfBuffer,
+        fileName: `${baseFileName}.pdf`,
+        contentType: 'application/pdf'
+      };
+    } catch (error) {
+      console.warn('PDF generation failed, falling back to CSV:', error);
+      // Fallback to CSV if PDF fails
+      const csvBuffer = await generateCSVBuffer(data, options);
+      return {
+        buffer: csvBuffer,
+        fileName: `${baseFileName}.csv`,
+        contentType: 'text/csv'
+      };
+    }
+  } else {
+    const csvBuffer = await generateCSVBuffer(data, options);
+    return {
+      buffer: csvBuffer,
+      fileName: `${baseFileName}.csv`,
+      contentType: 'text/csv'
+    };
+  }
+}
+
 async function generatePDFReport(data: ReportData, options: ReportOptions, baseFileName: string): Promise<{ filePath: string; fileName: string }> {
   const fileName = `${baseFileName}.pdf`;
   const filePath = path.join('temp_uploads', fileName);
@@ -106,6 +145,40 @@ async function makePDF(html: string): Promise<Buffer | null> {
   }
 
   return null;
+}
+
+async function generateCSVBuffer(data: ReportData, options: ReportOptions): Promise<Buffer> {
+  // Prepare CSV data
+  const csvData = data.analyses.map((analysis, index) => ({
+    'Property #': index + 1,
+    'Address': analysis.property.address || 'N/A',
+    'City': analysis.property.city || 'N/A',
+    'State': analysis.property.state || 'N/A',
+    'Property Type': analysis.property.propertyType || 'N/A',
+    'Purchase Price': analysis.property.purchasePrice || 0,
+    'Monthly Rent': analysis.property.monthlyRent || 0,
+    'Bedrooms': analysis.property.bedrooms || 'N/A',
+    'Bathrooms': analysis.property.bathrooms || 'N/A',
+    'Square Footage': analysis.property.squareFootage || 'N/A',
+    'Year Built': analysis.property.yearBuilt || 'N/A',
+    'Total Cash Needed': analysis.totalCashNeeded || 0,
+    'Monthly Cash Flow': analysis.cashFlow || 0,
+    'Cash-on-Cash Return (%)': ((analysis.cocReturn || 0) * 100).toFixed(2),
+    'Cap Rate (%)': ((analysis.capRate || 0) * 100).toFixed(2),
+    'Passes 1% Rule': analysis.passes1PercentRule ? 'Yes' : 'No',
+    'Meets Criteria': analysis.meetsCriteria ? 'Yes' : 'No',
+    'Analysis Date': analysis.analysisDate ? new Date(analysis.analysisDate).toLocaleDateString() : 'N/A'
+  }));
+
+  // Generate CSV as string
+  const headers = Object.keys(csvData[0] || {});
+  const csvRows = [
+    headers.join(','), // Header row
+    ...csvData.map(row => headers.map(header => JSON.stringify(row[header])).join(','))
+  ];
+  const csvContent = csvRows.join('\n');
+  
+  return Buffer.from(csvContent, 'utf-8');
 }
 
 async function generateCSVReport(data: ReportData, options: ReportOptions, baseFileName: string): Promise<{ filePath: string; fileName: string }> {
