@@ -23,12 +23,16 @@ export async function POST(request: NextRequest) {
 
     // Get analyses from storage
     const analyses: any[] = [];
+    console.log("Looking for analyses with IDs:", analysisIds);
     for (const id of analysisIds) {
+      console.log(`Looking for analysis with ID: ${id}`);
       const analysis = await storage.getDealAnalysis(id);
+      console.log(`Analysis ${id} found:`, !!analysis);
       if (analysis) {
         analyses.push(analysis);
       }
     }
+    console.log(`Found ${analyses.length} analyses out of ${analysisIds.length} requested`);
 
     if (analyses.length === 0) {
       return NextResponse.json(
