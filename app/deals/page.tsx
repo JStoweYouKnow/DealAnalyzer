@@ -256,14 +256,15 @@ export default function DealsPage() {
 
   // Generate report mutation
   const generateReportMutation = useMutation({
-    mutationFn: async ({ analysisId, format = 'pdf' }: { analysisId: string; format?: 'pdf' | 'csv' }) => {
+    mutationFn: async ({ dealId, analysisId, format = 'pdf' }: { dealId: string; analysisId?: string; format?: 'pdf' | 'csv' }) => {
       const response = await fetch('/api/generate-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          analysisIds: [analysisId],
+          // If analysisId exists, use it; otherwise use dealId
+          ...(analysisId ? { analysisIds: [analysisId] } : { dealIds: [dealId] }),
           format,
           title: 'Property Analysis Report'
         }),
@@ -902,15 +903,23 @@ export default function DealsPage() {
                       )}
 
                       {deal.analysis && (
-                        <div className="space-y-2">
-                          <Badge variant={deal.analysis.meetsCriteria ? "default" : "destructive"}>
-                            {deal.analysis.meetsCriteria ? 'Meets Criteria' : 'Does Not Meet'}
-                          </Badge>
+                        <Badge variant={deal.analysis.meetsCriteria ? "default" : "destructive"}>
+                          {deal.analysis.meetsCriteria ? 'Meets Criteria' : 'Does Not Meet'}
+                        </Badge>
+                      )}
+                      
+                      {/* Report generation buttons - available for all deals */}
+                      {(deal.analysis || deal.extractedProperty) && (
+                        <div className="flex flex-col space-y-2">
                           <div className="flex space-x-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => generateReportMutation.mutate({ analysisId: deal.analysis?.id || '', format: 'pdf' })}
+                              onClick={() => generateReportMutation.mutate({ 
+                                dealId: deal.id, 
+                                analysisId: deal.analysis?.id,
+                                format: 'pdf' 
+                              })}
                               disabled={generateReportMutation.isPending}
                               data-testid={`button-report-pdf-${deal.id}`}
                             >
@@ -920,7 +929,11 @@ export default function DealsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => generateReportMutation.mutate({ analysisId: deal.analysis?.id || '', format: 'csv' })}
+                              onClick={() => generateReportMutation.mutate({ 
+                                dealId: deal.id, 
+                                analysisId: deal.analysis?.id,
+                                format: 'csv' 
+                              })}
                               disabled={generateReportMutation.isPending}
                               data-testid={`button-report-csv-${deal.id}`}
                             >
@@ -928,6 +941,11 @@ export default function DealsPage() {
                               {generateReportMutation.isPending ? 'Generating...' : 'CSV Report'}
                             </Button>
                           </div>
+                          {!deal.analysis && deal.extractedProperty && (
+                            <p className="text-xs text-muted-foreground">
+                              Report will include extracted property data
+                            </p>
+                          )}
                         </div>
                       )}
 
