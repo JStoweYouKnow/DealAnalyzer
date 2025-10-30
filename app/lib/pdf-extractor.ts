@@ -161,6 +161,23 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
         data: buffer,
         verbosity: 0, // Suppress warnings
       });
+      
+      // Ensure GlobalWorkerOptions is set right before getText() call
+      // pdfjs-dist checks this when getText() is called
+      if (typeof globalThis !== 'undefined') {
+        const pdfjsLib = (globalThis as any).pdfjsLib;
+        if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+          if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+          }
+        }
+      }
+      
+      // Also try to ensure worker is set via setWorker before getText
+      if (pdfParseModule.PDFParse.setWorker) {
+        pdfParseModule.PDFParse.setWorker('');
+      }
+      
       const textResult = await pdfParser.getText({ max: 0 });
       pdfData = {
         text: textResult.text,
