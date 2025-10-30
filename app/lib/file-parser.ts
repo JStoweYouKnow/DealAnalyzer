@@ -38,11 +38,29 @@ export function parseTextFile(content: string): ParsedProperty {
     property.address = addressMatch[0].trim();
   }
 
-  // Extract price
-  const priceMatch = content.match(/\$\s*([0-9,]+)/);
-  if (priceMatch) {
-    property.purchase_price = parseInt(priceMatch[1].replace(/,/g, ""));
+  // Extract price - try multiple patterns (similar to Python parser)
+  const pricePatterns = [
+    /(?:Price|Purchase Price|Listing Price|Asking Price|List Price|Sale Price)[:=]?\s*\$?([\d,]+)/i,
+    /\$\s*([\d,]+)(?:\s*(?:price|list|asking|purchase))?/i,
+    /([\d,]+)\s*(?:dollars?|USD)/i,
+    /\$([\d,]+)/,
+  ];
+  
+  let purchasePrice = 0;
+  for (const pattern of pricePatterns) {
+    const priceMatch = content.match(pattern);
+    if (priceMatch) {
+      const priceStr = priceMatch[1] || priceMatch[0];
+      if (priceStr) {
+        purchasePrice = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
+        if (purchasePrice > 0) {
+          break; // Use first valid match
+        }
+      }
+    }
   }
+  
+  property.purchase_price = purchasePrice;
 
   // Extract rent
   const rentMatch = content.match(/rent[:\$]?\s*\$?([0-9,]+)/i);
@@ -109,9 +127,15 @@ export async function parseCSVFile(content: string): Promise<ParsedProperty> {
     if (headerLower.includes('city')) property.city = value;
     if (headerLower.includes('state')) property.state = value;
     if (headerLower.includes('zip')) property.zipCode = value;
-    if (headerLower.includes('price')) property.purchase_price = parseFloat(value.replace(/[^0-9.]/g, ""));
-    if (headerLower.includes('rent')) property.monthly_rent = parseFloat(value.replace(/[^0-9.]/g, ""));
-    if (headerLower.includes('bed')) property.bedrooms = parseInt(value);
+    // Check for various price column names (price, purchase_price, listing_price, etc.)
+    if (headerLower.includes('price') && !headerLower.includes('rent')) {
+      property.purchase_price = parseFloat(value.replace(/[^0-9.]/g, ""));
+    }
+    // Check for various rent column names
+    if (headerLower.includes('rent') || headerLower.includes('rental')) {
+      property.monthly_rent = parseFloat(value.replace(/[^0-9.]/g, ""));
+    }
+    if (headerLower.includes('bed') && !headerLower.includes('bath')) property.bedrooms = parseInt(value);
     if (headerLower.includes('bath')) property.bathrooms = parseFloat(value);
     if (headerLower.includes('sqft') || headerLower.includes('square')) property.square_footage = parseInt(value);
     if (headerLower.includes('year')) property.year_built = parseInt(value);
