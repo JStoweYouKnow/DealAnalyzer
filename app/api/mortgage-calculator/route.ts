@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { calculateMortgage, calculateMortgageManual, type MortgageCalculatorParams } from "../../../server/mortgage-calculator-service";
+import { calculateMortgage, calculateMortgageManual, type MortgageCalculatorParams, type MortgageCalculatorResponse } from "../../../server/mortgage-calculator-service";
 
 export async function POST(request: NextRequest) {
   try {
