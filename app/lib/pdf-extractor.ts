@@ -47,8 +47,21 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
 
     // Extract text from PDF
     console.log('Parsing PDF with unpdf...');
-    const result = await extractText(data);
-    const text = result.text;
+    const result = await extractText(data) as any;
+
+    // extractText returns an object with pages array or text string
+    // Handle both formats
+    let text: string;
+    if (result.pages && Array.isArray(result.pages)) {
+      // Join all pages into a single string
+      text = result.pages.join('\n');
+    } else if (typeof result === 'string') {
+      text = result;
+    } else if (result.text) {
+      text = result.text;
+    } else {
+      text = String(result);
+    }
 
     console.log('PDF parsed successfully:', {
       textLength: text?.length || 0,
