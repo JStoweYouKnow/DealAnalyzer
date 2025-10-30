@@ -10,15 +10,28 @@ import { extractTextFromPDF } from "../../lib/pdf-extractor";
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== Analyze File API Called ===');
+    console.log('Request headers:', Object.fromEntries(request.headers.entries()));
+    
     const formData = await request.formData();
+    console.log('FormData received, entries:', Array.from(formData.keys()));
+    
     const file = formData.get('file') as File;
     
     if (!file) {
+      console.error('No file found in formData');
       return NextResponse.json(
-        { success: false, error: "No file uploaded" },
+        { success: false, error: "No file uploaded. Please select a file and try again." },
         { status: 400 }
       );
     }
+    
+    console.log('File received:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified
+    });
 
     // Get file extension first to determine how to read it
     const originalName = file.name;
