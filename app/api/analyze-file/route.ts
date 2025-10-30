@@ -24,14 +24,28 @@ export async function POST(request: NextRequest) {
     const originalName = file.name;
     const fileExtension = originalName.substring(originalName.lastIndexOf('.')).toLowerCase();
     
+    // Validate file size (max 50MB)
+    const maxFileSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxFileSize) {
+      return NextResponse.json(
+        { success: false, error: `File size exceeds maximum allowed size of 50MB. File size: ${(file.size / 1024 / 1024).toFixed(2)}MB` },
+        { status: 400 }
+      );
+    }
+
     // Read file content directly into memory (no temp files needed for Vercel)
     // For PDFs, extract text using PDF.js; for other files, read as text
     let fileContent: string;
     try {
       if (fileExtension === '.pdf') {
-        console.log('Extracting text from PDF file...');
+        console.log(`Extracting text from PDF file: ${originalName}, size: ${file.size} bytes`);
         fileContent = await extractTextFromPDF(file);
-        console.log(`PDF text extracted - length: ${fileContent.length} characters`);
+        
+        if (!fileContent || fileContent.trim().length === 0) {
+          throw new Error('PDF extraction returned empty content. The PDF may be image-based or encrypted.');
+        }
+        
+        console.log(`PDF text extracted successfully - length: ${fileContent.length} characters`);
         console.log(`PDF text preview (first 500 chars): ${fileContent.substring(0, 500)}`);
       } else {
         fileContent = await file.text();
@@ -40,8 +54,18 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error reading/extracting file:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Full error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return NextResponse.json(
-        { success: false, error: `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}` },
+        { 
+          success: false, 
+          error: `Failed to read file: ${errorMessage}`,
+          details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
+        },
         { status: 400 }
       );
     }
