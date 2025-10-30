@@ -60,11 +60,18 @@ async function getPdfParse() {
   if (!pdfParse) {
     try {
       // Use require for CommonJS compatibility (works in Next.js serverless)
-      pdfParse = require('pdf-parse');
-    } catch {
+      const pdfParseModule = require('pdf-parse');
+      pdfParse = pdfParseModule;
+    } catch (error) {
+      console.error('Error loading pdf-parse:', error);
       // Fallback to dynamic import if require fails
-      const pdfParseModule = await import('pdf-parse');
-      pdfParse = (pdfParseModule as any).default || pdfParseModule.PDFParse || pdfParseModule;
+      try {
+        const pdfParseModule = await import('pdf-parse');
+        pdfParse = pdfParseModule;
+      } catch (importError) {
+        console.error('Error importing pdf-parse:', importError);
+        throw new Error('Failed to load pdf-parse module');
+      }
     }
   }
   return pdfParse;
@@ -110,11 +117,28 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
 
     // Parse PDF using pdf-parse
     console.log('Parsing PDF with pdf-parse...');
-    const pdfParseFn = await getPdfParse();
-    const pdfData = await pdfParseFn(buffer, {
-      // Options for better text extraction
-      max: 0, // Parse all pages (0 = unlimited)
-    });
+    const pdfParseModule = await getPdfParse();
+    
+    // pdf-parse exports PDFParse class, we need to instantiate it
+    let pdfData: any;
+    if (pdfParseModule.PDFParse) {
+      // Use PDFParse class (new API)
+      const pdfParser = new pdfParseModule.PDFParse({ data: buffer });
+      const textResult = await pdfParser.getText({ max: 0 });
+      pdfData = {
+        text: textResult.text,
+        numpages: textResult.total,
+        info: textResult.info || {},
+        metadata: textResult.metadata || {},
+      };
+    } else if (typeof pdfParseModule === 'function') {
+      // If it's a function, call it directly (legacy API)
+      pdfData = await pdfParseModule(buffer, {
+        max: 0, // Parse all pages (0 = unlimited)
+      });
+    } else {
+      throw new Error('pdf-parse module structure is unexpected - PDFParse class not found');
+    }
     
     console.log('PDF parsed successfully:', {
       pages: pdfData.numpages,
