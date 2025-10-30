@@ -69,11 +69,16 @@ export default function HomePage() {
           body: formData,
         });
         
+        const responseData = await response.json();
+        
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          // Try to extract error message from response
+          const errorMessage = responseData.error || responseData.message || `HTTP error! status: ${response.status}`;
+          const errorDetails = responseData.details || '';
+          throw new Error(errorMessage + (errorDetails ? `\n${errorDetails}` : ''));
         }
         
-        return await response.json() as Promise<AnalyzePropertyResponse>;
+        return responseData as Promise<AnalyzePropertyResponse>;
       } else {
         // Handle text input (existing functionality)
         const response = await apiRequest("POST", "/api/analyze", {
