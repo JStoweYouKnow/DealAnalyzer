@@ -165,9 +165,9 @@ export default function HomePage() {
             onAnalyze={handleAnalyze}
             isLoading={analysisMutation.isPending}
             mortgageValues={mortgageValues}
+            onMortgageCalculated={setMortgageValues}
             data-testid="analyzer-form"
           />
-          <MortgageCalculator onMortgageCalculated={setMortgageValues} />
         </div>
 
         {/* Right Panel - Analysis Results */}

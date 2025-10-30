@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 import type { FundingSource } from "../../shared/schema";
 
 interface STRMetrics {
@@ -38,15 +40,32 @@ interface AnalyzerFormProps {
   onAnalyze: (data: { file?: File; strMetrics?: STRMetrics; ltrMetrics?: LTRMetrics; monthlyExpenses?: MonthlyExpenses; fundingSource?: FundingSource; mortgageValues?: MortgageValues }) => void;
   isLoading: boolean;
   mortgageValues?: MortgageValues | null;
+  onMortgageCalculated?: (values: MortgageValues | null) => void;
 }
 
-export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues }: AnalyzerFormProps) {
+interface MortgageCalculatorResult {
+  monthly_payment: number;
+  total_interest_paid: number;
+  total_paid: number;
+  payback_period_years?: number;
+  payback_period_months?: number;
+}
+
+export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageCalculated }: AnalyzerFormProps) {
+  const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [strMetrics, setSTRMetrics] = useState<STRMetrics>({});
   const [ltrMetrics, setLTRMetrics] = useState<LTRMetrics>({});
   const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpenses>({});
   const [fundingSource, setFundingSource] = useState<FundingSource>('conventional');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Mortgage calculator state
+  const [mortgageLoading, setMortgageLoading] = useState(false);
+  const [mortgageResult, setMortgageResult] = useState<MortgageCalculatorResult | null>(null);
+  const [loanAmount, setLoanAmount] = useState("");
+  const [interestRate, setInterestRate] = useState("");
+  const [durationYears, setDurationYears] = useState("30");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +95,120 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues }: AnalyzerF
       setSelectedFile(file);
     } else {
       setSelectedFile(null);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  const handleMortgageCalculate = async () => {
+    if (!loanAmount || !interestRate || !durationYears) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all mortgage calculator fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const loan = parseFloat(loanAmount);
+    const rate = parseFloat(interestRate);
+    const years = parseFloat(durationYears);
+
+    if (isNaN(loan) || loan <= 0) {
+      toast({
+        title: "Invalid Loan Amount",
+        description: "Loan amount must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(rate) || rate < 0) {
+      toast({
+        title: "Invalid Interest Rate",
+        description: "Interest rate must be 0 or greater",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(years) || years <= 0) {
+      toast({
+        title: "Invalid Duration",
+        description: "Duration must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setMortgageLoading(true);
+    try {
+      const response = await fetch('/api/mortgage-calculator', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          loan_amount: loan,
+          interest_rate: rate,
+          duration_years: years,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to calculate mortgage');
+      }
+
+      if (data.success && data.data) {
+        if (data.data.monthly_payment === null || 
+            data.data.monthly_payment === undefined || 
+            isNaN(data.data.monthly_payment)) {
+          throw new Error('Received invalid calculation result');
+        }
+        setMortgageResult(data.data);
+        
+        // Notify parent component of calculated values
+        if (onMortgageCalculated) {
+          onMortgageCalculated({
+            loanAmount: loan,
+            interestRate: rate,
+            loanTermYears: years,
+            monthlyPayment: data.data.monthly_payment,
+          });
+        }
+      } else {
+        throw new Error(data.error || 'Calculation failed');
+      }
+    } catch (error) {
+      console.error('Error calculating mortgage:', error);
+      toast({
+        title: "Calculation Error",
+        description: error instanceof Error ? error.message : "Failed to calculate mortgage payment",
+        variant: "destructive",
+      });
+    } finally {
+      setMortgageLoading(false);
+    }
+  };
+
+  const handleMortgageReset = () => {
+    setLoanAmount("");
+    setInterestRate("");
+    setDurationYears("30");
+    setMortgageResult(null);
+    
+    // Notify parent that mortgage calculator was reset
+    if (onMortgageCalculated) {
+      onMortgageCalculated(null);
     }
   };
 
@@ -165,6 +298,118 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues }: AnalyzerF
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border/50"></div>
+
+            {/* Mortgage Calculator Section */}
+            <div>
+              <h4 className="font-semibold mb-3 text-base">Mortgage Calculator</h4>
+              <p className="text-sm text-muted-foreground mb-4">Optional - Calculate mortgage payment to use in property analysis</p>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="loan-amount" className="text-sm font-medium">Loan Amount ($)</Label>
+                    <Input
+                      id="loan-amount"
+                      type="number"
+                      placeholder="e.g., 200000"
+                      value={loanAmount}
+                      onChange={(e) => setLoanAmount(e.target.value)}
+                      min="0"
+                      step="1000"
+                      className="h-10"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="interest-rate" className="text-sm font-medium">Interest Rate (%)</Label>
+                    <Input
+                      id="interest-rate"
+                      type="number"
+                      placeholder="e.g., 3.5"
+                      value={interestRate}
+                      onChange={(e) => setInterestRate(e.target.value)}
+                      min="0"
+                      step="0.1"
+                      className="h-10"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="duration" className="text-sm font-medium">Loan Term (years)</Label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      placeholder="e.g., 30"
+                      value={durationYears}
+                      onChange={(e) => setDurationYears(e.target.value)}
+                      min="1"
+                      step="1"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleMortgageCalculate}
+                    disabled={mortgageLoading}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    {mortgageLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Calculating...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-calculator mr-2"></i>
+                        Calculate Mortgage
+                      </>
+                    )}
+                  </Button>
+                  {mortgageResult && (
+                    <Button
+                      type="button"
+                      onClick={handleMortgageReset}
+                      variant="outline"
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
+
+                {mortgageResult && (
+                  <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-sm text-blue-700 dark:text-blue-300">Monthly Payment</p>
+                        <p className="text-xl font-bold text-blue-900 dark:text-blue-100">
+                          {formatCurrency(mortgageResult.monthly_payment)}
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <p className="text-sm text-blue-700 dark:text-blue-300">Total Interest Paid</p>
+                        <p className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                          {formatCurrency(mortgageResult.total_interest_paid)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
+                      <p className="text-xs text-blue-600 dark:text-blue-400">
+                        <i className="fas fa-check-circle mr-1"></i>
+                        Mortgage values will be used in property analysis
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Divider */}
