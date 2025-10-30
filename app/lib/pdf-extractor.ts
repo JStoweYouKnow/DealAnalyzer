@@ -73,16 +73,22 @@ async function getPdfParse() {
       }
       
       // Try to access pdfjsLib through globalThis (pdf-parse sets it)
+      // setWorker() sets globalThis.pdfjs and sets ds.workerSrc internally
+      // But we need to ensure GlobalWorkerOptions.workerSrc is accessible
       if (typeof globalThis !== 'undefined') {
         const pdfjsLib = (globalThis as any).pdfjsLib;
         if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-          // Ensure workerSrc is set (setWorker should have done this, but double-check)
-          if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+          // GlobalWorkerOptions is a class/object, ensure workerSrc is set
+          const gwo = pdfjsLib.GlobalWorkerOptions;
+          if (gwo.workerSrc === undefined || gwo.workerSrc === null) {
+            gwo.workerSrc = '';
             console.log('Manually set GlobalWorkerOptions.workerSrc to empty string');
           } else {
-            console.log('GlobalWorkerOptions.workerSrc already set to:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+            console.log('GlobalWorkerOptions.workerSrc already set to:', gwo.workerSrc);
           }
+          
+          // Also try setting it explicitly one more time before use
+          gwo.workerSrc = '';
         } else {
           console.log('pdfjsLib not found on globalThis, may be accessed differently');
         }
@@ -174,18 +180,19 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
       
       // Ensure GlobalWorkerOptions is set right before getText() call
       // pdfjs-dist checks this when getText() is called
+      // Call setWorker again to ensure it's set
+      if (pdfParseModule.PDFParse.setWorker) {
+        pdfParseModule.PDFParse.setWorker('');
+      }
+      
+      // Also directly set GlobalWorkerOptions.workerSrc as backup
       if (typeof globalThis !== 'undefined') {
         const pdfjsLib = (globalThis as any).pdfjsLib;
         if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-          if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-          }
+          const gwo = pdfjsLib.GlobalWorkerOptions;
+          gwo.workerSrc = '';
+          console.log('Set GlobalWorkerOptions.workerSrc to empty string before getText()');
         }
-      }
-      
-      // Also try to ensure worker is set via setWorker before getText
-      if (pdfParseModule.PDFParse.setWorker) {
-        pdfParseModule.PDFParse.setWorker('');
       }
       
       const textResult = await pdfParser.getText({ max: 0 });
