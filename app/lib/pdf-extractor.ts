@@ -49,28 +49,56 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
     console.log('Parsing PDF with unpdf...');
     const result = await extractText(data) as any;
 
-    // extractText returns an object with pages array or text string
-    // Handle both formats - pages may be strings or objects
+    console.log('unpdf result type:', typeof result);
+    console.log('unpdf result keys:', result ? Object.keys(result) : 'null');
+    console.log('unpdf result.pages type:', result?.pages ? typeof result.pages : 'undefined');
+    console.log('unpdf result.pages isArray:', result?.pages ? Array.isArray(result.pages) : false);
+
+    // extractText returns different formats depending on unpdf version
+    // Handle all possible formats
     let text: string;
-    if (result.pages && Array.isArray(result.pages)) {
-      // Pages might be strings or objects with text property
-      text = result.pages
-        .map((page: any) => {
-          if (typeof page === 'string') {
-            return page;
-          } else if (page && typeof page === 'object' && page.text) {
-            return page.text;
-          } else if (page && typeof page === 'object' && page.content) {
-            return page.content;
-          }
-          return String(page);
-        })
-        .join('\n');
-    } else if (typeof result === 'string') {
+
+    // Check if result is directly a string
+    if (typeof result === 'string') {
+      console.log('Result is string, length:', result.length);
       text = result;
-    } else if (result.text) {
-      text = result.text;
-    } else {
+    }
+    // Check if result has pages property that is an array
+    else if (result && result.pages && Array.isArray(result.pages)) {
+      console.log('Result has pages array, length:', result.pages.length);
+      console.log('First page type:', result.pages[0] ? typeof result.pages[0] : 'empty');
+
+      // Map over pages safely
+      const pageTexts: string[] = [];
+      for (let i = 0; i < result.pages.length; i++) {
+        const page = result.pages[i];
+        if (typeof page === 'string') {
+          pageTexts.push(page);
+        } else if (page && typeof page === 'object') {
+          // Try different text properties
+          if (typeof page.text === 'string') {
+            pageTexts.push(page.text);
+          } else if (typeof page.content === 'string') {
+            pageTexts.push(page.content);
+          } else if (typeof page.str === 'string') {
+            pageTexts.push(page.str);
+          } else {
+            pageTexts.push(JSON.stringify(page));
+          }
+        } else {
+          pageTexts.push(String(page));
+        }
+      }
+      text = pageTexts.join('\n');
+    }
+    // Check if result has text property
+    else if (result && result.text) {
+      console.log('Result has text property, type:', typeof result.text);
+      text = typeof result.text === 'string' ? result.text : String(result.text);
+    }
+    // Fallback to stringifying the result
+    else {
+      console.log('Fallback: converting result to string');
       text = String(result);
     }
 
