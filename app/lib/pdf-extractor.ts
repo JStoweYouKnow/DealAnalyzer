@@ -119,11 +119,22 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
     console.log('Parsing PDF with pdf-parse...');
     const pdfParseModule = await getPdfParse();
     
+    // Configure PDFParse to disable workers (required for serverless)
+    if (pdfParseModule.PDFParse && typeof pdfParseModule.PDFParse.setWorker === 'function') {
+      // Set worker to empty string to disable worker (use main thread)
+      pdfParseModule.PDFParse.setWorker('');
+      console.log('PDFParse worker disabled for serverless environment');
+    }
+    
     // pdf-parse exports PDFParse class, we need to instantiate it
     let pdfData: any;
     if (pdfParseModule.PDFParse) {
       // Use PDFParse class (new API)
-      const pdfParser = new pdfParseModule.PDFParse({ data: buffer });
+      // Disable verbosity to reduce errors
+      const pdfParser = new pdfParseModule.PDFParse({ 
+        data: buffer,
+        verbosity: 0, // Suppress warnings
+      });
       const textResult = await pdfParser.getText({ max: 0 });
       pdfData = {
         text: textResult.text,
