@@ -50,11 +50,22 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
     const result = await extractText(data) as any;
 
     // extractText returns an object with pages array or text string
-    // Handle both formats
+    // Handle both formats - pages may be strings or objects
     let text: string;
     if (result.pages && Array.isArray(result.pages)) {
-      // Join all pages into a single string
-      text = result.pages.join('\n');
+      // Pages might be strings or objects with text property
+      text = result.pages
+        .map((page: any) => {
+          if (typeof page === 'string') {
+            return page;
+          } else if (page && typeof page === 'object' && page.text) {
+            return page.text;
+          } else if (page && typeof page === 'object' && page.content) {
+            return page.content;
+          }
+          return String(page);
+        })
+        .join('\n');
     } else if (typeof result === 'string') {
       text = result;
     } else if (result.text) {
