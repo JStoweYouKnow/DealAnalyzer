@@ -1,6 +1,16 @@
 // PDF text extraction using pdf-parse (no workers required)
 // Simplified implementation for serverless compatibility
 
+// Type declaration for pdf-parse
+type PdfParseFunction = (dataBuffer: Buffer, options?: { max?: number; version?: string }) => Promise<{
+  numpages: number;
+  numrender: number;
+  info: any;
+  metadata: any;
+  text: string;
+  version: string;
+}>;
+
 export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Promise<string> {
   try {
     console.log('Starting PDF extraction with pdf-parse...');
@@ -27,7 +37,7 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
     }
 
     // Check PDF magic bytes
-    const firstBytes = buffer.slice(0, 4);
+    const firstBytes = buffer.subarray(0, 4);
     const pdfMagicBytes = Buffer.from([0x25, 0x50, 0x44, 0x46]); // %PDF
     const isPDF = firstBytes.equals(pdfMagicBytes);
 
@@ -42,7 +52,8 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
 
     // Import pdf-parse dynamically
     console.log('Importing pdf-parse...');
-    const pdfParse = (await import('pdf-parse')).default;
+    // pdf-parse exports as CommonJS, need to use require for Node.js compatibility
+    const pdfParse = require('pdf-parse') as PdfParseFunction;
     console.log('pdf-parse imported successfully');
 
     // Parse PDF
