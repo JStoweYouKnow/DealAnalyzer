@@ -64,17 +64,27 @@ async function getPdfParse() {
       
       // Configure worker before using PDFParse
       // pdf-parse uses pdfjs-dist internally, need to set GlobalWorkerOptions
+      // Call setWorker BEFORE any PDFParse instances are created
       if (pdfParseModule.PDFParse && typeof pdfParseModule.PDFParse.setWorker === 'function') {
         // Set worker to empty string to disable worker (use main thread)
-        pdfParseModule.PDFParse.setWorker('');
+        // This internally sets GlobalWorkerOptions.workerSrc
+        const workerResult = pdfParseModule.PDFParse.setWorker('');
+        console.log('PDFParse.setWorker("") called, result:', workerResult);
       }
       
-      // Also try to access pdfjsLib if it's exposed
+      // Try to access pdfjsLib through globalThis (pdf-parse sets it)
       if (typeof globalThis !== 'undefined') {
-        // Check if pdfjsLib is available globally (pdf-parse might set it)
         const pdfjsLib = (globalThis as any).pdfjsLib;
         if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+          // Ensure workerSrc is set (setWorker should have done this, but double-check)
+          if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+            console.log('Manually set GlobalWorkerOptions.workerSrc to empty string');
+          } else {
+            console.log('GlobalWorkerOptions.workerSrc already set to:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+          }
+        } else {
+          console.log('pdfjsLib not found on globalThis, may be accessed differently');
         }
       }
       
