@@ -1,7 +1,23 @@
 // PDF text extraction utility using pdf-parse (no workers required)
 // This is a simpler alternative to pdfjs-dist that works better in serverless environments
 
-import pdfParse from 'pdf-parse';
+// pdf-parse exports PDFParse class, but we use dynamic require for compatibility
+let pdfParse: any;
+
+// Initialize pdf-parse dynamically (handles both ESM and CJS)
+async function getPdfParse() {
+  if (!pdfParse) {
+    try {
+      // Try ESM import first
+      const pdfParseModule = await import('pdf-parse');
+      pdfParse = pdfParseModule.default || pdfParseModule.PDFParse || pdfParseModule;
+    } catch {
+      // Fallback to require for CommonJS
+      pdfParse = require('pdf-parse');
+    }
+  }
+  return pdfParse;
+}
 
 export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Promise<string> {
   try {
@@ -43,7 +59,8 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
 
     // Parse PDF using pdf-parse
     console.log('Parsing PDF with pdf-parse...');
-    const pdfData = await pdfParse(buffer, {
+    const pdfParseFn = await getPdfParse();
+    const pdfData = await pdfParseFn(buffer, {
       // Options for better text extraction
       max: 0, // Parse all pages (0 = unlimited)
     });
