@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FundingSource } from "../../shared/schema";
@@ -97,257 +96,258 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues }: AnalyzerF
         </CardHeader>
         
         <CardContent className="p-6 pt-6">
-          <form onSubmit={handleSubmit}>
-            <Tabs defaultValue="input" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 gap-2">
-                <TabsTrigger value="input">Upload File</TabsTrigger>
-                <TabsTrigger value="str">STR Metrics</TabsTrigger>
-                <TabsTrigger value="ltr">Monthly Rent</TabsTrigger>
-                <TabsTrigger value="expenses">Expenses</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="input" className="space-y-6 mt-6">
-                <div>
-                  <Label htmlFor="file-upload" className="text-base font-semibold mb-3 block">Upload Property Data File</Label>
-                  <div className="space-y-5">
-                    <div className="relative">
-                      <Input
-                        ref={fileInputRef}
-                        id="file-upload"
-                        type="file"
-                        accept=".pdf,.csv,.txt,.xlsx,.xls"
-                        onChange={handleFileChange}
-                        className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                        data-testid="input-file-upload"
-                      />
-                    </div>
-
-                    {selectedFile && (
-                      <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3 flex items-center space-x-2">
-                        <i className="fas fa-file text-green-600"></i>
-                        <span className="font-medium text-green-800 dark:text-green-200 text-sm truncate">
-                          {selectedFile.name}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* File Upload Section */}
+            <div>
+              <Label htmlFor="file-upload" className="text-base font-semibold mb-3 block">Upload Property Data File</Label>
+              <div className="space-y-5">
+                <div className="relative">
+                  <Input
+                    ref={fileInputRef}
+                    id="file-upload"
+                    type="file"
+                    accept=".pdf,.csv,.txt,.xlsx,.xls"
+                    onChange={handleFileChange}
+                    className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                    data-testid="input-file-upload"
+                  />
                 </div>
 
-                <div className="pt-4">
-                  <Label htmlFor="funding-source" className="text-base font-semibold mb-3 block">Funding Source</Label>
-                  <Select
-                    value={fundingSource}
-                    onValueChange={(value) => setFundingSource(value as FundingSource)}
-                  >
-                    <SelectTrigger id="funding-source" className="h-10" data-testid="select-funding-source">
-                      <SelectValue placeholder="Select funding source" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="conventional">Conventional (5% down)</SelectItem>
-                      <SelectItem value="fha">FHA (3.5% down)</SelectItem>
-                      <SelectItem value="va">VA (0% down)</SelectItem>
-                      <SelectItem value="dscr">DSCR (20% down)</SelectItem>
-                      <SelectItem value="cash">Cash (100% down)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {fundingSource === 'conventional' && 'Conventional loans require 5% down payment'}
-                    {fundingSource === 'fha' && 'FHA loans require 3.5% down payment'}
-                    {fundingSource === 'va' && 'VA loans require 0% down payment (for qualified veterans)'}
-                    {fundingSource === 'dscr' && 'DSCR (Debt Service Coverage Ratio) loans require 20% down payment'}
-                    {fundingSource === 'cash' && 'Cash purchase - no mortgage payment'}
-                  </p>
-                  {mortgageValues && (
-                    <div className="mt-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <i className="fas fa-info-circle text-blue-600 dark:text-blue-400"></i>
-                        <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                          Using Mortgage Calculator Values
-                        </p>
-                      </div>
-                      <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                        <p>Loan Amount: ${mortgageValues.loanAmount.toLocaleString()}</p>
-                        <p>Interest Rate: {mortgageValues.interestRate}% ({mortgageValues.loanTermYears} years)</p>
-                        <p>Monthly Payment: ${mortgageValues.monthlyPayment.toFixed(2)}</p>
-                        <p className="mt-1 italic">Down payment will be calculated from purchase price - loan amount</p>
-                      </div>
+                {selectedFile && (
+                  <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3 flex items-center space-x-2">
+                    <i className="fas fa-file text-green-600"></i>
+                    <span className="font-medium text-green-800 dark:text-green-200 text-sm truncate">
+                      {selectedFile.name}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Funding Source Section */}
+            <div>
+              <Label htmlFor="funding-source" className="text-base font-semibold mb-3 block">Funding Source</Label>
+              <Select
+                value={fundingSource}
+                onValueChange={(value) => setFundingSource(value as FundingSource)}
+              >
+                <SelectTrigger id="funding-source" className="h-10" data-testid="select-funding-source">
+                  <SelectValue placeholder="Select funding source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="conventional">Conventional (5% down)</SelectItem>
+                  <SelectItem value="fha">FHA (3.5% down)</SelectItem>
+                  <SelectItem value="va">VA (0% down)</SelectItem>
+                  <SelectItem value="dscr">DSCR (20% down)</SelectItem>
+                  <SelectItem value="cash">Cash (100% down)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground mt-2">
+                {fundingSource === 'conventional' && 'Conventional loans require 5% down payment'}
+                {fundingSource === 'fha' && 'FHA loans require 3.5% down payment'}
+                {fundingSource === 'va' && 'VA loans require 0% down payment (for qualified veterans)'}
+                {fundingSource === 'dscr' && 'DSCR (Debt Service Coverage Ratio) loans require 20% down payment'}
+                {fundingSource === 'cash' && 'Cash purchase - no mortgage payment'}
+              </p>
+              {mortgageValues && (
+                <div className="mt-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <i className="fas fa-info-circle text-blue-600 dark:text-blue-400"></i>
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                      Using Mortgage Calculator Values
+                    </p>
+                  </div>
+                  <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                    <p>Loan Amount: ${mortgageValues.loanAmount.toLocaleString()}</p>
+                    <p>Interest Rate: {mortgageValues.interestRate}% ({mortgageValues.loanTermYears} years)</p>
+                    <p>Monthly Payment: ${mortgageValues.monthlyPayment.toFixed(2)}</p>
+                    <p className="mt-1 italic">Down payment will be calculated from purchase price - loan amount</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border/50"></div>
+
+            {/* Rental Income Section */}
+            <div>
+              <h4 className="font-semibold mb-3 text-base">Rental Income</h4>
+              <p className="text-sm text-muted-foreground mb-4">Choose one: Short-term rental metrics or monthly rent amount</p>
+              
+              {/* Short-Term Rental Metrics */}
+              <div className="mb-6">
+                <Label className="text-sm font-medium mb-3 block">Short-Term Rental (Optional)</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="adr" className="text-sm font-medium">Average Daily Rate (ADR)</Label>
+                    <Input
+                      id="adr"
+                      type="number"
+                      placeholder="100"
+                      value={strMetrics.adr || ""}
+                      onChange={(e) => {
+                        const adr = e.target.value ? Number(e.target.value) : undefined;
+                        const occupancy = strMetrics.occupancyRate;
+                        const monthlyRent = adr && occupancy ? adr * 30 * occupancy : undefined;
+                        setSTRMetrics(prev => ({ ...prev, adr, monthlyRent }));
+                      }}
+                      className="h-10"
+                      data-testid="input-adr"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="occupancy" className="text-sm font-medium">Occupancy Rate (%)</Label>
+                    <Input
+                      id="occupancy"
+                      type="number"
+                      placeholder="65"
+                      value={strMetrics.occupancyRate ? strMetrics.occupancyRate * 100 : ""}
+                      onChange={(e) => {
+                        const occupancyRate = e.target.value ? Number(e.target.value) / 100 : undefined;
+                        const adr = strMetrics.adr;
+                        const monthlyRent = adr && occupancyRate ? adr * 30 * occupancyRate : undefined;
+                        setSTRMetrics(prev => ({ ...prev, occupancyRate, monthlyRent }));
+                      }}
+                      className="h-10"
+                      data-testid="input-occupancy"
+                    />
+                  </div>
+                  {strMetrics.monthlyRent && (
+                    <div className="col-span-full bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3">
+                      <Label className="text-sm font-medium text-blue-800 dark:text-blue-200">Calculated Monthly Income</Label>
+                      <p className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                        ${strMetrics.monthlyRent.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                        Based on ADR × 30 days × Occupancy Rate
+                      </p>
                     </div>
                   )}
                 </div>
-              </TabsContent>
-              
-              <TabsContent value="str" className="space-y-6 mt-6">
-                <div>
-                  <h4 className="font-semibold mb-2 text-base">Short-Term Rental Metrics</h4>
-                  <p className="text-sm text-muted-foreground mb-4">Optional - ADR and occupancy for STR properties</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="adr" className="text-sm font-medium">Average Daily Rate (ADR)</Label>
-                      <Input
-                        id="adr"
-                        type="number"
-                        placeholder="100"
-                        value={strMetrics.adr || ""}
-                        onChange={(e) => {
-                          const adr = e.target.value ? Number(e.target.value) : undefined;
-                          const occupancy = strMetrics.occupancyRate;
-                          const monthlyRent = adr && occupancy ? adr * 30 * occupancy : undefined;
-                          setSTRMetrics(prev => ({ ...prev, adr, monthlyRent }));
-                        }}
-                        className="h-10"
-                        data-testid="input-adr"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="occupancy" className="text-sm font-medium">Occupancy Rate (%)</Label>
-                      <Input
-                        id="occupancy"
-                        type="number"
-                        placeholder="65"
-                        value={strMetrics.occupancyRate ? strMetrics.occupancyRate * 100 : ""}
-                        onChange={(e) => {
-                          const occupancyRate = e.target.value ? Number(e.target.value) / 100 : undefined;
-                          const adr = strMetrics.adr;
-                          const monthlyRent = adr && occupancyRate ? adr * 30 * occupancyRate : undefined;
-                          setSTRMetrics(prev => ({ ...prev, occupancyRate, monthlyRent }));
-                        }}
-                        className="h-10"
-                        data-testid="input-occupancy"
-                      />
-                    </div>
-                    {strMetrics.monthlyRent && (
-                      <div className="col-span-full bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3">
-                        <Label className="text-sm font-medium text-blue-800 dark:text-blue-200">Calculated Monthly Income</Label>
-                        <p className="text-lg font-semibold text-blue-900 dark:text-blue-100">
-                          ${strMetrics.monthlyRent.toFixed(2)}
-                        </p>
-                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                          Based on ADR × 30 days × Occupancy Rate
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="expenses" className="space-y-6 mt-6">
-                <div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="property-taxes" className="text-sm font-medium">Property Taxes</Label>
-                      <Input
-                        id="property-taxes"
-                        type="number"
-                        placeholder="Auto-calculated"
-                        value={monthlyExpenses.propertyTaxes || ""}
-                        onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, propertyTaxes: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="h-10"
-                        data-testid="input-property-taxes"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="insurance" className="text-sm font-medium">Insurance</Label>
-                      <Input
-                        id="insurance"
-                        type="number"
-                        placeholder="100"
-                        value={monthlyExpenses.insurance || ""}
-                        onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, insurance: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="h-10"
-                        data-testid="input-insurance"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="utilities" className="text-sm font-medium">Utilities</Label>
-                      <Input
-                        id="utilities"
-                        type="number"
-                        placeholder="150"
-                        value={monthlyExpenses.utilities || ""}
-                        onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, utilities: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="h-10"
-                        data-testid="input-utilities"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="management" className="text-sm font-medium">Management</Label>
-                      <Input
-                        id="management"
-                        type="number"
-                        placeholder="Auto-calculated"
-                        value={monthlyExpenses.management || ""}
-                        onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, management: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="h-10"
-                        data-testid="input-management"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="maintenance" className="text-sm font-medium">Maintenance</Label>
-                      <Input
-                        id="maintenance"
-                        type="number"
-                        placeholder="Auto-calculated"
-                        value={monthlyExpenses.maintenance || ""}
-                        onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, maintenance: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="h-10"
-                        data-testid="input-maintenance"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="cleaning" className="text-sm font-medium">Cleaning</Label>
-                      <Input
-                        id="cleaning"
-                        type="number"
-                        placeholder="Auto-calculated"
-                        value={monthlyExpenses.cleaning || ""}
-                        onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, cleaning: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="h-10"
-                        data-testid="input-cleaning"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="supplies" className="text-sm font-medium">Supplies</Label>
-                      <Input
-                        id="supplies"
-                        type="number"
-                        placeholder="50"
-                        value={monthlyExpenses.supplies || ""}
-                        onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, supplies: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="h-10"
-                        data-testid="input-supplies"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="other" className="text-sm font-medium">Other</Label>
-                      <Input
-                        id="other"
-                        type="number"
-                        placeholder="0"
-                        value={monthlyExpenses.other || ""}
-                        onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, other: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="h-10"
-                        data-testid="input-other"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="ltr" className="space-y-6 mt-6">
+              </div>
+
+              {/* Long-Term Rental */}
+              <div>
+                <Label htmlFor="monthly-rent" className="text-sm font-medium block mb-2">Monthly Rent (Long-Term)</Label>
+                <Input
+                  id="monthly-rent"
+                  type="number"
+                  placeholder="1200"
+                  value={ltrMetrics.monthlyRent || ""}
+                  onChange={(e) => setLTRMetrics(prev => ({ ...prev, monthlyRent: e.target.value ? Number(e.target.value) : undefined }))}
+                  className="h-10"
+                  data-testid="input-monthly-rent"
+                />
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border/50"></div>
+
+            {/* Monthly Expenses Section */}
+            <div>
+              <h4 className="font-semibold mb-3 text-base">Monthly Expenses</h4>
+              <p className="text-sm text-muted-foreground mb-4">Optional - Expenses will be auto-calculated if not provided</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="monthly-rent" className="text-sm font-medium">Monthly Rent Amount</Label>
+                  <Label htmlFor="property-taxes" className="text-sm font-medium">Property Taxes</Label>
                   <Input
-                    id="monthly-rent"
+                    id="property-taxes"
                     type="number"
-                    placeholder="1200"
-                    value={ltrMetrics.monthlyRent || ""}
-                    onChange={(e) => setLTRMetrics(prev => ({ ...prev, monthlyRent: e.target.value ? Number(e.target.value) : undefined }))}
+                    placeholder="Auto-calculated"
+                    value={monthlyExpenses.propertyTaxes || ""}
+                    onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, propertyTaxes: e.target.value ? Number(e.target.value) : undefined }))}
                     className="h-10"
-                    data-testid="input-monthly-rent"
+                    data-testid="input-property-taxes"
                   />
                 </div>
-              </TabsContent>
-            </Tabs>
+                <div className="space-y-2">
+                  <Label htmlFor="insurance" className="text-sm font-medium">Insurance</Label>
+                  <Input
+                    id="insurance"
+                    type="number"
+                    placeholder="100"
+                    value={monthlyExpenses.insurance || ""}
+                    onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, insurance: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="h-10"
+                    data-testid="input-insurance"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="utilities" className="text-sm font-medium">Utilities</Label>
+                  <Input
+                    id="utilities"
+                    type="number"
+                    placeholder="150"
+                    value={monthlyExpenses.utilities || ""}
+                    onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, utilities: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="h-10"
+                    data-testid="input-utilities"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="management" className="text-sm font-medium">Management</Label>
+                  <Input
+                    id="management"
+                    type="number"
+                    placeholder="Auto-calculated"
+                    value={monthlyExpenses.management || ""}
+                    onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, management: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="h-10"
+                    data-testid="input-management"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="maintenance" className="text-sm font-medium">Maintenance</Label>
+                  <Input
+                    id="maintenance"
+                    type="number"
+                    placeholder="Auto-calculated"
+                    value={monthlyExpenses.maintenance || ""}
+                    onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, maintenance: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="h-10"
+                    data-testid="input-maintenance"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cleaning" className="text-sm font-medium">Cleaning</Label>
+                  <Input
+                    id="cleaning"
+                    type="number"
+                    placeholder="Auto-calculated"
+                    value={monthlyExpenses.cleaning || ""}
+                    onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, cleaning: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="h-10"
+                    data-testid="input-cleaning"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="supplies" className="text-sm font-medium">Supplies</Label>
+                  <Input
+                    id="supplies"
+                    type="number"
+                    placeholder="50"
+                    value={monthlyExpenses.supplies || ""}
+                    onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, supplies: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="h-10"
+                    data-testid="input-supplies"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="other" className="text-sm font-medium">Other</Label>
+                  <Input
+                    id="other"
+                    type="number"
+                    placeholder="0"
+                    value={monthlyExpenses.other || ""}
+                    onChange={(e) => setMonthlyExpenses(prev => ({ ...prev, other: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="h-10"
+                    data-testid="input-other"
+                  />
+                </div>
+              </div>
+            </div>
             
             <div className="mt-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4 border-t border-border/50">
               <div className="text-xs text-muted-foreground leading-relaxed">
