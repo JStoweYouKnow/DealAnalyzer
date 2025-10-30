@@ -6,6 +6,7 @@ import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 import { getMortgageRate } from "../../../server/mortgage-rate-service";
 import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
+import { extractTextFromPDF } from "../../lib/pdf-extractor";
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,15 +20,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get file extension first to determine how to read it
+    const originalName = file.name;
+    const fileExtension = originalName.substring(originalName.lastIndexOf('.')).toLowerCase();
+    
     // Read file content directly into memory (no temp files needed for Vercel)
-    // For PDFs, we'll need to extract text properly, but for now try text() first
+    // For PDFs, extract text using PDF.js; for other files, read as text
     let fileContent: string;
     try {
-      fileContent = await file.text();
-      console.log(`File content length: ${fileContent.length} characters`);
-      console.log(`File content preview (first 500 chars): ${fileContent.substring(0, 500)}`);
+      if (fileExtension === '.pdf') {
+        console.log('Extracting text from PDF file...');
+        fileContent = await extractTextFromPDF(file);
+        console.log(`PDF text extracted - length: ${fileContent.length} characters`);
+        console.log(`PDF text preview (first 500 chars): ${fileContent.substring(0, 500)}`);
+      } else {
+        fileContent = await file.text();
+        console.log(`File content length: ${fileContent.length} characters`);
+        console.log(`File content preview (first 500 chars): ${fileContent.substring(0, 500)}`);
+      }
     } catch (error) {
-      console.error('Error reading file as text:', error);
+      console.error('Error reading/extracting file:', error);
       return NextResponse.json(
         { success: false, error: `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}` },
         { status: 400 }
@@ -54,10 +66,6 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.warn("Failed to parse form data:", e);
     }
-
-    // Get file extension
-    const originalName = file.name;
-    const fileExtension = originalName.substring(originalName.lastIndexOf('.')).toLowerCase();
 
     console.log(`Running TypeScript file analysis for: ${originalName}, extension: ${fileExtension}`);
 

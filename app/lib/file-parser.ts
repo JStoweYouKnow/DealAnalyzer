@@ -38,26 +38,43 @@ export function parseTextFile(content: string): ParsedProperty {
     property.address = addressMatch[0].trim();
   }
 
-  // Extract price - try multiple patterns (similar to Python parser)
+  // Extract price - try multiple patterns (enhanced for PDF and text files)
+  // Try more flexible patterns that work with PDF text extraction
   const pricePatterns = [
-    /(?:Price|Purchase Price|Listing Price|Asking Price|List Price|Sale Price)[:=]?\s*\$?([\d,]+)/i,
-    /\$\s*([\d,]+)(?:\s*(?:price|list|asking|purchase))?/i,
-    /([\d,]+)\s*(?:dollars?|USD)/i,
-    /\$([\d,]+)/,
+    // Explicit price labels (case-insensitive, flexible spacing)
+    /(?:Price|Purchase\s+Price|Listing\s+Price|Asking\s+Price|List\s+Price|Sale\s+Price|Total\s+Price)[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/i,
+    // Price after ":" or "=" with flexible spacing
+    /(?:Price|Cost|Asking|List|Sale)[:\s=]+\$?\s*([\d,]+(?:\.\d{2})?)/i,
+    // Standalone dollar amounts (prefer larger numbers that look like prices)
+    /\$\s*([1-9]\d{2,3}(?:,\d{3})*(?:\.\d{2})?)/g,
+    // Numbers followed by price-related keywords
+    /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD|price|asking|list)/i,
+    // Simple dollar amount pattern (but require at least 3 digits)
+    /\$([1-9]\d{2,}(?:,\d{3})*)/g,
   ];
   
   let purchasePrice = 0;
+  const foundPrices: number[] = [];
+  
+  // Collect all potential prices
   for (const pattern of pricePatterns) {
-    const priceMatch = content.match(pattern);
-    if (priceMatch) {
-      const priceStr = priceMatch[1] || priceMatch[0];
+    const matches = content.matchAll(pattern);
+    for (const match of matches) {
+      const priceStr = match[1] || match[0];
       if (priceStr) {
-        purchasePrice = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
-        if (purchasePrice > 0) {
-          break; // Use first valid match
+        const cleanedPrice = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
+        // Filter out unrealistic prices (too small or too large)
+        if (cleanedPrice >= 10000 && cleanedPrice <= 50000000) {
+          foundPrices.push(cleanedPrice);
         }
       }
     }
+  }
+  
+  // Use the largest valid price found (typically the listing price)
+  if (foundPrices.length > 0) {
+    purchasePrice = Math.max(...foundPrices);
+    console.log(`Found ${foundPrices.length} potential prices, using: $${purchasePrice.toLocaleString()}`);
   }
   
   property.purchase_price = purchasePrice;
