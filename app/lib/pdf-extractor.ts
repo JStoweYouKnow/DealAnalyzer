@@ -61,12 +61,35 @@ async function getPdfParse() {
     try {
       // Use require for CommonJS compatibility (works in Next.js serverless)
       const pdfParseModule = require('pdf-parse');
+      
+      // Configure worker before using PDFParse
+      // pdf-parse uses pdfjs-dist internally, need to set GlobalWorkerOptions
+      if (pdfParseModule.PDFParse && typeof pdfParseModule.PDFParse.setWorker === 'function') {
+        // Set worker to empty string to disable worker (use main thread)
+        pdfParseModule.PDFParse.setWorker('');
+      }
+      
+      // Also try to access pdfjsLib if it's exposed
+      if (typeof globalThis !== 'undefined') {
+        // Check if pdfjsLib is available globally (pdf-parse might set it)
+        const pdfjsLib = (globalThis as any).pdfjsLib;
+        if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+        }
+      }
+      
       pdfParse = pdfParseModule;
     } catch (error) {
       console.error('Error loading pdf-parse:', error);
       // Fallback to dynamic import if require fails
       try {
         const pdfParseModule = await import('pdf-parse');
+        
+        // Configure worker before using PDFParse
+        if (pdfParseModule.PDFParse && typeof pdfParseModule.PDFParse.setWorker === 'function') {
+          pdfParseModule.PDFParse.setWorker('');
+        }
+        
         pdfParse = pdfParseModule;
       } catch (importError) {
         console.error('Error importing pdf-parse:', importError);
@@ -119,11 +142,14 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
     console.log('Parsing PDF with pdf-parse...');
     const pdfParseModule = await getPdfParse();
     
-    // Configure PDFParse to disable workers (required for serverless)
-    if (pdfParseModule.PDFParse && typeof pdfParseModule.PDFParse.setWorker === 'function') {
-      // Set worker to empty string to disable worker (use main thread)
-      pdfParseModule.PDFParse.setWorker('');
-      console.log('PDFParse worker disabled for serverless environment');
+    // Worker should already be configured in getPdfParse()
+    // Double-check GlobalWorkerOptions is set
+    if (typeof globalThis !== 'undefined' && (globalThis as any).pdfjsLib) {
+      const pdfjsLib = (globalThis as any).pdfjsLib;
+      if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+        console.log('GlobalWorkerOptions.workerSrc set to empty string');
+      }
     }
     
     // pdf-parse exports PDFParse class, we need to instantiate it
