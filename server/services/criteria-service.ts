@@ -28,64 +28,10 @@ const DEFAULT_CRITERIA: CriteriaResponse = {
 };
 
 export async function loadInvestmentCriteria(): Promise<CriteriaResponse> {
-  // Check if we're in a serverless environment without Python
-  if (process.env.VERCEL || process.env.VERCEL_ENV) {
-    console.log("Running on Vercel - using default criteria");
-    return DEFAULT_CRITERIA;
-  }
-
-  return new Promise((resolve) => {
-    const pythonPath = path.join(process.cwd(), "python_modules");
-
-    // Check if Python modules exist
-    if (!fs.existsSync(pythonPath)) {
-      console.log("Python modules not found - using default criteria");
-      resolve(DEFAULT_CRITERIA);
-      return;
-    }
-
-    const python = spawn("python3", ["-c", `
-import sys
-sys.path.append('${pythonPath}')
-from criteria_manager import load_investment_criteria
-import json
-
-criteria = load_investment_criteria('${path.join(pythonPath, 'investment_criteria.md')}')
-print(json.dumps(criteria))
-`]);
-
-    let stdout = "";
-    let stderr = "";
-
-    python.stdout.on("data", (data) => {
-      stdout += data.toString();
-    });
-
-    python.stderr.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    python.on("close", (code) => {
-      if (code !== 0) {
-        console.warn("Failed to load criteria from Python, using defaults:", stderr);
-        resolve(DEFAULT_CRITERIA);
-        return;
-      }
-
-      try {
-        const criteria = JSON.parse(stdout);
-        resolve(criteria);
-      } catch (e) {
-        console.warn("Failed to parse criteria, using defaults:", e);
-        resolve(DEFAULT_CRITERIA);
-      }
-    });
-
-    python.on("error", (error) => {
-      console.warn("Python process error, using defaults:", error);
-      resolve(DEFAULT_CRITERIA);
-    });
-  });
+  // Always use default criteria - Python backend is no longer used
+  // Criteria can be updated via the API PUT endpoint if needed in the future
+  console.log("Loading investment criteria - using default values");
+  return DEFAULT_CRITERIA;
 }
 
 export async function updateInvestmentCriteria(criteria: any): Promise<{success: boolean, error?: string}> {
