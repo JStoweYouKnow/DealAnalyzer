@@ -6,7 +6,7 @@ const nextConfig = {
       bodySizeLimit: '50mb',
     },
   },
-  serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium-min"],
+  serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium-min", "pdfjs-dist"],
   images: {
     domains: ['images.unsplash.com', 'maps.googleapis.com'],
     remotePatterns: [

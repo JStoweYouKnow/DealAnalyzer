@@ -1,15 +1,17 @@
 // PDF text extraction utility using pdfjs-dist
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Set up the worker for pdfjs-dist (server-side only)
-if (typeof window === 'undefined') {
-  // Use a CDN worker URL for server-side execution
-  // In a production environment, you might want to bundle the worker differently
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-}
+// Use dynamic import to avoid build-time issues with workers
 
 export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Promise<string> {
   try {
+    // Dynamically import pdfjs-dist only when needed (avoid build-time issues)
+    const pdfjsLib = await import('pdfjs-dist');
+    
+    // Set up the worker for pdfjs-dist (server-side only)
+    // Use a CDN worker URL that works in serverless environments
+    if (typeof window === 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    }
+
     let arrayBuffer: ArrayBuffer;
     
     if (file instanceof File) {
@@ -20,8 +22,13 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
       arrayBuffer = file;
     }
 
-    // Load the PDF document
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    // Load the PDF document with disableAutoFetch and disableStream for better serverless compatibility
+    const loadingTask = pdfjsLib.getDocument({ 
+      data: arrayBuffer,
+      useSystemFonts: true,
+      disableAutoFetch: true,
+      disableStream: true,
+    });
     const pdf = await loadingTask.promise;
 
     let fullText = '';
