@@ -29,6 +29,7 @@ export interface PropertyAnalysis {
   passes1PercentRule: boolean;
   cashFlow: number;
   cashFlowPositive: boolean;
+  monthlyMortgagePayment: number;
   cocReturn: number;
   cocMeetsBenchmark: boolean;
   cocMeetsMinimum: boolean;
@@ -140,9 +141,11 @@ export function analyzeProperty(
   monthlyExpenses?: any,
   fundingSource?: FundingSource,
   mortgageRate?: number, // Annual interest rate as decimal (e.g., 0.07 for 7%)
-  mortgageValues?: MortgageValues // Mortgage calculator values (loan amount, interest rate, loan term, monthly payment)
+  mortgageValues?: MortgageValues, // Mortgage calculator values (loan amount, interest rate, loan term, monthly payment)
+  criteria?: any // Optional criteria - if not provided, uses default
 ): PropertyAnalysis {
-  const criteria = loadInvestmentCriteria();
+  // Use provided criteria or fall back to default
+  const analysisCriteria = criteria || loadInvestmentCriteria();
 
   // Use provided data or default values
   const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
@@ -198,9 +201,9 @@ export function analyzeProperty(
     calculatedDownpayment = purchasePrice * downpaymentPercentage;
   }
   
-  const closingCostsPercentage = (criteria.closing_costs_percentage_min + criteria.closing_costs_percentage_max) / 2;
-  const initialFixedCostsPercentage = criteria.initial_fixed_costs_percentage;
-  const maintenanceReservePercentage = criteria.maintenance_reserve_percentage;
+  const closingCostsPercentage = (analysisCriteria.closing_costs_percentage_min + analysisCriteria.closing_costs_percentage_max) / 2;
+  const initialFixedCostsPercentage = analysisCriteria.initial_fixed_costs_percentage;
+  const maintenanceReservePercentage = analysisCriteria.maintenance_reserve_percentage;
   const calculatedClosingCosts = purchasePrice * closingCostsPercentage;
   const calculatedInitialFixedCosts = purchasePrice * initialFixedCostsPercentage;
   const estimatedMaintenanceReserve = monthlyRent * maintenanceReservePercentage;
@@ -235,20 +238,58 @@ export function analyzeProperty(
     }
   }
 
-  // Estimated Monthly Expenses
-  const estimatedPropertyTax = purchasePrice * 0.012 / 12; // 1.2% annually
-  const estimatedInsurance = 100.0;
+  // Monthly Expenses - use provided values or estimate
+  const providedPropertyTax = monthlyExpenses?.propertyTaxes;
+  const providedInsurance = monthlyExpenses?.insurance;
+  const providedUtilities = monthlyExpenses?.utilities || 0;
+  const providedManagement = monthlyExpenses?.management;
+  const providedMaintenance = monthlyExpenses?.maintenance;
+  const providedCleaning = monthlyExpenses?.cleaning || 0;
+  const providedSupplies = monthlyExpenses?.supplies || 0;
+  const providedOther = monthlyExpenses?.other || 0;
+
+  // Use provided values or calculate estimates
+  const estimatedPropertyTax = providedPropertyTax !== undefined 
+    ? providedPropertyTax 
+    : purchasePrice * 0.012 / 12; // 1.2% annually default
+  const estimatedInsurance = providedInsurance !== undefined 
+    ? providedInsurance 
+    : 100.0; // Default $100/month
   const estimatedVacancy = monthlyRent * 0.05; // 5% of gross rents
-  const estimatedPropertyManagement = monthlyRent * 0.10; // 10% of gross rents
+  const estimatedPropertyManagement = providedManagement !== undefined
+    ? providedManagement
+    : monthlyRent * 0.10; // 10% of gross rents default
+  const actualMaintenanceReserve = providedMaintenance !== undefined
+    ? providedMaintenance
+    : estimatedMaintenanceReserve;
 
   const totalMonthlyExpenses = (
     monthlyMortgagePayment +
     estimatedPropertyTax +
     estimatedInsurance +
     estimatedVacancy +
-    estimatedMaintenanceReserve +
-    estimatedPropertyManagement
+    actualMaintenanceReserve +
+    estimatedPropertyManagement +
+    providedUtilities +
+    providedCleaning +
+    providedSupplies +
+    providedOther
   );
+
+  console.log('Monthly Expenses Calculation:', {
+    provided: !!monthlyExpenses,
+    mortgage: monthlyMortgagePayment,
+    propertyTax: estimatedPropertyTax,
+    insurance: estimatedInsurance,
+    vacancy: estimatedVacancy,
+    maintenance: actualMaintenanceReserve,
+    management: estimatedPropertyManagement,
+    utilities: providedUtilities,
+    cleaning: providedCleaning,
+    supplies: providedSupplies,
+    other: providedOther,
+    total: totalMonthlyExpenses
+  });
 
   const cashFlow = monthlyRent - totalMonthlyExpenses;
   const cashFlowPositive = cashFlow >= 0;
@@ -256,14 +297,14 @@ export function analyzeProperty(
   // Cash-on-Cash Return
   const annualCashFlow = cashFlow * 12;
   const cocReturn = totalCashNeeded > 0 ? annualCashFlow / totalCashNeeded : 0;
-  const cocMeetsBenchmark = cocReturn >= criteria.coc_benchmark_min;
-  const cocMeetsMinimum = cocReturn >= criteria.coc_minimum_min;
+  const cocMeetsBenchmark = cocReturn >= analysisCriteria.coc_benchmark_min;
+  const cocMeetsMinimum = cocReturn >= analysisCriteria.coc_minimum_min;
 
   // Cap Rate
   const netOperatingIncome = monthlyRent * 12;
   const capRate = purchasePrice > 0 ? netOperatingIncome / purchasePrice : 0;
-  const capMeetsBenchmark = capRate >= criteria.cap_benchmark_min;
-  const capMeetsMinimum = capRate >= criteria.cap_minimum;
+  const capMeetsBenchmark = capRate >= analysisCriteria.cap_benchmark_min;
+  const capMeetsMinimum = capRate >= analysisCriteria.cap_minimum;
 
   // STR (Short-Term Rental) Calculations
   let projectedAnnualRevenue: number | undefined = undefined;
@@ -283,16 +324,16 @@ export function analyzeProperty(
     
     // Check STR criteria
     strMeetsCriteria = true;
-    if (criteria.str_adr_minimum && adr < criteria.str_adr_minimum) {
+    if (analysisCriteria.str_adr_minimum && adr < analysisCriteria.str_adr_minimum) {
       strMeetsCriteria = false;
     }
-    if (criteria.str_occupancy_rate_minimum && occupancyRate < criteria.str_occupancy_rate_minimum) {
+    if (analysisCriteria.str_occupancy_rate_minimum && occupancyRate < analysisCriteria.str_occupancy_rate_minimum) {
       strMeetsCriteria = false;
     }
-    if (criteria.str_gross_yield_minimum && projectedGrossYield < criteria.str_gross_yield_minimum) {
+    if (analysisCriteria.str_gross_yield_minimum && projectedGrossYield < analysisCriteria.str_gross_yield_minimum) {
       strMeetsCriteria = false;
     }
-    if (criteria.str_annual_revenue_minimum && projectedAnnualRevenue < criteria.str_annual_revenue_minimum) {
+    if (analysisCriteria.str_annual_revenue_minimum && projectedAnnualRevenue < analysisCriteria.str_annual_revenue_minimum) {
       strMeetsCriteria = false;
     }
   }
@@ -300,12 +341,27 @@ export function analyzeProperty(
   // Determine if meets criteria
   // Base criteria check
   let meetsCriteria = (
-    purchasePrice <= criteria.max_purchase_price &&
+    purchasePrice <= analysisCriteria.max_purchase_price &&
     passes1PercentRule &&
     cashFlowPositive &&
     cocMeetsMinimum &&
     capMeetsMinimum
   );
+
+  console.log('Criteria Check:', {
+    purchasePrice,
+    maxPrice: analysisCriteria.max_purchase_price,
+    priceMeets: purchasePrice <= analysisCriteria.max_purchase_price,
+    passes1PercentRule,
+    cashFlowPositive,
+    cocReturn,
+    cocMinimum: analysisCriteria.coc_minimum_min,
+    cocMeets: cocMeetsMinimum,
+    capRate,
+    capMinimum: analysisCriteria.cap_minimum,
+    capMeets: capMeetsMinimum,
+    meetsCriteria
+  });
   
   // If STR data is available, also check STR criteria
   if (strMeetsCriteria !== undefined) {
@@ -347,6 +403,7 @@ export function analyzeProperty(
     capMeetsMinimum,
     projectedAnnualRevenue,
     projectedGrossYield,
+    monthlyMortgagePayment,
     totalMonthlyExpenses,
     strNetIncome,
     strMeetsCriteria,

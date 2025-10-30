@@ -4,6 +4,7 @@ import { analyzeProperty } from "../../lib/property-analyzer";
 import { storage } from "../../../server/storage";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 import { getMortgageRate } from "../../../server/mortgage-rate-service";
+import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
 
 export async function POST(request: NextRequest) {
@@ -99,15 +100,34 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Run analysis with optional mortgage values
+    // Fetch current investment criteria
+    const criteria = await loadInvestmentCriteria();
+    console.log('Using criteria for analysis:', {
+      maxPurchasePrice: criteria.max_purchase_price,
+      cocMinimum: criteria.coc_minimum_min,
+      capMinimum: criteria.cap_minimum,
+    });
+
+    // Run analysis with optional mortgage values and criteria
     const analysisData = analyzeProperty(
       propertyData, 
       strMetrics, 
       monthlyExpenses, 
       propertyFundingSource, 
       mortgageRate,
-      mortgageValues // Pass mortgage calculator values
+      mortgageValues, // Pass mortgage calculator values
+      criteria // Pass criteria from API
     );
+    
+    console.log('Analysis Results:', {
+      meetsCriteria: analysisData.meetsCriteria,
+      cocReturn: analysisData.cocReturn,
+      capRate: analysisData.capRate,
+      cashFlow: analysisData.cashFlow,
+      totalMonthlyExpenses: analysisData.totalMonthlyExpenses,
+      calculatedDownpayment: analysisData.calculatedDownpayment,
+      monthlyMortgagePayment: analysisData.monthlyMortgagePayment,
+    });
     
     console.log("Analysis result: Success");
 

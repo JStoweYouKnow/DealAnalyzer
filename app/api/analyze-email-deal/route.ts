@@ -3,6 +3,7 @@ import { storage } from "../../../server/storage";
 import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 import { getMortgageRate } from "../../../server/mortgage-rate-service";
+import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
 
 export async function POST(request: NextRequest) {
@@ -63,7 +64,10 @@ export async function POST(request: NextRequest) {
       zip_code: propertyData.zip_code || propertyData.zipCode,
     });
 
-    const analysisData = analyzeProperty(propertyData, strMetrics, undefined, propertyFundingSource, mortgageRate);
+    // Fetch current investment criteria
+    const criteria = await loadInvestmentCriteria();
+    
+    const analysisData = analyzeProperty(propertyData, strMetrics, undefined, propertyFundingSource, mortgageRate, undefined, criteria);
 
     // Run AI analysis if available
     let analysisWithAI = analysisData;

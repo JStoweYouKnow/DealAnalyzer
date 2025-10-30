@@ -4,6 +4,7 @@ import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer"
 import { storage } from "../../../server/storage";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 import { getMortgageRate } from "../../../server/mortgage-rate-service";
+import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,8 +56,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Run TypeScript analysis with optional mortgage values
-    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, propertyFundingSource, mortgageRate, mortgageValues);
+    // Fetch current investment criteria
+    const criteria = await loadInvestmentCriteria();
+    console.log('Using criteria for analysis:', {
+      maxPurchasePrice: criteria.max_purchase_price,
+      cocMinimum: criteria.coc_minimum_min,
+      capMinimum: criteria.cap_minimum,
+    });
+
+    // Run TypeScript analysis with optional mortgage values and criteria
+    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, propertyFundingSource, mortgageRate, mortgageValues, criteria);
+    
+    console.log('Analysis Results:', {
+      meetsCriteria: analysisData.meetsCriteria,
+      cocReturn: analysisData.cocReturn,
+      capRate: analysisData.capRate,
+      cashFlow: analysisData.cashFlow,
+      totalMonthlyExpenses: analysisData.totalMonthlyExpenses,
+    });
     
     // Run AI analysis if available
     let analysisWithAI = analysisData;
