@@ -43,14 +43,31 @@ export async function calculateMortgage(
     });
 
     if (!response.ok) {
-      throw new Error(`API Ninjas returned status ${response.status}`);
+      const errorText = await response.text();
+      console.error('API Ninjas error response:', errorText);
+      throw new Error(`API Ninjas returned status ${response.status}: ${errorText}`);
     }
 
-    const data: MortgageCalculatorResponse = await response.json();
+    const data: any = await response.json();
     
-    console.log('Mortgage calculation result:', data);
+    console.log('Mortgage calculation result from API:', data);
     
-    return data;
+    // Check if the API returned null or missing values
+    if (!data || data.monthly_payment === null || data.monthly_payment === undefined) {
+      console.warn('API returned null or invalid values, will use manual calculation');
+      throw new Error('API returned null values');
+    }
+    
+    // Ensure all required fields are present and valid
+    const result: MortgageCalculatorResponse = {
+      monthly_payment: data.monthly_payment ?? 0,
+      total_interest_paid: data.total_interest_paid ?? 0,
+      total_paid: data.total_paid ?? 0,
+      payback_period_years: data.payback_period_years ?? data.duration_years ?? undefined,
+      payback_period_months: data.payback_period_months ?? undefined,
+    };
+    
+    return result;
   } catch (error) {
     console.error('Error calculating mortgage with API Ninjas:', error);
     throw error;

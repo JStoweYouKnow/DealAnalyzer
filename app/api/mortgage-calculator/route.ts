@@ -34,28 +34,52 @@ export async function POST(request: NextRequest) {
       duration_years: Number(duration_years),
     };
 
+    let result: MortgageCalculatorResponse;
+    let usedFallback = false;
+    
     try {
       // Try to fetch from API Ninjas
-      const result = await calculateMortgage(params);
-      return NextResponse.json({
-        success: true,
-        data: result
-      });
+      result = await calculateMortgage(params);
+      
+      // Validate the result has valid numeric values
+      if (!result || 
+          result.monthly_payment === null || 
+          result.monthly_payment === undefined || 
+          isNaN(result.monthly_payment) ||
+          result.monthly_payment <= 0) {
+        throw new Error('API returned invalid monthly payment value');
+      }
     } catch (error) {
       console.warn("API Ninjas mortgage calculator failed, using manual calculation:", error);
       // Fallback to manual calculation
       const interestRateDecimal = params.interest_rate / 100; // Convert percentage to decimal
-      const result = calculateMortgageManual(
+      result = calculateMortgageManual(
         params.loan_amount,
         interestRateDecimal,
         params.duration_years
       );
-      return NextResponse.json({
-        success: true,
-        data: result,
-        fallback: true // Indicate this was a fallback calculation
-      });
+      usedFallback = true;
     }
+    
+    // Validate final result
+    if (!result || 
+        !result.monthly_payment || 
+        isNaN(result.monthly_payment) ||
+        result.monthly_payment <= 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Invalid calculation result: monthly payment is null or invalid' 
+        },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({
+      success: true,
+      data: result,
+      fallback: usedFallback // Indicate if this was a fallback calculation
+    });
   } catch (error) {
     console.error("Error in mortgage calculator endpoint:", error);
     return NextResponse.json(

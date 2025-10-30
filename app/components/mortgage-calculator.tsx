@@ -95,7 +95,13 @@ export function MortgageCalculator() {
         throw new Error(data.error || 'Failed to calculate mortgage');
       }
 
-      if (data.success) {
+      if (data.success && data.data) {
+        // Validate the data has valid values
+        if (data.data.monthly_payment === null || 
+            data.data.monthly_payment === undefined || 
+            isNaN(data.data.monthly_payment)) {
+          throw new Error('Received invalid calculation result');
+        }
         setResult(data.data);
       } else {
         throw new Error(data.error || 'Calculation failed');
