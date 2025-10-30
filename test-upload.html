@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test PDF Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .container {
+            border: 2px solid #ccc;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        h1 {
+            color: #333;
+        }
+        .form-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="file"] {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 PDF Upload Tester</h1>
+        <p>Use this page to test if the PDF upload API is working correctly.</p>
+
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="file">Select PDF File:</label>
+                <input type="file" id="file" accept=".pdf" required>
+            </div>
+
+            <div class="form-group">
+                <label for="fundingSource">Funding Source:</label>
+                <select id="fundingSource">
+                    <option value="conventional">Conventional (5% down)</option>
+                    <option value="fha">FHA (3.5% down)</option>
+                    <option value="va">VA (0% down)</option>
+                    <option value="dscr">DSCR (20% down)</option>
+                    <option value="cash">Cash (100% down)</option>
+                </select>
+            </div>
+
+            <button type="submit" id="submitBtn">Test Upload</button>
+        </form>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('file');
+        const fundingSource = document.getElementById('fundingSource');
+        const submitBtn = document.getElementById('submitBtn');
+        const result = document.getElementById('result');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const file = fileInput.files[0];
+            if (!file) {
+                showResult('No file selected', 'error');
+                return;
+            }
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Uploading...';
+            result.style.display = 'block';
+            result.className = 'info';
+            result.innerHTML = `
+                <h3>Uploading...</h3>
+                <p>File: ${file.name} (${(file.size / 1024).toFixed(2)} KB)</p>
+            `;
+
+            try {
+                // Create FormData
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('fundingSource', fundingSource.value);
+
+                console.log('Sending request to: http://localhost:3002/api/analyze-file');
+                console.log('File:', file.name, 'Size:', file.size);
+
+                // Send request
+                const response = await fetch('http://localhost:3002/api/analyze-file', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('Response status:', response.status);
+
+                const data = await response.json();
+                console.log('Response data:', data);
+
+                if (response.ok && data.success) {
+                    showResult(`
+                        <h3>✅ Success!</h3>
+                        <p>Property: ${data.data.property.address || 'Unknown address'}</p>
+                        <p>Purchase Price: $${(data.data.property.purchasePrice || 0).toLocaleString()}</p>
+                        <p>Monthly Rent: $${(data.data.property.monthlyRent || 0).toLocaleString()}</p>
+                        <p>COC Return: ${(data.data.cocReturn * 100).toFixed(2)}%</p>
+                        <p>Cap Rate: ${(data.data.capRate * 100).toFixed(2)}%</p>
+                        <p>Cash Flow: $${data.data.cashFlow.toFixed(2)}/month</p>
+                        <p>Meets Criteria: ${data.data.meetsCriteria ? '✅ Yes' : '❌ No'}</p>
+                        <hr>
+                        <details>
+                            <summary>Full Response</summary>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </details>
+                    `, 'success');
+                } else {
+                    showResult(`
+                        <h3>❌ Error</h3>
+                        <p>${data.error || 'Unknown error'}</p>
+                        ${data.details ? `<p>Details: ${data.details}</p>` : ''}
+                        <hr>
+                        <details>
+                            <summary>Full Response</summary>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </details>
+                    `, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showResult(`
+                    <h3>❌ Request Failed</h3>
+                    <p>${error.message}</p>
+                    <p>Make sure the server is running on http://localhost:3002</p>
+                `, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Test Upload';
+            }
+        });
+
+        function showResult(html, type) {
+            result.style.display = 'block';
+            result.className = type;
+            result.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

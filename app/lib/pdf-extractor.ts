@@ -1,127 +1,13 @@
-// PDF text extraction utility using pdf-parse (no workers required)
-// This is a simpler alternative to pdfjs-dist that works better in serverless environments
-
-// Polyfill DOMMatrix for Node.js/serverless environments
-if (typeof globalThis.DOMMatrix === 'undefined') {
-  // Simple DOMMatrix polyfill for pdf-parse
-  (globalThis as any).DOMMatrix = class DOMMatrix {
-    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
-    
-    constructor(init?: string | number[]) {
-      if (typeof init === 'string') {
-        const matrix = init.match(/matrix\(([^)]+)\)/);
-        if (matrix) {
-          const values = matrix[1].split(',').map(v => parseFloat(v.trim()));
-          if (values.length === 6) {
-            this.a = values[0]; this.b = values[1]; this.c = values[2];
-            this.d = values[3]; this.e = values[4]; this.f = values[5];
-          }
-        }
-      } else if (Array.isArray(init) && init.length === 6) {
-        this.a = init[0]; this.b = init[1]; this.c = init[2];
-        this.d = init[3]; this.e = init[4]; this.f = init[5];
-      }
-    }
-    
-    multiply(other: any) {
-      const result = new (globalThis as any).DOMMatrix();
-      result.a = this.a * other.a + this.c * other.b;
-      result.b = this.b * other.a + this.d * other.b;
-      result.c = this.a * other.c + this.c * other.d;
-      result.d = this.b * other.c + this.d * other.d;
-      result.e = this.a * other.e + this.c * other.f + this.e;
-      result.f = this.b * other.e + this.d * other.f + this.f;
-      return result;
-    }
-    
-    toString() {
-      return `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.e}, ${this.f})`;
-    }
-  };
-}
-
-// Polyfill DOMPoint for Node.js/serverless environments
-if (typeof globalThis.DOMPoint === 'undefined') {
-  (globalThis as any).DOMPoint = class DOMPoint {
-    x = 0; y = 0; z = 0; w = 1;
-    
-    constructor(x = 0, y = 0, z = 0, w = 1) {
-      this.x = x; this.y = y; this.z = z; this.w = w;
-    }
-  };
-}
-
-// pdf-parse exports PDFParse class, but we use dynamic require for compatibility
-// pdf-parse's default export in CommonJS is the function we need
-let pdfParse: any;
-
-// Initialize pdf-parse dynamically (handles both ESM and CJS)
-async function getPdfParse() {
-  if (!pdfParse) {
-    try {
-      // Use require for CommonJS compatibility (works in Next.js serverless)
-      const pdfParseModule = require('pdf-parse');
-      
-      // Configure worker before using PDFParse
-      // pdf-parse uses pdfjs-dist internally, need to set GlobalWorkerOptions
-      // Call setWorker BEFORE any PDFParse instances are created
-      if (pdfParseModule.PDFParse && typeof pdfParseModule.PDFParse.setWorker === 'function') {
-        // Set worker to empty string to disable worker (use main thread)
-        // This internally sets GlobalWorkerOptions.workerSrc
-        const workerResult = pdfParseModule.PDFParse.setWorker('');
-        console.log('PDFParse.setWorker("") called, result:', workerResult);
-      }
-      
-      // Try to access pdfjsLib through globalThis (pdf-parse sets it)
-      // setWorker() sets globalThis.pdfjs and sets ds.workerSrc internally
-      // But we need to ensure GlobalWorkerOptions.workerSrc is accessible
-      if (typeof globalThis !== 'undefined') {
-        const pdfjsLib = (globalThis as any).pdfjsLib;
-        if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-          // GlobalWorkerOptions is a class/object, ensure workerSrc is set
-          const gwo = pdfjsLib.GlobalWorkerOptions;
-          if (gwo.workerSrc === undefined || gwo.workerSrc === null) {
-            gwo.workerSrc = '';
-            console.log('Manually set GlobalWorkerOptions.workerSrc to empty string');
-          } else {
-            console.log('GlobalWorkerOptions.workerSrc already set to:', gwo.workerSrc);
-          }
-          
-          // Also try setting it explicitly one more time before use
-          gwo.workerSrc = '';
-        } else {
-          console.log('pdfjsLib not found on globalThis, may be accessed differently');
-        }
-      }
-      
-      pdfParse = pdfParseModule;
-    } catch (error) {
-      console.error('Error loading pdf-parse:', error);
-      // Fallback to dynamic import if require fails
-      try {
-        const pdfParseModule = await import('pdf-parse');
-        
-        // Configure worker before using PDFParse
-        if (pdfParseModule.PDFParse && typeof pdfParseModule.PDFParse.setWorker === 'function') {
-          pdfParseModule.PDFParse.setWorker('');
-        }
-        
-        pdfParse = pdfParseModule;
-      } catch (importError) {
-        console.error('Error importing pdf-parse:', importError);
-        throw new Error('Failed to load pdf-parse module');
-      }
-    }
-  }
-  return pdfParse;
-}
+// PDF text extraction using pdf-parse (no workers required)
+// Simplified implementation for serverless compatibility
 
 export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Promise<string> {
   try {
     console.log('Starting PDF extraction with pdf-parse...');
-    
+
+    // Convert to Buffer
     let buffer: Buffer;
-    
+
     if (file instanceof File) {
       console.log('Converting File to Buffer, size:', file.size);
       const arrayBuffer = await file.arrayBuffer();
@@ -144,78 +30,32 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
     const firstBytes = buffer.slice(0, 4);
     const pdfMagicBytes = Buffer.from([0x25, 0x50, 0x44, 0x46]); // %PDF
     const isPDF = firstBytes.equals(pdfMagicBytes);
-    
+
     console.log('PDF magic bytes check:', {
       firstBytes: Array.from(firstBytes),
       isPDF
     });
-    
+
     if (!isPDF) {
       throw new Error('File does not appear to be a valid PDF (missing PDF magic bytes)');
     }
 
-    // Parse PDF using pdf-parse
-    console.log('Parsing PDF with pdf-parse...');
-    const pdfParseModule = await getPdfParse();
-    
-    // Worker should already be configured in getPdfParse()
-    // Double-check GlobalWorkerOptions is set
-    if (typeof globalThis !== 'undefined' && (globalThis as any).pdfjsLib) {
-      const pdfjsLib = (globalThis as any).pdfjsLib;
-      if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-        console.log('GlobalWorkerOptions.workerSrc set to empty string');
-      }
-    }
-    
-    // pdf-parse exports PDFParse class, we need to instantiate it
-    let pdfData: any;
-    if (pdfParseModule.PDFParse) {
-      // Use PDFParse class (new API)
-      // Disable verbosity to reduce errors
-      const pdfParser = new pdfParseModule.PDFParse({ 
-        data: buffer,
-        verbosity: 0, // Suppress warnings
-      });
-      
-      // Ensure GlobalWorkerOptions is set right before getText() call
-      // pdfjs-dist checks this when getText() is called
-      // Call setWorker again to ensure it's set
-      if (pdfParseModule.PDFParse.setWorker) {
-        pdfParseModule.PDFParse.setWorker('');
-      }
-      
-      // Also directly set GlobalWorkerOptions.workerSrc as backup
-      if (typeof globalThis !== 'undefined') {
-        const pdfjsLib = (globalThis as any).pdfjsLib;
-        if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-          const gwo = pdfjsLib.GlobalWorkerOptions;
-          gwo.workerSrc = '';
-          console.log('Set GlobalWorkerOptions.workerSrc to empty string before getText()');
-        }
-      }
-      
-      const textResult = await pdfParser.getText({ max: 0 });
-      pdfData = {
-        text: textResult.text,
-        numpages: textResult.total,
-        info: textResult.info || {},
-        metadata: textResult.metadata || {},
-      };
-    } else if (typeof pdfParseModule === 'function') {
-      // If it's a function, call it directly (legacy API)
-      pdfData = await pdfParseModule(buffer, {
-        max: 0, // Parse all pages (0 = unlimited)
-      });
-    } else {
-      throw new Error('pdf-parse module structure is unexpected - PDFParse class not found');
-    }
-    
+    // Import pdf-parse dynamically
+    console.log('Importing pdf-parse...');
+    const pdfParse = (await import('pdf-parse')).default;
+    console.log('pdf-parse imported successfully');
+
+    // Parse PDF
+    console.log('Parsing PDF...');
+    const pdfData = await pdfParse(buffer, {
+      max: 0, // Parse all pages (0 = no limit)
+      version: 'default', // Use default version
+    });
+
     console.log('PDF parsed successfully:', {
       pages: pdfData.numpages,
+      textLength: pdfData.text?.length || 0,
       info: pdfData.info,
-      metadata: pdfData.metadata,
-      textLength: pdfData.text?.length || 0
     });
 
     if (!pdfData.text || pdfData.text.trim().length === 0) {
@@ -224,12 +64,22 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
 
     const extractedText = pdfData.text.trim();
     console.log(`PDF text extracted successfully - length: ${extractedText.length} characters`);
-    console.log(`PDF text preview (first 500 chars): ${extractedText.substring(0, 500)}`);
-    
+    console.log(`PDF text preview (first 200 chars): ${extractedText.substring(0, 200)}`);
+
     return extractedText;
   } catch (error) {
     console.error('Error extracting text from PDF:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    throw new Error(`Failed to extract text from PDF: ${errorMessage}`);
+
+    // Provide more detailed error information
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+      throw new Error(`Failed to extract text from PDF: ${error.message}`);
+    }
+
+    throw new Error('Failed to extract text from PDF: Unknown error');
   }
 }
