@@ -19,7 +19,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Read file content directly into memory (no temp files needed for Vercel)
-    const fileContent = await file.text();
+    // For PDFs, we'll need to extract text properly, but for now try text() first
+    let fileContent: string;
+    try {
+      fileContent = await file.text();
+      console.log(`File content length: ${fileContent.length} characters`);
+      console.log(`File content preview (first 500 chars): ${fileContent.substring(0, 500)}`);
+    } catch (error) {
+      console.error('Error reading file as text:', error);
+      return NextResponse.json(
+        { success: false, error: `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}` },
+        { status: 400 }
+      );
+    }
 
     // Parse additional form data
     let strMetrics, monthlyExpenses, mortgageValues;
@@ -50,6 +62,15 @@ export async function POST(request: NextRequest) {
 
     // Parse file content
     const propertyData = await parseFileContent(fileContent, fileExtension, strMetrics, monthlyExpenses);
+    
+    // Log parsed data for debugging
+    console.log('Parsed property data:', {
+      address: propertyData.address,
+      purchase_price: propertyData.purchase_price || propertyData.purchasePrice,
+      monthly_rent: propertyData.monthly_rent || propertyData.monthlyRent,
+      bedrooms: propertyData.bedrooms,
+      bathrooms: propertyData.bathrooms,
+    });
 
     // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
     const propertyFundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
