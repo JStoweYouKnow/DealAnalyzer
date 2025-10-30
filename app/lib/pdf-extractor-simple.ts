@@ -2,18 +2,19 @@
 // This is a simpler alternative to pdfjs-dist that works better in serverless environments
 
 // pdf-parse exports PDFParse class, but we use dynamic require for compatibility
+// pdf-parse's default export in CommonJS is the function we need
 let pdfParse: any;
 
 // Initialize pdf-parse dynamically (handles both ESM and CJS)
 async function getPdfParse() {
   if (!pdfParse) {
     try {
-      // Try ESM import first
-      const pdfParseModule = await import('pdf-parse');
-      pdfParse = pdfParseModule.default || pdfParseModule.PDFParse || pdfParseModule;
-    } catch {
-      // Fallback to require for CommonJS
+      // Use require for CommonJS compatibility (works in Next.js serverless)
       pdfParse = require('pdf-parse');
+    } catch {
+      // Fallback to dynamic import if require fails
+      const pdfParseModule = await import('pdf-parse');
+      pdfParse = (pdfParseModule as any).default || pdfParseModule.PDFParse || pdfParseModule;
     }
   }
   return pdfParse;
