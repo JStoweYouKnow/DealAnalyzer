@@ -16,7 +16,16 @@ interface MortgageCalculatorResult {
   payback_period_months?: number;
 }
 
-export function MortgageCalculator() {
+interface MortgageCalculatorProps {
+  onMortgageCalculated?: (values: {
+    loanAmount: number;
+    interestRate: number;
+    loanTermYears: number;
+    monthlyPayment: number;
+  } | null) => void;
+}
+
+export function MortgageCalculator({ onMortgageCalculated }: MortgageCalculatorProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<MortgageCalculatorResult | null>(null);
@@ -103,6 +112,16 @@ export function MortgageCalculator() {
           throw new Error('Received invalid calculation result');
         }
         setResult(data.data);
+        
+        // Notify parent component of calculated values
+        if (onMortgageCalculated) {
+          onMortgageCalculated({
+            loanAmount: loan,
+            interestRate: rate,
+            loanTermYears: years,
+            monthlyPayment: data.data.monthly_payment,
+          });
+        }
       } else {
         throw new Error(data.error || 'Calculation failed');
       }
@@ -123,6 +142,11 @@ export function MortgageCalculator() {
     setInterestRate("");
     setDurationYears("30");
     setResult(null);
+    
+    // Notify parent that mortgage calculator was reset
+    if (onMortgageCalculated) {
+      onMortgageCalculated(null);
+    }
   };
 
   return (

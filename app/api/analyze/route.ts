@@ -21,25 +21,42 @@ export async function POST(request: NextRequest) {
     }
 
     const { emailContent, strMetrics, monthlyExpenses, fundingSource } = validation.data;
+    
+    // Parse mortgage values if provided (not in schema yet, so check body directly)
+    const mortgageValues = (body as any).mortgageValues;
 
     // Parse email content to extract property data
     const propertyData = parseEmailContent(emailContent);
 
-    // Fetch current mortgage rate (fallback to 7% on error)
-    const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
     // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
     const propertyFundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
-    const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS];
-    const downpayment = purchasePrice * downpaymentPercentage;
-    const loanAmount = purchasePrice - downpayment;
-    const mortgageRate = await getMortgageRate({
-      loan_term: 30,
-      loan_amount: loanAmount,
-      zip_code: propertyData.zip_code || propertyData.zipCode,
-    });
+    
+    // Use mortgage calculator values if provided, otherwise fetch mortgage rate
+    let mortgageRate: number | undefined;
+    if (mortgageValues) {
+      // Convert interest rate from percentage to decimal
+      mortgageRate = mortgageValues.interestRate / 100;
+      console.log('Using mortgage calculator values:', {
+        loanAmount: mortgageValues.loanAmount,
+        interestRate: mortgageRate,
+        loanTermYears: mortgageValues.loanTermYears,
+        monthlyPayment: mortgageValues.monthlyPayment
+      });
+    } else {
+      // Fetch current mortgage rate (fallback to 7% on error)
+      const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
+      const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS];
+      const downpayment = purchasePrice * downpaymentPercentage;
+      const loanAmount = purchasePrice - downpayment;
+      mortgageRate = await getMortgageRate({
+        loan_term: 30,
+        loan_amount: loanAmount,
+        zip_code: propertyData.zip_code || propertyData.zipCode,
+      });
+    }
 
-    // Run TypeScript analysis
-    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, propertyFundingSource, mortgageRate);
+    // Run TypeScript analysis with optional mortgage values
+    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, propertyFundingSource, mortgageRate, mortgageValues);
     
     // Run AI analysis if available
     let analysisWithAI = analysisData;

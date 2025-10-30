@@ -126,13 +126,21 @@ export function parseEmailContent(emailContent: string): any {
   return property;
 }
 
+interface MortgageValues {
+  loanAmount: number;
+  interestRate: number; // As percentage (e.g., 3.5 for 3.5%)
+  loanTermYears: number;
+  monthlyPayment: number;
+}
+
 // Main analysis function
 export function analyzeProperty(
   propertyData: any,
   strMetrics?: { adr?: number; occupancyRate?: number; monthlyRent?: number },
   monthlyExpenses?: any,
   fundingSource?: FundingSource,
-  mortgageRate?: number // Annual interest rate as decimal (e.g., 0.07 for 7%)
+  mortgageRate?: number, // Annual interest rate as decimal (e.g., 0.07 for 7%)
+  mortgageValues?: MortgageValues // Mortgage calculator values (loan amount, interest rate, loan term, monthly payment)
 ): PropertyAnalysis {
   const criteria = loadInvestmentCriteria();
 
@@ -174,12 +182,25 @@ export function analyzeProperty(
 
   // Financial Calculations
   // Use funding source to determine down payment percentage
-  const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource];
+  // If mortgage calculator provided loan amount, calculate down payment from purchase price - loan amount
+  let calculatedDownpayment: number;
+  if (mortgageValues && mortgageValues.loanAmount > 0) {
+    // Down payment = purchase price - loan amount from mortgage calculator
+    calculatedDownpayment = purchasePrice - mortgageValues.loanAmount;
+    console.log('Using mortgage calculator loan amount:', {
+      purchasePrice,
+      loanAmount: mortgageValues.loanAmount,
+      calculatedDownpayment
+    });
+  } else {
+    // Use funding source percentage
+    const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource];
+    calculatedDownpayment = purchasePrice * downpaymentPercentage;
+  }
+  
   const closingCostsPercentage = (criteria.closing_costs_percentage_min + criteria.closing_costs_percentage_max) / 2;
   const initialFixedCostsPercentage = criteria.initial_fixed_costs_percentage;
   const maintenanceReservePercentage = criteria.maintenance_reserve_percentage;
-
-  const calculatedDownpayment = purchasePrice * downpaymentPercentage;
   const calculatedClosingCosts = purchasePrice * closingCostsPercentage;
   const calculatedInitialFixedCosts = purchasePrice * initialFixedCostsPercentage;
   const estimatedMaintenanceReserve = monthlyRent * maintenanceReservePercentage;
@@ -191,15 +212,21 @@ export function analyzeProperty(
 
   // Calculate estimated monthly mortgage payment (Principal & Interest)
   // For cash purchases, there is no mortgage payment
+  // If mortgage calculator provided monthly payment, use it directly
   let monthlyMortgagePayment = 0;
   if (propertyFundingSource === 'cash') {
     monthlyMortgagePayment = 0;
+  } else if (mortgageValues && mortgageValues.monthlyPayment > 0) {
+    // Use the monthly payment from mortgage calculator
+    monthlyMortgagePayment = mortgageValues.monthlyPayment;
+    console.log('Using mortgage calculator monthly payment:', monthlyMortgagePayment);
   } else {
+    // Calculate mortgage payment using loan amount and interest rate
     const loanAmount = purchasePrice - calculatedDownpayment;
     // Use provided mortgage rate or default to 7% (0.07)
     const annualInterestRate = mortgageRate ?? 0.07;
     const monthlyInterestRate = annualInterestRate / 12;
-    const numberOfPayments = 30 * 12;
+    const numberOfPayments = 30 * 12; // Default to 30 years if not provided
 
     if (monthlyInterestRate > 0 && loanAmount > 0) {
       monthlyMortgagePayment = loanAmount * (monthlyInterestRate * (1 + monthlyInterestRate)**numberOfPayments) / ((1 + monthlyInterestRate)**numberOfPayments - 1);

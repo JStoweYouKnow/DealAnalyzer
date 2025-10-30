@@ -15,9 +15,17 @@ import { useToast } from "@/hooks/use-toast";
 import { useComparison } from "@/hooks/use-comparison";
 import type { AnalyzePropertyResponse, DealAnalysis, CriteriaResponse } from "@shared/schema";
 
+interface MortgageValues {
+  loanAmount: number;
+  interestRate: number;
+  loanTermYears: number;
+  monthlyPayment: number;
+}
+
 export default function HomePage() {
   const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(null);
   const [recentAnalyses, setRecentAnalyses] = useState<DealAnalysis[]>([]);
+  const [mortgageValues, setMortgageValues] = useState<MortgageValues | null>(null);
   const { toast } = useToast();
 
   const { 
@@ -35,7 +43,7 @@ export default function HomePage() {
 
   // Analysis mutation
   const analysisMutation = useMutation({
-    mutationFn: async (data: { emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any }) => {
+    mutationFn: async (data: { emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any; mortgageValues?: MortgageValues }) => {
       if (data.file) {
         // Handle file upload
         const formData = new FormData();
@@ -51,6 +59,9 @@ export default function HomePage() {
         }
         if (data.fundingSource) {
           formData.append('fundingSource', data.fundingSource);
+        }
+        if (data.mortgageValues) {
+          formData.append('mortgageValues', JSON.stringify(data.mortgageValues));
         }
         
         const response = await fetch('/api/analyze-file', {
@@ -71,6 +82,7 @@ export default function HomePage() {
           ltrMetrics: data.ltrMetrics,
           monthlyExpenses: data.monthlyExpenses,
           fundingSource: data.fundingSource,
+          mortgageValues: data.mortgageValues,
         });
         return response.json() as Promise<AnalyzePropertyResponse>;
       }
@@ -107,7 +119,7 @@ export default function HomePage() {
     },
   });
 
-  const handleAnalyze = (data: { emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any }) => {
+  const handleAnalyze = (data: { emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any; mortgageValues?: MortgageValues }) => {
     analysisMutation.mutate(data);
   };
 
@@ -152,9 +164,10 @@ export default function HomePage() {
           <AnalyzerForm 
             onAnalyze={handleAnalyze}
             isLoading={analysisMutation.isPending}
+            mortgageValues={mortgageValues}
             data-testid="analyzer-form"
           />
-          <MortgageCalculator />
+          <MortgageCalculator onMortgageCalculated={setMortgageValues} />
         </div>
 
         {/* Right Panel - Analysis Results */}

@@ -28,12 +28,20 @@ interface MonthlyExpenses {
   other?: number;
 }
 
-interface AnalyzerFormProps {
-  onAnalyze: (data: { file?: File; strMetrics?: STRMetrics; ltrMetrics?: LTRMetrics; monthlyExpenses?: MonthlyExpenses; fundingSource?: FundingSource }) => void;
-  isLoading: boolean;
+interface MortgageValues {
+  loanAmount: number;
+  interestRate: number;
+  loanTermYears: number;
+  monthlyPayment: number;
 }
 
-export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
+interface AnalyzerFormProps {
+  onAnalyze: (data: { file?: File; strMetrics?: STRMetrics; ltrMetrics?: LTRMetrics; monthlyExpenses?: MonthlyExpenses; fundingSource?: FundingSource; mortgageValues?: MortgageValues }) => void;
+  isLoading: boolean;
+  mortgageValues?: MortgageValues | null;
+}
+
+export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues }: AnalyzerFormProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [strMetrics, setSTRMetrics] = useState<STRMetrics>({});
   const [ltrMetrics, setLTRMetrics] = useState<LTRMetrics>({});
@@ -48,7 +56,7 @@ export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
       return;
     }
 
-    onAnalyze({ file: selectedFile, strMetrics, ltrMetrics, monthlyExpenses, fundingSource });
+    onAnalyze({ file: selectedFile, strMetrics, ltrMetrics, monthlyExpenses, fundingSource, mortgageValues: mortgageValues || undefined });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,6 +157,22 @@ export function AnalyzerForm({ onAnalyze, isLoading }: AnalyzerFormProps) {
                     {fundingSource === 'dscr' && 'DSCR (Debt Service Coverage Ratio) loans require 20% down payment'}
                     {fundingSource === 'cash' && 'Cash purchase - no mortgage payment'}
                   </p>
+                  {mortgageValues && (
+                    <div className="mt-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <i className="fas fa-info-circle text-blue-600 dark:text-blue-400"></i>
+                        <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                          Using Mortgage Calculator Values
+                        </p>
+                      </div>
+                      <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                        <p>Loan Amount: ${mortgageValues.loanAmount.toLocaleString()}</p>
+                        <p>Interest Rate: {mortgageValues.interestRate}% ({mortgageValues.loanTermYears} years)</p>
+                        <p>Monthly Payment: ${mortgageValues.monthlyPayment.toFixed(2)}</p>
+                        <p className="mt-1 italic">Down payment will be calculated from purchase price - loan amount</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
               
