@@ -1,6 +1,56 @@
 // PDF text extraction utility using pdf-parse (no workers required)
 // This is a simpler alternative to pdfjs-dist that works better in serverless environments
 
+// Polyfill DOMMatrix for Node.js/serverless environments
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  // Simple DOMMatrix polyfill for pdf-parse
+  (globalThis as any).DOMMatrix = class DOMMatrix {
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+    
+    constructor(init?: string | number[]) {
+      if (typeof init === 'string') {
+        const matrix = init.match(/matrix\(([^)]+)\)/);
+        if (matrix) {
+          const values = matrix[1].split(',').map(v => parseFloat(v.trim()));
+          if (values.length === 6) {
+            this.a = values[0]; this.b = values[1]; this.c = values[2];
+            this.d = values[3]; this.e = values[4]; this.f = values[5];
+          }
+        }
+      } else if (Array.isArray(init) && init.length === 6) {
+        this.a = init[0]; this.b = init[1]; this.c = init[2];
+        this.d = init[3]; this.e = init[4]; this.f = init[5];
+      }
+    }
+    
+    multiply(other: any) {
+      const result = new (globalThis as any).DOMMatrix();
+      result.a = this.a * other.a + this.c * other.b;
+      result.b = this.b * other.a + this.d * other.b;
+      result.c = this.a * other.c + this.c * other.d;
+      result.d = this.b * other.c + this.d * other.d;
+      result.e = this.a * other.e + this.c * other.f + this.e;
+      result.f = this.b * other.e + this.d * other.f + this.f;
+      return result;
+    }
+    
+    toString() {
+      return `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.e}, ${this.f})`;
+    }
+  };
+}
+
+// Polyfill DOMPoint for Node.js/serverless environments
+if (typeof globalThis.DOMPoint === 'undefined') {
+  (globalThis as any).DOMPoint = class DOMPoint {
+    x = 0; y = 0; z = 0; w = 1;
+    
+    constructor(x = 0, y = 0, z = 0, w = 1) {
+      this.x = x; this.y = y; this.z = z; this.w = w;
+    }
+  };
+}
+
 // pdf-parse exports PDFParse class, but we use dynamic require for compatibility
 // pdf-parse's default export in CommonJS is the function we need
 let pdfParse: any;
