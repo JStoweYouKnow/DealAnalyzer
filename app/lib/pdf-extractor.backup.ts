@@ -76,16 +76,25 @@ export async function extractTextFromPDF(file: File | Buffer | ArrayBuffer): Pro
       // If worker-related error, try without worker
       if (loadError instanceof Error && (loadError.message.includes('worker') || loadError.message.includes('Worker'))) {
         console.log('Worker error detected, trying fallback method...');
-        // Reset worker source and try again
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-        const loadingTask = pdfjsLib.getDocument({ 
-          data: arrayBuffer,
-          useSystemFonts: true,
-          disableAutoFetch: true,
-          disableStream: true,
+        // Create a PDFWorker without a port to run on main thread
+        // This avoids the fake-worker fallback and warnings
+        const mainThreadWorker = pdfjsLib.PDFWorker.create({ 
+          verbosity: 0 
         });
-        pdf = await loadingTask.promise;
-        console.log('PDF loaded with fallback method, pages:', pdf.numPages);
+        try {
+          const loadingTask = pdfjsLib.getDocument({ 
+            data: arrayBuffer,
+            useSystemFonts: true,
+            disableAutoFetch: true,
+            disableStream: true,
+            worker: mainThreadWorker,
+          });
+          pdf = await loadingTask.promise;
+          console.log('PDF loaded with fallback method, pages:', pdf.numPages);
+        } finally {
+          // Clean up the worker
+          mainThreadWorker.destroy();
+        }
       } else {
         throw loadError;
       }

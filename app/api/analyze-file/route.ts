@@ -5,7 +5,7 @@ import { storage } from "../../../server/storage";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 import { getMortgageRate } from "../../../server/mortgage-rate-service";
 import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
-import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
+import { FUNDING_SOURCE_DOWN_PAYMENTS, mortgageValuesSchema } from "../../../shared/schema";
 import { extractTextFromPDF } from "../../lib/pdf-extractor";
 
 export async function POST(request: NextRequest) {
@@ -94,7 +94,19 @@ export async function POST(request: NextRequest) {
         monthlyExpenses = JSON.parse(formData.get('monthlyExpenses') as string);
       }
       if (formData.get('mortgageValues')) {
-        mortgageValues = JSON.parse(formData.get('mortgageValues') as string);
+        const rawMortgageValues = JSON.parse(formData.get('mortgageValues') as string);
+        // Validate mortgage values using schema
+        const validation = mortgageValuesSchema.safeParse(rawMortgageValues);
+        if (!validation.success) {
+          return NextResponse.json(
+            { 
+              success: false, 
+              error: "Invalid mortgage values: " + validation.error.errors.map(e => e.message).join(", ")
+            },
+            { status: 400 }
+          );
+        }
+        mortgageValues = validation.data;
       }
       const fundingSourceStr = formData.get('fundingSource') as string | null;
       if (fundingSourceStr && ['conventional', 'fha', 'va', 'dscr', 'cash'].includes(fundingSourceStr)) {
@@ -122,27 +134,69 @@ export async function POST(request: NextRequest) {
     const propertyFundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
     
     // Use mortgage calculator values if provided, otherwise fetch mortgage rate
+    // Note: mortgageRate should be passed directly as a decimal if provided
+    // MortgageValues no longer includes interestRate - use monthlyPayment directly
     let mortgageRate: number | undefined;
     if (mortgageValues) {
-      // Convert interest rate from percentage to decimal
-      mortgageRate = mortgageValues.interestRate / 100;
       console.log('Using mortgage calculator values:', {
         loanAmount: mortgageValues.loanAmount,
-        interestRate: mortgageRate,
         loanTermYears: mortgageValues.loanTermYears,
         monthlyPayment: mortgageValues.monthlyPayment
       });
+      // mortgageRate will be undefined when mortgageValues is provided,
+      // and analyzeProperty will use mortgageValues.monthlyPayment directly
     } else {
       // Fetch current mortgage rate (fallback to 7% on error)
       const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
-      const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS];
+      
+      // Validate purchasePrice is a positive number
+      if (typeof purchasePrice !== 'number' || !Number.isFinite(purchasePrice) || purchasePrice <= 0) {
+        return NextResponse.json(
+          { success: false, error: "Invalid purchase price. Please provide a positive number." },
+          { status: 400 }
+        );
+      }
+      
+      // Validate that propertyFundingSource exists as a key in FUNDING_SOURCE_DOWN_PAYMENTS
+      const isValidFundingSource = propertyFundingSource in FUNDING_SOURCE_DOWN_PAYMENTS;
+      if (!isValidFundingSource) {
+        return NextResponse.json(
+          { success: false, error: `Invalid funding source: ${propertyFundingSource}. Valid options are: conventional, fha, va, dscr, cash.` },
+          { status: 400 }
+        );
+      }
+      
+      const validatedFundingSource = propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS;
+      const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[validatedFundingSource];
+      
+      // Ensure downpaymentPercentage is defined (should never be undefined due to validation above, but adding safety check)
+      if (downpaymentPercentage === undefined) {
+        return NextResponse.json(
+          { success: false, error: `Down payment percentage not found for funding source: ${propertyFundingSource}` },
+          { status: 500 }
+        );
+      }
+      
       const downpayment = purchasePrice * downpaymentPercentage;
       const loanAmount = purchasePrice - downpayment;
-      mortgageRate = await getMortgageRate({
-        loan_term: 30,
-        loan_amount: loanAmount,
-        zip_code: propertyData.zip_code || propertyData.zipCode,
-      });
+      
+      // Fetch mortgage rate with error handling
+      try {
+        const zipCode = propertyData.zip_code || propertyData.zipCode;
+        if (zipCode) {
+          mortgageRate = await getMortgageRate({
+            loan_term: 30,
+            loan_amount: loanAmount,
+            zip_code: zipCode,
+          });
+        } else {
+          console.warn('No zip code found in property data, using default mortgage rate of 7%');
+          mortgageRate = 0.07;
+        }
+      } catch (error) {
+        console.error('Error fetching mortgage rate, falling back to 7%:', error);
+        mortgageRate = 0.07;
+      }
     }
 
     // Fetch current investment criteria

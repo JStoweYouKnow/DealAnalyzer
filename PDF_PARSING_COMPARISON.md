@@ -24,7 +24,7 @@
 #### Cons
 - ❌ No page-by-page extraction (extracts all text at once)
 - ❌ Limited formatting/layout preservation
-- ❌ Node.js only (no browser support)
+- ⚠️ Primarily Node.js-focused, but recent builds support browser usage with ESM/UMD and web/worker bundles — verify bundler/config for your app
 
 #### Installation
 ```bash
@@ -135,6 +135,8 @@ npm install @anthropic/pdfjs-serverless
 
 ## Migration Guide
 
+**Environment Compatibility**: pdf-parse targets server-side environments by default, unpdf supports both client and server usage, and pdfjs-dist requires browser/web worker setup. For browser usage with pdf-parse, ensure your bundler supports ESM/UMD and configure worker setup if needed.
+
 ### Quick Switch to pdf-parse
 
 1. **Install pdf-parse**:
@@ -157,10 +159,21 @@ npm install @anthropic/pdfjs-serverless
    # Upload a PDF and verify it works
    ```
 
-4. **Optional - Remove old dependencies**:
+4. **Optional - Remove old dependencies** (ONLY after verification):
+   
+   **⚠️ IMPORTANT**: Before removing these packages, verify they're not used elsewhere:
+   
+   ```bash
+   # Search for any remaining imports/usages
+   grep -r "pdfjs-dist\|pdfjs" --include="*.ts" --include="*.tsx" --include="*.js" .
+   ```
+   
+   If the grep command shows no results (or only matches in backup files), it's safe to remove:
    ```bash
    npm uninstall pdfjs-dist @types/pdfjs-dist
    ```
+   
+   If you see matches in active code files, update those files first before uninstalling.
 
 ### Quick Switch to unpdf
 

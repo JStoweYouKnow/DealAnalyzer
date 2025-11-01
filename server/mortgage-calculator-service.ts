@@ -54,17 +54,24 @@ export async function calculateMortgage(
     
     // Check if the API returned null or missing values
     if (!data || data.monthly_payment === null || data.monthly_payment === undefined) {
-      console.warn('API returned null or invalid values, will use manual calculation');
-      throw new Error('API returned null values');
+      console.warn('API returned null or invalid values, using manual calculation fallback');
+      // Convert percentage interest rate to decimal for manual calculation
+      const manualResult = calculateMortgageManual(
+        params.loan_amount,
+        params.interest_rate / 100,
+        params.duration_years
+      );
+      console.log('Manual calculation fallback result:', manualResult);
+      return manualResult;
     }
     
     // Ensure all required fields are present and valid
     const result: MortgageCalculatorResponse = {
-      monthly_payment: data.monthly_payment ?? 0,
-      total_interest_paid: data.total_interest_paid ?? 0,
-      total_paid: data.total_paid ?? 0,
-      payback_period_years: data.payback_period_years ?? data.duration_years ?? undefined,
-      payback_period_months: data.payback_period_months ?? undefined,
+      monthly_payment: data.monthly_payment,
+      total_interest_paid: data.total_interest_paid,
+      total_paid: data.total_paid,
+      payback_period_years: data.payback_period_years,
+      payback_period_months: data.payback_period_months,
     };
     
     return result;

@@ -1,5 +1,5 @@
 // TypeScript property analyzer to replace Python backend for Vercel deployment
-import type { Property, FundingSource } from "../../shared/schema";
+import type { Property, FundingSource, MortgageValues } from "../../shared/schema";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../shared/schema";
 
 export interface PropertyAnalysis {
@@ -127,13 +127,6 @@ export function parseEmailContent(emailContent: string): any {
   return property;
 }
 
-interface MortgageValues {
-  loanAmount: number;
-  interestRate: number; // As percentage (e.g., 3.5 for 3.5%)
-  loanTermYears: number;
-  monthlyPayment: number;
-}
-
 // Main analysis function
 export function analyzeProperty(
   propertyData: any,
@@ -141,7 +134,7 @@ export function analyzeProperty(
   monthlyExpenses?: any,
   fundingSource?: FundingSource,
   mortgageRate?: number, // Annual interest rate as decimal (e.g., 0.07 for 7%)
-  mortgageValues?: MortgageValues, // Mortgage calculator values (loan amount, interest rate, loan term, monthly payment)
+  mortgageValues?: MortgageValues, // Mortgage calculator values (loan amount, loan term, monthly payment)
   criteria?: any // Optional criteria - if not provided, uses default
 ): PropertyAnalysis {
   // Use provided criteria or fall back to default
@@ -151,7 +144,11 @@ export function analyzeProperty(
   const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
 
   // Get funding source (from parameter, property data, or default to 'conventional')
-  const propertyFundingSource: FundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
+  let propertyFundingSource: FundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
+  // Validate that propertyFundingSource exists as a key in FUNDING_SOURCE_DOWN_PAYMENTS
+  if (!Object.prototype.hasOwnProperty.call(FUNDING_SOURCE_DOWN_PAYMENTS, propertyFundingSource)) {
+    propertyFundingSource = 'conventional';
+  }
   
   // Calculate monthly rent: if STR metrics are provided, calculate from ADR and occupancy
   let monthlyRent = strMetrics?.monthlyRent || propertyData.monthly_rent || propertyData.monthlyRent || 0;
@@ -189,16 +186,31 @@ export function analyzeProperty(
   let calculatedDownpayment: number;
   if (mortgageValues && mortgageValues.loanAmount > 0) {
     // Down payment = purchase price - loan amount from mortgage calculator
-    calculatedDownpayment = purchasePrice - mortgageValues.loanAmount;
-    console.log('Using mortgage calculator loan amount:', {
-      purchasePrice,
-      loanAmount: mortgageValues.loanAmount,
-      calculatedDownpayment
-    });
+    // Validate: loan amount should not exceed purchase price
+    if (mortgageValues.loanAmount >= purchasePrice) {
+      console.warn('Warning: Loan amount >= purchase price, setting downpayment to 0', {
+        purchasePrice,
+        loanAmount: mortgageValues.loanAmount,
+        calculatedDownpayment: 0
+      });
+      calculatedDownpayment = 0;
+    } else {
+      calculatedDownpayment = Math.max(0, purchasePrice - mortgageValues.loanAmount);
+      console.log('Using mortgage calculator loan amount:', {
+        purchasePrice,
+        loanAmount: mortgageValues.loanAmount,
+        calculatedDownpayment
+      });
+    }
   } else {
     // Use funding source percentage
-    const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource];
+    const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource] || 0.20;
     calculatedDownpayment = purchasePrice * downpaymentPercentage;
+    console.log('Using funding source percentage:', {
+      fundingSource: propertyFundingSource,
+      downpaymentPercentage,
+      calculatedDownpayment
+    });
   }
   
   const closingCostsPercentage = (analysisCriteria.closing_costs_percentage_min + analysisCriteria.closing_costs_percentage_max) / 2;

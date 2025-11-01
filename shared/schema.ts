@@ -114,6 +114,15 @@ export const dealAnalysisSchema = z.object({
   analysisDate: z.date().optional(),
 });
 
+// Mortgage values schema for mortgage calculator input
+export const mortgageValuesSchema = z.object({
+  loanAmount: z.coerce.number().positive("Loan amount must be positive").finite("Loan amount must be a finite number"),
+  loanTermYears: z.coerce.number().positive("Loan term must be positive").int("Loan term must be an integer").finite("Loan term must be a finite number"),
+  monthlyPayment: z.coerce.number().positive("Monthly payment must be positive").finite("Monthly payment must be a finite number"),
+});
+
+export type MortgageValues = z.infer<typeof mortgageValuesSchema>;
+
 // API request/response schemas
 export const analyzePropertyRequestSchema = z.object({
   emailContent: z.string().min(1, "Email content is required"),
@@ -132,6 +141,7 @@ export const analyzePropertyRequestSchema = z.object({
     supplies: z.number().optional(),
     other: z.number().optional(),
   }).optional(),
+  mortgageValues: mortgageValuesSchema.optional(),
 });
 
 export const analyzePropertyResponseSchema = z.object({
@@ -173,10 +183,17 @@ export const configurableCriteriaSchema = z.object({
   // COC Return range (as percentages, will be converted to decimals)
   coc_return_min: z.number().min(0, "COC return minimum must be positive").max(100, "COC return cannot exceed 100%"),
   coc_return_max: z.number().min(0, "COC return maximum must be positive").max(100, "COC return cannot exceed 100%"),
+  coc_benchmark_min: z.number().min(0, "COC benchmark minimum must be positive").max(100, "COC benchmark cannot exceed 100%").optional(),
+  coc_benchmark_max: z.number().min(0, "COC benchmark maximum must be positive").max(100, "COC benchmark cannot exceed 100%").optional(),
+  coc_minimum_min: z.number().min(0, "COC minimum minimum must be positive").max(100, "COC minimum cannot exceed 100%").optional(),
+  coc_minimum_max: z.number().min(0, "COC minimum maximum must be positive").max(100, "COC minimum cannot exceed 100%").optional(),
   
   // Cap Rate range (as percentages, will be converted to decimals)
   cap_rate_min: z.number().min(0, "Cap rate minimum must be positive").max(100, "Cap rate cannot exceed 100%"),
   cap_rate_max: z.number().min(0, "Cap rate maximum must be positive").max(100, "Cap rate cannot exceed 100%"),
+  cap_benchmark_min: z.number().min(0, "Cap benchmark minimum must be positive").max(100, "Cap benchmark cannot exceed 100%").optional(),
+  cap_benchmark_max: z.number().min(0, "Cap benchmark maximum must be positive").max(100, "Cap benchmark cannot exceed 100%").optional(),
+  cap_minimum: z.number().min(0, "Cap minimum must be positive").max(100, "Cap minimum cannot exceed 100%").optional(),
 }).refine(data => data.price_min <= data.price_max, {
   message: "Minimum price cannot be greater than maximum price",
   path: ["price_max"]
@@ -186,6 +203,15 @@ export const configurableCriteriaSchema = z.object({
 }).refine(data => data.cap_rate_min <= data.cap_rate_max, {
   message: "Minimum cap rate cannot be greater than maximum cap rate",
   path: ["cap_rate_max"]
+}).refine(data => !data.coc_benchmark_min || !data.coc_benchmark_max || data.coc_benchmark_min <= data.coc_benchmark_max, {
+  message: "COC benchmark minimum cannot be greater than maximum",
+  path: ["coc_benchmark_max"]
+}).refine(data => !data.coc_minimum_min || !data.coc_minimum_max || data.coc_minimum_min <= data.coc_minimum_max, {
+  message: "COC minimum minimum cannot be greater than maximum",
+  path: ["coc_minimum_max"]
+}).refine(data => !data.cap_benchmark_min || !data.cap_benchmark_max || data.cap_benchmark_min <= data.cap_benchmark_max, {
+  message: "Cap benchmark minimum cannot be greater than maximum",
+  path: ["cap_benchmark_max"]
 });
 
 // Update criteria request schema

@@ -17,7 +17,6 @@ import type { AnalyzePropertyResponse, DealAnalysis, CriteriaResponse } from "@s
 
 interface MortgageValues {
   loanAmount: number;
-  interestRate: number;
   loanTermYears: number;
   monthlyPayment: number;
 }
@@ -78,7 +77,7 @@ export default function HomePage() {
           throw new Error(errorMessage + (errorDetails ? `\n${errorDetails}` : ''));
         }
         
-        return responseData as Promise<AnalyzePropertyResponse>;
+        return responseData as AnalyzePropertyResponse;
       } else {
         // Handle text input (existing functionality)
         const response = await apiRequest("POST", "/api/analyze", {

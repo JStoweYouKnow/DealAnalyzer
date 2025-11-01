@@ -4,7 +4,7 @@ import fs from "fs";
 import type { CriteriaResponse } from "@shared/schema";
 
 // Default criteria for Vercel/serverless environments
-const DEFAULT_CRITERIA: CriteriaResponse = {
+export const DEFAULT_CRITERIA: CriteriaResponse = {
   property_types: ["Single Family", "Multi-Family", "Condo"],
   location: "Any",
   max_purchase_price: 500000,

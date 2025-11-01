@@ -148,20 +148,74 @@
                 });
 
                 console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
-                const data = await response.json();
-                console.log('Response data:', data);
+                // Safely parse JSON response
+                let data;
+                const contentType = response.headers.get('content-type');
+                const isJson = contentType && contentType.includes('application/json');
+                
+                // Read response body once (can only be read once)
+                let responseText;
+                try {
+                    responseText = await response.text();
+                } catch (readError) {
+                    console.error('Failed to read response body:', readError);
+                    showResult(`
+                        <h3>❌ Read Error</h3>
+                        <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                        <p><strong>Error:</strong> Could not read response body: ${readError.message}</p>
+                    `, 'error');
+                    return;
+                }
+                
+                try {
+                    if (isJson) {
+                        data = JSON.parse(responseText);
+                        console.log('Response data:', data);
+                    } else {
+                        // Not JSON, show raw text
+                        console.error('Non-JSON response:', responseText);
+                        showResult(`
+                            <h3>❌ Non-JSON Response</h3>
+                            <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                            <p><strong>Content-Type:</strong> ${contentType || 'unknown'}</p>
+                            <p>Server returned non-JSON content</p>
+                            <hr>
+                            <details>
+                                <summary>Response Body (Raw)</summary>
+                                <pre>${responseText.substring(0, 1000)}${responseText.length > 1000 ? '\n... (truncated)' : ''}</pre>
+                            </details>
+                        `, 'error');
+                        return;
+                    }
+                } catch (parseError) {
+                    // Handle JSON parse errors
+                    console.error('JSON parse error:', parseError);
+                    showResult(`
+                        <h3>❌ Parse Error</h3>
+                        <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                        <p><strong>Content-Type:</strong> ${contentType || 'unknown'}</p>
+                        <p><strong>Error:</strong> ${parseError.message}</p>
+                        <hr>
+                        <details>
+                            <summary>Response Body (Raw)</summary>
+                            <pre>${responseText.substring(0, 1000)}${responseText.length > 1000 ? '\n... (truncated)' : ''}</pre>
+                        </details>
+                    `, 'error');
+                    return;
+                }
 
                 if (response.ok && data.success) {
                     showResult(`
                         <h3>✅ Success!</h3>
-                        <p>Property: ${data.data.property.address || 'Unknown address'}</p>
-                        <p>Purchase Price: $${(data.data.property.purchasePrice || 0).toLocaleString()}</p>
-                        <p>Monthly Rent: $${(data.data.property.monthlyRent || 0).toLocaleString()}</p>
-                        <p>COC Return: ${(data.data.cocReturn * 100).toFixed(2)}%</p>
-                        <p>Cap Rate: ${(data.data.capRate * 100).toFixed(2)}%</p>
-                        <p>Cash Flow: $${data.data.cashFlow.toFixed(2)}/month</p>
-                        <p>Meets Criteria: ${data.data.meetsCriteria ? '✅ Yes' : '❌ No'}</p>
+                        <p>Property: ${data?.data?.property?.address ?? 'Unknown address'}</p>
+                        <p>Purchase Price: $${((data?.data?.property?.purchasePrice ?? 0)).toLocaleString()}</p>
+                        <p>Monthly Rent: $${((data?.data?.property?.monthlyRent ?? 0)).toLocaleString()}</p>
+                        <p>COC Return: ${((data?.data?.cocReturn ?? 0) * 100).toFixed(2)}%</p>
+                        <p>Cap Rate: ${((data?.data?.capRate ?? 0) * 100).toFixed(2)}%</p>
+                        <p>Cash Flow: $${((data?.data?.cashFlow ?? 0)).toFixed(2)}/month</p>
+                        <p>Meets Criteria: ${(data?.data?.meetsCriteria ?? false) ? '✅ Yes' : '❌ No'}</p>
                         <hr>
                         <details>
                             <summary>Full Response</summary>
@@ -171,8 +225,8 @@
                 } else {
                     showResult(`
                         <h3>❌ Error</h3>
-                        <p>${data.error || 'Unknown error'}</p>
-                        ${data.details ? `<p>Details: ${data.details}</p>` : ''}
+                        <p>${data?.error ?? 'Unknown error'}</p>
+                        ${data?.details ? `<p>Details: ${data?.details}</p>` : ''}
                         <hr>
                         <details>
                             <summary>Full Response</summary>

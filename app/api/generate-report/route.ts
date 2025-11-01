@@ -81,9 +81,13 @@ export async function POST(request: NextRequest) {
             // Fetch mortgage rate
             const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || emailDeal.extractedProperty?.price || 0;
             // fundingSource is in propertyData after merge, or default to 'conventional'
-            const propertyFundingSource = propertyData.fundingSource || propertyData.funding_source || 'conventional';
+            let propertyFundingSource = propertyData.fundingSource || propertyData.funding_source || 'conventional';
+            // Validate that propertyFundingSource exists as a key in FUNDING_SOURCE_DOWN_PAYMENTS
+            if (!Object.prototype.hasOwnProperty.call(FUNDING_SOURCE_DOWN_PAYMENTS, propertyFundingSource)) {
+              propertyFundingSource = 'conventional';
+            }
             // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
-            const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS];
+            const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS] || 0.20;
             const downpayment = purchasePrice * downpaymentPercentage;
             const loanAmount = purchasePrice - downpayment;
             const mortgageRate = await getMortgageRate({

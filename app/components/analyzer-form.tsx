@@ -31,7 +31,6 @@ interface MonthlyExpenses {
 
 interface MortgageValues {
   loanAmount: number;
-  interestRate: number;
   loanTermYears: number;
   monthlyPayment: number;
 }
@@ -180,7 +179,6 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
         if (onMortgageCalculated) {
           onMortgageCalculated({
             loanAmount: loan,
-            interestRate: rate,
             loanTermYears: years,
             monthlyPayment: data.data.monthly_payment,
           });
@@ -292,7 +290,7 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
                   </div>
                   <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
                     <p>Loan Amount: ${mortgageValues.loanAmount.toLocaleString()}</p>
-                    <p>Interest Rate: {mortgageValues.interestRate}% ({mortgageValues.loanTermYears} years)</p>
+                    <p>Loan Term: {mortgageValues.loanTermYears} years</p>
                     <p>Monthly Payment: ${mortgageValues.monthlyPayment.toFixed(2)}</p>
                     <p className="mt-1 italic">Down payment will be calculated from purchase price - loan amount</p>
                   </div>

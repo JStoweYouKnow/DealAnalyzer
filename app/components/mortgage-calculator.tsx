@@ -19,7 +19,6 @@ interface MortgageCalculatorResult {
 interface MortgageCalculatorProps {
   onMortgageCalculated?: (values: {
     loanAmount: number;
-    interestRate: number;
     loanTermYears: number;
     monthlyPayment: number;
   } | null) => void;
@@ -111,13 +110,29 @@ export function MortgageCalculator({ onMortgageCalculated }: MortgageCalculatorP
             isNaN(data.data.monthly_payment)) {
           throw new Error('Received invalid calculation result');
         }
+        
+        // Validate and sanitize total_interest_paid
+        if (data.data.total_interest_paid === null || 
+            data.data.total_interest_paid === undefined || 
+            isNaN(data.data.total_interest_paid) ||
+            !Number.isFinite(data.data.total_interest_paid)) {
+          throw new Error('Received invalid calculation result');
+        }
+        
+        // Validate and sanitize total_paid
+        if (data.data.total_paid === null || 
+            data.data.total_paid === undefined || 
+            isNaN(data.data.total_paid) ||
+            !Number.isFinite(data.data.total_paid)) {
+          throw new Error('Received invalid calculation result');
+        }
+        
         setResult(data.data);
         
         // Notify parent component of calculated values
         if (onMortgageCalculated) {
           onMortgageCalculated({
             loanAmount: loan,
-            interestRate: rate,
             loanTermYears: years,
             monthlyPayment: data.data.monthly_payment,
           });

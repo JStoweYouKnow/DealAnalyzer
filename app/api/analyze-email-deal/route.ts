@@ -55,19 +55,36 @@ export async function POST(request: NextRequest) {
     // fundingSource is in propertyData after merge, or default to 'conventional'
     const propertyFundingSource = propertyData.fundingSource || propertyData.funding_source || 'conventional';
     // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
-    const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS];
+    // Validate that propertyFundingSource exists as a key in FUNDING_SOURCE_DOWN_PAYMENTS
+    const isValidFundingSource = propertyFundingSource in FUNDING_SOURCE_DOWN_PAYMENTS;
+    const validatedFundingSource = isValidFundingSource ? propertyFundingSource : 'conventional';
+    const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[validatedFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS] ?? 0.20;
     const downpayment = purchasePrice * downpaymentPercentage;
     const loanAmount = purchasePrice - downpayment;
-    const mortgageRate = await getMortgageRate({
-      loan_term: 30,
-      loan_amount: loanAmount,
-      zip_code: propertyData.zip_code || propertyData.zipCode,
-    });
+    
+    // Fetch mortgage rate with error handling
+    let mortgageRate: number;
+    try {
+      const zipCode = propertyData.zip_code || propertyData.zipCode;
+      if (zipCode) {
+        mortgageRate = await getMortgageRate({
+          loan_term: 30,
+          loan_amount: loanAmount,
+          zip_code: zipCode,
+        });
+      } else {
+        console.warn('No zip code found in property data, using default mortgage rate of 7%');
+        mortgageRate = 0.07;
+      }
+    } catch (error) {
+      console.error('Error fetching mortgage rate, falling back to 7%:', error);
+      mortgageRate = 0.07;
+    }
 
     // Fetch current investment criteria
     const criteria = await loadInvestmentCriteria();
     
-    const analysisData = analyzeProperty(propertyData, strMetrics, undefined, propertyFundingSource, mortgageRate, undefined, criteria);
+    const analysisData = analyzeProperty(propertyData, strMetrics, undefined, validatedFundingSource as any, mortgageRate, undefined, criteria);
 
     // Run AI analysis if available
     let analysisWithAI = analysisData;
