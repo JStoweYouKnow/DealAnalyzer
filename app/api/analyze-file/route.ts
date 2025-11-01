@@ -147,12 +147,14 @@ export async function POST(request: NextRequest) {
       // and analyzeProperty will use mortgageValues.monthlyPayment directly
     } else {
       // Fetch current mortgage rate (fallback to 7% on error)
+      // Note: If purchase price is missing but mortgage calculator values are provided,
+      // analyzeProperty will calculate purchase price from loan amount as backup logic
       const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
       
-      // Validate purchasePrice is a positive number
+      // Validate purchasePrice is a positive number (needed to calculate loan amount for mortgage rate)
       if (typeof purchasePrice !== 'number' || !Number.isFinite(purchasePrice) || purchasePrice <= 0) {
         return NextResponse.json(
-          { success: false, error: "Invalid purchase price. Please provide a positive number." },
+          { success: false, error: "Invalid purchase price. Please provide a positive number, or use the mortgage calculator to calculate purchase price from loan amount." },
           { status: 400 }
         );
       }

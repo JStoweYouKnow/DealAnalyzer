@@ -292,7 +292,11 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
                     <p>Loan Amount: ${mortgageValues.loanAmount.toLocaleString()}</p>
                     <p>Loan Term: {mortgageValues.loanTermYears} years</p>
                     <p>Monthly Payment: ${mortgageValues.monthlyPayment.toFixed(2)}</p>
-                    <p className="mt-1 italic">Down payment will be calculated from purchase price - loan amount</p>
+                    <p className="mt-1 italic">
+                      {fundingSource === 'cash' 
+                        ? 'Cash purchase - no mortgage payment used' 
+                        : `Down payment will be calculated from purchase price using ${fundingSource === 'conventional' ? '5%' : fundingSource === 'fha' ? '3.5%' : fundingSource === 'va' ? '0%' : fundingSource === 'dscr' ? '20%' : '100%'} funding source percentage. If purchase price is missing, it will be calculated from loan amount.`}
+                    </p>
                   </div>
                 </div>
               )}

@@ -140,14 +140,61 @@ export function analyzeProperty(
   // Use provided criteria or fall back to default
   const analysisCriteria = criteria || loadInvestmentCriteria();
 
-  // Use provided data or default values
-  const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
-
   // Get funding source (from parameter, property data, or default to 'conventional')
   let propertyFundingSource: FundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
   // Validate that propertyFundingSource exists as a key in FUNDING_SOURCE_DOWN_PAYMENTS
   if (!Object.prototype.hasOwnProperty.call(FUNDING_SOURCE_DOWN_PAYMENTS, propertyFundingSource)) {
     propertyFundingSource = 'conventional';
+  }
+
+  // Get down payment percentage from funding source
+  const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource] || 0.20;
+
+  // Determine purchase price and down payment:
+  // PRIMARY: Use purchase price from file/input, calculate down payment from funding source percentage
+  // BACKUP: If no purchase price but mortgage loan amount provided, calculate purchase price from loan amount
+  let purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
+  let calculatedDownpayment: number;
+  
+  if (purchasePrice > 0) {
+    // PRIMARY LOGIC: Purchase price exists (from file), calculate down payment using funding source percentage
+    calculatedDownpayment = purchasePrice * downpaymentPercentage;
+    console.log('Using purchase price from file with funding source percentage:', {
+      purchasePrice,
+      fundingSource: propertyFundingSource,
+      downpaymentPercentage,
+      calculatedDownpayment
+    });
+  } else if (mortgageValues && mortgageValues.loanAmount > 0) {
+    // BACKUP LOGIC: No purchase price, but mortgage loan amount provided
+    // Calculate purchase price = loan amount / (1 - down payment percentage)
+    // Example: If loan is $200k and down payment is 20%, then purchase price = $200k / 0.80 = $250k
+    const loanPercentage = 1 - downpaymentPercentage;
+    if (loanPercentage > 0) {
+      purchasePrice = mortgageValues.loanAmount / loanPercentage;
+      calculatedDownpayment = purchasePrice - mortgageValues.loanAmount;
+      console.log('BACKUP: Calculated purchase price from mortgage loan amount:', {
+        loanAmount: mortgageValues.loanAmount,
+        fundingSource: propertyFundingSource,
+        downpaymentPercentage,
+        calculatedPurchasePrice: purchasePrice,
+        calculatedDownpayment
+      });
+      
+      // Update propertyData with calculated purchase price
+      propertyData.purchase_price = purchasePrice;
+      propertyData.purchasePrice = purchasePrice;
+    } else {
+      // Fallback if down payment is 100% (cash purchase)
+      purchasePrice = mortgageValues.loanAmount;
+      calculatedDownpayment = 0;
+      console.warn('Cash purchase detected (100% down), using loan amount as purchase price');
+    }
+  } else {
+    // No purchase price and no mortgage values - can't calculate
+    purchasePrice = 0;
+    calculatedDownpayment = 0;
+    console.warn('Warning: No purchase price found and no mortgage values provided. Cannot calculate down payment.');
   }
   
   // Calculate monthly rent: if STR metrics are provided, calculate from ADR and occupancy
@@ -180,38 +227,7 @@ export function analyzeProperty(
     monthlyRent = adr * 30 * occupancyRate;
   }
 
-  // Financial Calculations
-  // Use funding source to determine down payment percentage
-  // If mortgage calculator provided loan amount, calculate down payment from purchase price - loan amount
-  let calculatedDownpayment: number;
-  if (mortgageValues && mortgageValues.loanAmount > 0) {
-    // Down payment = purchase price - loan amount from mortgage calculator
-    // Validate: loan amount should not exceed purchase price
-    if (mortgageValues.loanAmount >= purchasePrice) {
-      console.warn('Warning: Loan amount >= purchase price, setting downpayment to 0', {
-        purchasePrice,
-        loanAmount: mortgageValues.loanAmount,
-        calculatedDownpayment: 0
-      });
-      calculatedDownpayment = 0;
-    } else {
-      calculatedDownpayment = Math.max(0, purchasePrice - mortgageValues.loanAmount);
-      console.log('Using mortgage calculator loan amount:', {
-        purchasePrice,
-        loanAmount: mortgageValues.loanAmount,
-        calculatedDownpayment
-      });
-    }
-  } else {
-    // Use funding source percentage
-    const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource] || 0.20;
-    calculatedDownpayment = purchasePrice * downpaymentPercentage;
-    console.log('Using funding source percentage:', {
-      fundingSource: propertyFundingSource,
-      downpaymentPercentage,
-      calculatedDownpayment
-    });
-  }
+  // Financial Calculations (down payment already calculated above)
   
   const closingCostsPercentage = (analysisCriteria.closing_costs_percentage_min + analysisCriteria.closing_costs_percentage_max) / 2;
   const initialFixedCostsPercentage = analysisCriteria.initial_fixed_costs_percentage;
