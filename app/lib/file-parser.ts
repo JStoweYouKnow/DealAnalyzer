@@ -42,13 +42,13 @@ export function parseTextFile(content: string): ParsedProperty {
   // Try more flexible patterns that work with PDF text extraction
   const pricePatterns = [
     // Explicit price labels (case-insensitive, flexible spacing)
-    /(?:Price|Purchase\s+Price|Listing\s+Price|Asking\s+Price|List\s+Price|Sale\s+Price|Total\s+Price)[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/i,
+    /(?:Price|Purchase\s+Price|Listing\s+Price|Asking\s+Price|List\s+Price|Sale\s+Price|Total\s+Price)[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
     // Price after ":" or "=" with flexible spacing
-    /(?:Price|Cost|Asking|List|Sale)[:\s=]+\$?\s*([\d,]+(?:\.\d{2})?)/i,
+    /(?:Price|Cost|Asking|List|Sale)[:\s=]+\$?\s*([\d,]+(?:\.\d{2})?)/gi,
     // Standalone dollar amounts (prefer larger numbers that look like prices)
     /\$\s*([1-9]\d{2,3}(?:,\d{3})*(?:\.\d{2})?)/g,
     // Numbers followed by price-related keywords
-    /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD|price|asking|list)/i,
+    /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD|price|asking|list)/gi,
     // Simple dollar amount pattern (but require at least 3 digits)
     /\$([1-9]\d{2,}(?:,\d{3})*)/g,
   ];
