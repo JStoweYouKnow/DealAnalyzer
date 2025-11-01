@@ -164,6 +164,34 @@ export async function POST(request: NextRequest) {
       console.warn("AI analysis failed for updated property, continuing without AI insights:", error);
     }
 
+    // Transform PropertyAnalysis to match DealAnalysis schema
+    // Ensure all required property fields are present with defaults
+    const transformedAnalysis = {
+      ...analysisWithAI,
+      property: {
+        address: analysisWithAI.property.address || "",
+        city: analysisWithAI.property.city || "Unknown",
+        state: analysisWithAI.property.state || "Unknown",
+        zipCode: analysisWithAI.property.zipCode || "00000",
+        propertyType: analysisWithAI.property.propertyType || "single-family",
+        purchasePrice: analysisWithAI.property.purchasePrice,
+        monthlyRent: analysisWithAI.property.monthlyRent,
+        bedrooms: analysisWithAI.property.bedrooms || 0,
+        bathrooms: analysisWithAI.property.bathrooms || 0,
+        squareFootage: analysisWithAI.property.squareFootage || 0,
+        lotSize: (property as any).lotSize || (propertyData as any).lot_size,
+        yearBuilt: analysisWithAI.property.yearBuilt || 0,
+        description: analysisWithAI.property.description || "",
+        listingUrl: analysisWithAI.property.listingUrl || "N/A",
+        fundingSource: propertyFundingSource,
+        monthlyExpenses: monthlyExpenses,
+        adr: analysisWithAI.property.adr,
+        occupancyRate: analysisWithAI.property.occupancyRate,
+        imageUrls: (property as any).imageUrls,
+        sourceLinks: (property as any).sourceLinks,
+      }
+    };
+
     // Find and update existing analysis
     // Preserve propertyId from existing analysis if available
     let storedAnalysis: any;
@@ -189,13 +217,13 @@ export async function POST(request: NextRequest) {
       
       if (existingAnalysis?.id) {
         // Preserve the original propertyId when updating
-        analysisWithAI.propertyId = existingAnalysis.propertyId || analysisWithAI.propertyId;
-        storedAnalysis = await storage.updateDealAnalysis(existingAnalysis.id, analysisWithAI);
+        transformedAnalysis.propertyId = existingAnalysis.propertyId || transformedAnalysis.propertyId;
+        storedAnalysis = await storage.updateDealAnalysis(existingAnalysis.id, transformedAnalysis);
       } else {
-        storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
+        storedAnalysis = await storage.createDealAnalysis(transformedAnalysis);
       }
     } else {
-      storedAnalysis = await storage.createDealAnalysis(analysisWithAI);
+      storedAnalysis = await storage.createDealAnalysis(transformedAnalysis);
     }
 
     // If dealId is provided, update the email deal with the new analysis
