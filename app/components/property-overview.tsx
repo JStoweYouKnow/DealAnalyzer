@@ -93,6 +93,7 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     mutationFn: async (newRent: number) => {
       // Only send essential property fields to reduce payload size
       const essentialProperty = {
+        propertyId: analysis.propertyId,
         address: property.address,
         purchasePrice: property.purchasePrice,
         monthlyRent: newRent,
@@ -138,6 +139,7 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     mutationFn: async ({ bedrooms, bathrooms }: { bedrooms: number; bathrooms: number }) => {
       // Only send essential property fields to reduce payload size
       const essentialProperty = {
+        propertyId: analysis.propertyId,
         address: property.address,
         purchasePrice: property.purchasePrice,
         monthlyRent: property.monthlyRent,
@@ -183,6 +185,7 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     mutationFn: async ({ adr, occupancyRate }: { adr: number; occupancyRate: number }) => {
       // Only send essential property fields to reduce payload size
       const essentialProperty = {
+        propertyId: analysis.propertyId,
         address: property.address,
         purchasePrice: property.purchasePrice,
         monthlyRent: property.monthlyRent,
@@ -228,6 +231,7 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     mutationFn: async (newAddress: string) => {
       // Only send essential property fields to reduce payload size
       const essentialProperty = {
+        propertyId: analysis.propertyId,
         address: newAddress,
         purchasePrice: property.purchasePrice,
         monthlyRent: property.monthlyRent,
@@ -273,6 +277,7 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
     mutationFn: async (newPrice: number) => {
       // Only send essential property fields to reduce payload size
       const essentialProperty = {
+        propertyId: analysis.propertyId,
         address: property.address,
         purchasePrice: newPrice,
         monthlyRent: property.monthlyRent,
