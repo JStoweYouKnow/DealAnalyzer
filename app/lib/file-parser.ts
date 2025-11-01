@@ -38,47 +38,117 @@ export function parseTextFile(content: string): ParsedProperty {
     property.address = addressMatch[0].trim();
   }
 
-  // Extract price - try multiple patterns (enhanced for PDF and text files)
-  // Try more flexible patterns that work with PDF text extraction
-  const pricePatterns = [
-    // Explicit price labels (case-insensitive, flexible spacing)
-    /(?:Price|Purchase\s+Price|Listing\s+Price|Asking\s+Price|List\s+Price|Sale\s+Price|Total\s+Price|Purchase\s+Amount|Sale\s+Amount)[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
-    // Price after ":" or "=" with flexible spacing
-    /(?:Price|Cost|Asking|List|Sale|Purchase|Value|Amount)[:\s=]+\$?\s*([\d,]+(?:\.\d{2})?)/gi,
-    // Standalone dollar amounts (prefer larger numbers that look like prices)
+  // Extract price - try multiple patterns with priority ordering
+  // PRIORITY 1: Explicit "Purchase Price" label (highest priority - this is what we want)
+  const purchasePricePattern = /(?:Purchase\s+Price|Purchase\s+Amount)[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/gi;
+  
+  // PRIORITY 2: Other explicit price labels (listing, asking, sale, etc.)
+  const highPriorityPatterns = [
+    /(?:List\s+Price|Listing\s+Price|Asking\s+Price|Sale\s+Price)[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+    /(?:Price|Cost)[:\s=]+\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+  ];
+  
+  // PRIORITY 2: Price with context keywords
+  const mediumPriorityPatterns = [
+    /(?:For\s+Sale|Listed\s+at|Asking)[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+    /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)\s*(?:for|purchase|sale|listing|price)/gi,
+  ];
+  
+  // PRIORITY 3: Standalone dollar amounts (less reliable, might catch other prices)
+  const lowPriorityPatterns = [
     /\$\s*([1-9]\d{2,3}(?:,\d{3})*(?:\.\d{2})?)/g,
-    // Numbers followed by price-related keywords
-    /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD|price|asking|list|purchase|sale|value)/gi,
-    // Simple dollar amount pattern (but require at least 3 digits)
     /\$([1-9]\d{2,}(?:,\d{3})*)/g,
-    // Price in parentheses or brackets (common in listings)
-    /[\(\[]\s*\$?\s*([\d,]+(?:\.\d{2})?)\s*[\)\]]/g,
-    // "For Sale" or "Listed at" patterns
-    /(?:For\s+Sale|Listed\s+at|Asking)\s*[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
   ];
   
   let purchasePrice = 0;
-  const foundPrices: number[] = [];
+  const purchasePriceMatches: number[] = [];
+  const highPriorityPrices: number[] = [];
+  const mediumPriorityPrices: number[] = [];
+  const lowPriorityPrices: number[] = [];
   
-  // Collect all potential prices
-  for (const pattern of pricePatterns) {
+  // First, look specifically for "Purchase Price" - this is what we want
+  const purchaseMatches = content.matchAll(purchasePricePattern);
+  for (const match of purchaseMatches) {
+    const priceStr = match[1] || match[0];
+    if (priceStr) {
+      const cleanedPrice = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
+      if (cleanedPrice >= 10000 && cleanedPrice <= 50000000) {
+        purchasePriceMatches.push(cleanedPrice);
+      }
+    }
+  }
+  
+  // Collect other prices by priority
+  for (const pattern of highPriorityPatterns) {
     const matches = content.matchAll(pattern);
     for (const match of matches) {
       const priceStr = match[1] || match[0];
       if (priceStr) {
         const cleanedPrice = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
-        // Filter out unrealistic prices (too small or too large)
         if (cleanedPrice >= 10000 && cleanedPrice <= 50000000) {
-          foundPrices.push(cleanedPrice);
+          highPriorityPrices.push(cleanedPrice);
         }
       }
     }
   }
   
-  // Use the largest valid price found (typically the listing price)
-  if (foundPrices.length > 0) {
-    purchasePrice = Math.max(...foundPrices);
-    console.log(`Found ${foundPrices.length} potential prices, using: $${purchasePrice.toLocaleString()}`);
+  for (const pattern of mediumPriorityPatterns) {
+    const matches = content.matchAll(pattern);
+    for (const match of matches) {
+      const priceStr = match[1] || match[0];
+      if (priceStr) {
+        const cleanedPrice = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
+        if (cleanedPrice >= 10000 && cleanedPrice <= 50000000) {
+          mediumPriorityPrices.push(cleanedPrice);
+        }
+      }
+    }
+  }
+  
+  for (const pattern of lowPriorityPatterns) {
+    const matches = content.matchAll(pattern);
+    for (const match of matches) {
+      const priceStr = match[1] || match[0];
+      if (priceStr) {
+        const cleanedPrice = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
+        if (cleanedPrice >= 10000 && cleanedPrice <= 50000000) {
+          lowPriorityPrices.push(cleanedPrice);
+        }
+      }
+    }
+  }
+  
+  // Select price based on priority:
+  // 1. If "Purchase Price" explicitly labeled, use it (prefer smallest if multiple)
+  // 2. Else if other high priority prices found, use the smallest (most likely purchase price, not appraisal)
+  // 3. Else if medium priority, use the smallest
+  // 4. Else use the smallest from low priority
+  if (purchasePriceMatches.length > 0) {
+    // Explicit "Purchase Price" label found - this is what we want
+    purchasePrice = Math.min(...purchasePriceMatches);
+    console.log(`Found ${purchasePriceMatches.length} explicit "Purchase Price" matches: [${purchasePriceMatches.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
+  } else if (highPriorityPrices.length > 0) {
+    // For other labeled prices, prefer the smaller one (purchase price is often less than appraised value)
+    purchasePrice = Math.min(...highPriorityPrices);
+    console.log(`Found ${highPriorityPrices.length} high-priority prices: [${highPriorityPrices.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
+  } else if (mediumPriorityPrices.length > 0) {
+    purchasePrice = Math.min(...mediumPriorityPrices);
+    console.log(`Found ${mediumPriorityPrices.length} medium-priority prices: [${mediumPriorityPrices.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
+  } else if (lowPriorityPrices.length > 0) {
+    // For standalone prices, still prefer smaller ones but filter out obvious outliers
+    const sortedPrices = [...lowPriorityPrices].sort((a, b) => a - b);
+    // If there's a clear cluster (prices within 20% of each other), use the smallest
+    // Otherwise, might be different types of prices, so be conservative
+    const minPrice = sortedPrices[0];
+    const maxPrice = sortedPrices[sortedPrices.length - 1];
+    if (maxPrice / minPrice < 1.2) {
+      // Prices are close together, use the smallest
+      purchasePrice = minPrice;
+    } else {
+      // Prices are far apart, might be different metrics, use smallest reasonable one
+      purchasePrice = minPrice;
+    }
+    console.log(`Found ${lowPriorityPrices.length} low-priority prices: [${lowPriorityPrices.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
   }
   
   property.purchase_price = purchasePrice;
