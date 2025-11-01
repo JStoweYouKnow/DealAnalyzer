@@ -26,10 +26,8 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import type { DealAnalysis, ComparableSale, NeighborhoodTrend } from "@shared/schema";
 
-// Import leaflet.css
-import 'leaflet/dist/leaflet.css';
-
 // Dynamically import map with SSR disabled and a loading placeholder
+// Note: leaflet.css is imported in leaflet-map.tsx using useEffect to prevent SSR issues
 const DynamicMap = dynamic(
   () => import('./leaflet-map').then(mod => mod.LeafletMap),
   { 

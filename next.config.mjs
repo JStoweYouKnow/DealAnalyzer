@@ -16,6 +16,20 @@ const nextConfig = {
       },
     ],
   },
+  webpack: (config, { isServer }) => {
+    // Fix for Leaflet in serverless environments
+    if (!isServer) {
+      // Handle Leaflet's Node.js dependencies for client-side builds
+      // These modules are not available in browser/serverless environments
+      config.resolve.fallback = {
+        ...(config.resolve.fallback || {}),
+        fs: false,
+        path: false,
+        crypto: false,
+      };
+    }
+    return config;
+  },
   // Path aliases are configured in tsconfig.json
   // Webpack will automatically use them
 };
