@@ -71,6 +71,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
   const [searchAddress, setSearchAddress] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [hasManualSearch, setHasManualSearch] = useState(false); // Track if user has manually searched
+  const prevAnalysisAddressRef = useRef<string | undefined>(undefined); // Track previous analysis address
 
   // Mock map properties data (in real implementation, this would come from backend)
   const [mapProperties, setMapProperties] = useState<MapProperty[]>([]);
@@ -177,31 +178,45 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
       
       // Add primary property
       if (analysis?.property.address) {
-        const coords = await geocodeAddress(analysis.property.address);
+        const currentAddress = analysis.property.address;
+        const isNewAnalysis = prevAnalysisAddressRef.current !== currentAddress;
+        
+        // If this is a new analysis (new document uploaded), reset manual search flag and always center
+        if (isNewAnalysis) {
+          console.log('[Map Init] New analysis detected, resetting manual search and auto-centering');
+          setHasManualSearch(false);
+          prevAnalysisAddressRef.current = currentAddress;
+        }
+        
+        const coords = await geocodeAddress(currentAddress);
         if (coords) {
           properties.push({
             id: analysis.propertyId,
             lat: coords.lat,
             lng: coords.lng,
-            address: analysis.property.address,
+            address: currentAddress,
             price: analysis.property.purchasePrice,
             type: 'primary',
             status: analysis.meetsCriteria ? 'meets_criteria' : 'does_not_meet',
             details: analysis
           });
 
-          // Only update map center if user hasn't manually searched and it's significantly different or first time
-          if (!hasManualSearch) {
-            const currentDistance = Math.sqrt(
-              Math.pow(coords.lat - mapCenter.lat, 2) + Math.pow(coords.lng - mapCenter.lng, 2)
-            );
-            if (currentDistance > 0.1 || mapCenter.lat === 39.8283) { // Default center
-              console.log('[Map Init] Auto-centering to primary property:', coords);
-              setMapCenter(coords);
-              setZoomLevel(12);
-            }
+          // Auto-center map when:
+          // 1. New analysis (new document) - always center
+          // 2. User hasn't manually searched and it's significantly different from current center or default
+          if (isNewAnalysis || (!hasManualSearch && (mapCenter.lat === 39.8283 || Math.sqrt(
+            Math.pow(coords.lat - mapCenter.lat, 2) + Math.pow(coords.lng - mapCenter.lng, 2)
+          ) > 0.1))) {
+            console.log('[Map Init] Auto-centering to primary property:', { 
+              coords, 
+              isNewAnalysis, 
+              hasManualSearch,
+              currentCenter: mapCenter 
+            });
+            setMapCenter({ ...coords });
+            setZoomLevel(12);
           } else {
-            console.log('[Map Init] Skipping auto-center because user has manually searched');
+            console.log('[Map Init] Skipping auto-center', { hasManualSearch, isNewAnalysis });
           }
         }
       }
@@ -319,7 +334,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
     if (allAddresses.length > 0) {
       initializeMapData();
     }
-  }, [allAddresses, geocodeAddress, mapCenter.lat, hasManualSearch]);
+  }, [allAddresses, geocodeAddress, hasManualSearch, analysis?.property.address, analysis?.propertyId]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
@@ -353,6 +368,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
     if (!searchAddress.trim()) return;
 
     setIsSearching(true);
+    setHasManualSearch(true); // Mark that user has manually searched
     try {
       console.log(`[Search] Searching for address: "${searchAddress}"`);
 
