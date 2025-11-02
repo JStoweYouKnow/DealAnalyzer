@@ -41,14 +41,41 @@ interface LeafletMapProps {
 
 const MapUpdater = ({ mapCenter, zoomLevel }: { mapCenter: { lat: number; lng: number }, zoomLevel: number }) => {
   const map = useMap();
+  const prevCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+  const prevZoomRef = useRef<number | null>(null);
   
   useEffect(() => {
-    // Always update map view when center or zoom changes
-    // Use smooth animation for better UX
-    map.setView([mapCenter.lat, mapCenter.lng], zoomLevel, {
-      animate: true,
-      duration: 0.5
-    });
+    const currentCenter = [mapCenter.lat, mapCenter.lng] as [number, number];
+    const currentZoom = zoomLevel;
+    
+    // Check if center or zoom has actually changed
+    const centerChanged = !prevCenterRef.current || 
+      prevCenterRef.current.lat !== mapCenter.lat || 
+      prevCenterRef.current.lng !== mapCenter.lng;
+    const zoomChanged = prevZoomRef.current === null || prevZoomRef.current !== currentZoom;
+    
+    if (centerChanged || zoomChanged) {
+      console.log('MapUpdater: Updating map view', { 
+        center: currentCenter, 
+        zoom: currentZoom,
+        centerChanged,
+        zoomChanged,
+        prevCenter: prevCenterRef.current,
+        prevZoom: prevZoomRef.current
+      });
+      
+      // Update map view with animation
+      map.setView(currentCenter, currentZoom, {
+        animate: true,
+        duration: 0.5
+      });
+      
+      // Update refs
+      prevCenterRef.current = { lat: mapCenter.lat, lng: mapCenter.lng };
+      prevZoomRef.current = currentZoom;
+    } else {
+      console.log('MapUpdater: No change detected, skipping update');
+    }
   }, [map, mapCenter.lat, mapCenter.lng, zoomLevel]);
 
   // Invalidate map size after mount to ensure proper rendering
@@ -77,6 +104,11 @@ export function LeafletMap({
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
   };
+
+  // Debug: Log when props change
+  useEffect(() => {
+    console.log('LeafletMap: Props updated', { mapCenter, zoomLevel });
+  }, [mapCenter.lat, mapCenter.lng, zoomLevel]);
 
   // Ensure component is mounted on client side only
   useEffect(() => {
@@ -110,12 +142,13 @@ export function LeafletMap({
     return (
       <div className="w-full h-full" style={{ minHeight: '384px' }}>
         <MapContainer
-        key="leaflet-map" // Stable key to prevent unnecessary remounts - MapUpdater handles position changes
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={zoomLevel}
         style={{ height: '100%', width: '100%', minHeight: '384px' }}
         className="rounded-lg z-0"
         ref={mapRef}
+        scrollWheelZoom={true}
+        key={`container-${mapCenter.lat}-${mapCenter.lng}-${zoomLevel}`}
       >
         <MapUpdater mapCenter={mapCenter} zoomLevel={zoomLevel} />
         <TileLayer

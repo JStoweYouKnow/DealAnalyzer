@@ -340,8 +340,12 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
     try {
       const coords = await geocodeAddress(searchAddress);
       if (coords) {
-        setMapCenter(coords);
+        console.log('Address search successful, updating map center:', coords);
+        // Force a new object reference to ensure React detects the change
+        setMapCenter({ ...coords });
         setZoomLevel(14);
+      } else {
+        console.warn('Geocoding returned no coordinates for:', searchAddress);
       }
     } catch (error) {
       console.error('Address search failed:', error);
@@ -433,6 +437,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
               {/* Leaflet Map Container */}
               <div className="w-full h-96 rounded-lg overflow-hidden relative" data-testid="map-container" style={{ minHeight: '384px' }}>
                 <DynamicMap
+                  key={`map-${mapCenter.lat.toFixed(4)}-${mapCenter.lng.toFixed(4)}-${zoomLevel}`}
                   mapCenter={mapCenter}
                   zoomLevel={zoomLevel}
                   mapLayer={mapLayer}
