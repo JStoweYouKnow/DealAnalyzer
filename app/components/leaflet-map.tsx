@@ -148,7 +148,6 @@ export function LeafletMap({
         className="rounded-lg z-0"
         ref={mapRef}
         scrollWheelZoom={true}
-        key={`container-${mapCenter.lat}-${mapCenter.lng}-${zoomLevel}`}
       >
         <MapUpdater mapCenter={mapCenter} zoomLevel={zoomLevel} />
         <TileLayer

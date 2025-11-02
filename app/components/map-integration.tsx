@@ -447,7 +447,6 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
               {/* Leaflet Map Container */}
               <div className="w-full h-96 rounded-lg overflow-hidden relative" data-testid="map-container" style={{ minHeight: '384px' }}>
                 <DynamicMap
-                  key={`map-${mapCenter.lat.toFixed(4)}-${mapCenter.lng.toFixed(4)}-${zoomLevel}`}
                   mapCenter={mapCenter}
                   zoomLevel={zoomLevel}
                   mapLayer={mapLayer}
