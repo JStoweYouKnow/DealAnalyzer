@@ -62,23 +62,31 @@ export class GeocodingService {
     try {
       // Clean and normalize the address
       const cleanAddress = address.trim();
-      
+
+      console.log(`[Geocoding] Starting geocode for address: "${address}"`);
+
       if (!cleanAddress) {
+        console.warn('[Geocoding] Empty address provided');
         return null;
       }
 
       // Try real geocoding with Nominatim (OpenStreetMap) first
       const realResult = await this.geocodeWithNominatim(cleanAddress);
       if (realResult) {
+        console.log(`[Geocoding] ✅ Nominatim success: "${address}" -> (${realResult.lat}, ${realResult.lng})`);
         return realResult;
       }
 
       // Fallback to deterministic coordinates for demo purposes
-      console.warn(`Real geocoding failed for "${address}", using fallback coordinates`);
-      return this.getFallbackCoordinates(cleanAddress);
+      console.warn(`[Geocoding] ⚠️ Real geocoding failed for "${address}", using fallback coordinates`);
+      const fallback = this.getFallbackCoordinates(cleanAddress);
+      if (fallback) {
+        console.log(`[Geocoding] Fallback result: "${address}" -> (${fallback.lat}, ${fallback.lng})`);
+      }
+      return fallback;
 
     } catch (error) {
-      console.error('Geocoding error:', error);
+      console.error('[Geocoding] Error:', error);
       // Try fallback on any error
       return this.getFallbackCoordinates(address);
     }
@@ -89,7 +97,9 @@ export class GeocodingService {
       // Use Nominatim geocoding service (OpenStreetMap)
       const encodedAddress = encodeURIComponent(address);
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&addressdetails=1&countrycodes=us`;
-      
+
+      console.log(`[Nominatim] Requesting: ${url}`);
+
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'RealEstateAnalyzer/1.0 (https://replit.com)', // Required by Nominatim
@@ -97,18 +107,23 @@ export class GeocodingService {
       });
 
       if (!response.ok) {
-        console.error(`Nominatim API error: ${response.status}`);
+        console.error(`[Nominatim] API error: ${response.status} ${response.statusText}`);
         return null;
       }
 
       const data = await response.json();
-      
+
+      console.log(`[Nominatim] Response data:`, JSON.stringify(data, null, 2));
+
       if (!data || data.length === 0) {
+        console.warn(`[Nominatim] No results found for: "${address}"`);
         return null;
       }
 
       const result = data[0];
-      
+
+      console.log(`[Nominatim] Found result: ${result.display_name} at (${result.lat}, ${result.lon})`);
+
       return {
         lat: parseFloat(result.lat),
         lng: parseFloat(result.lon),
@@ -116,7 +131,7 @@ export class GeocodingService {
       };
 
     } catch (error) {
-      console.error('Nominatim geocoding failed:', error);
+      console.error('[Nominatim] Geocoding failed:', error);
       return null;
     }
   }
@@ -124,38 +139,50 @@ export class GeocodingService {
   private getFallbackCoordinates(address: string): GeocodeResult | null {
     try {
       const cleanAddress = address.toLowerCase().trim();
-      
+
+      console.log(`[Fallback] Generating coordinates for: "${address}"`);
+
       // Check for exact city matches first
       for (const [city, coords] of Object.entries(this.fallbackCoordinates)) {
         if (cleanAddress.includes(city)) {
-          // Add some random variation to simulate different addresses in the same city
-          const latVariation = (Math.random() - 0.5) * 0.1; // ~5.5 mile variation
-          const lngVariation = (Math.random() - 0.5) * 0.1;
-          
-          return {
+          // Use hash-based variation instead of random to ensure consistency
+          // Same address will always get same coordinates
+          const hash = this.hashString(cleanAddress);
+          const latVariation = ((hash % 1000) / 1000 - 0.5) * 0.1; // ~5.5 mile variation
+          const lngVariation = ((Math.floor(hash / 1000) % 1000) / 1000 - 0.5) * 0.1;
+
+          const result = {
             lat: coords.lat + latVariation,
             lng: coords.lng + lngVariation,
             formatted_address: address // Use original address for display
           };
+
+          console.log(`[Fallback] City match "${city}": base (${coords.lat}, ${coords.lng}) + variation -> (${result.lat}, ${result.lng})`);
+
+          return result;
         }
       }
 
       // If no city match, use a hash-based approach for consistent coordinates
       // This ensures the same address always gets the same coordinates
       const hash = this.hashString(cleanAddress);
-      
+
       // Generate coordinates within the continental US bounds
       const lat = 25 + (hash % 20000) / 1000; // 25-45 latitude (approximate US range)
       const lng = -125 + (Math.floor(hash / 20000) % 50000) / 1000; // -125 to -75 longitude
-      
-      return {
+
+      const result = {
         lat: Math.round(lat * 10000) / 10000, // Round to 4 decimal places
         lng: Math.round(lng * 10000) / 10000,
         formatted_address: address
       };
 
+      console.log(`[Fallback] Hash-based coordinates for "${address}": (${result.lat}, ${result.lng})`);
+
+      return result;
+
     } catch (error) {
-      console.error('Fallback geocoding error:', error);
+      console.error('[Fallback] Error:', error);
       return null;
     }
   }

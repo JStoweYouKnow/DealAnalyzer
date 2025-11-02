@@ -96,40 +96,50 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
   // Memoized geocoding function with caching to prevent repeated API calls
   const geocodeAddress = useCallback(async (address: string): Promise<{ lat: number; lng: number } | null> => {
     if (!address || address.trim() === '') return null;
-    
+
     const cleanAddress = address.trim();
-    
+
     // Check cache first
     if (cleanAddress in geocodeCache) {
+      console.log(`[Frontend Geocode] Using cached result for "${cleanAddress}":`, geocodeCache[cleanAddress]);
       return geocodeCache[cleanAddress] || null;
     }
-    
+
+    console.log(`[Frontend Geocode] Requesting geocode for "${cleanAddress}"`);
+
     try {
       const response = await apiRequest('POST', '/api/geocode', {
         address: cleanAddress
       });
       const data = await response.json();
-      
+
+      console.log(`[Frontend Geocode] API response for "${cleanAddress}":`, data);
+
       let result: { lat: number; lng: number } | null = null;
-      
+
       if (data.success && data.data) {
         result = {
           lat: data.data.lat,
           lng: data.data.lng
         };
+        console.log(`[Frontend Geocode] ✅ Success: "${cleanAddress}" -> (${result.lat}, ${result.lng})`);
+      } else {
+        console.warn(`[Frontend Geocode] ⚠️ API returned no data for "${cleanAddress}"`);
       }
-      
+
       // Cache the result (even if null)
       setGeocodeCache(prev => ({ ...prev, [cleanAddress]: result }));
       return result;
     } catch (error) {
-      console.error('Geocoding failed:', error);
+      console.error(`[Frontend Geocode] ❌ Error for "${cleanAddress}":`, error);
       // Fallback to center of US if geocoding fails
       const fallback = {
         lat: 39.8283,
         lng: -98.5795
       };
-      
+
+      console.log(`[Frontend Geocode] Using fallback coordinates for "${cleanAddress}"`);
+
       // Cache the fallback result
       setGeocodeCache(prev => ({ ...prev, [cleanAddress]: fallback }));
       return fallback;
