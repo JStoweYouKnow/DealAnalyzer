@@ -6,6 +6,7 @@ interface GeocodeResult {
 
 export class GeocodingService {
   private fallbackCoordinates: { [key: string]: GeocodeResult } = {
+        'lake isabella': { lat: 35.6383, lng: -118.4845, formatted_address: 'Lake Isabella, CA, USA' },
         'austin': { lat: 30.2672, lng: -97.7431, formatted_address: 'Austin, TX, USA' },
         'dallas': { lat: 32.7767, lng: -96.7970, formatted_address: 'Dallas, TX, USA' },
         'houston': { lat: 29.7604, lng: -95.3698, formatted_address: 'Houston, TX, USA' },
