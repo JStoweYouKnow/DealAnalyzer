@@ -71,6 +71,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
   const [searchAddress, setSearchAddress] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [hasManualSearch, setHasManualSearch] = useState(false); // Track if user has manually searched
+  const [searchMarker, setSearchMarker] = useState<MapProperty | null>(null); // Marker for searched address
   const prevAnalysisAddressRef = useRef<string | undefined>(undefined); // Track previous analysis address
 
   // Mock map properties data (in real implementation, this would come from backend)
@@ -385,6 +386,20 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
       if (coords) {
         console.log(`[Search] ✅ Address search successful for "${searchAddress}":`, coords);
         console.log(`[Search] Updating map center to: (${coords.lat}, ${coords.lng}), zoom: 14`);
+
+        // Create a marker for the searched address
+        const marker: MapProperty = {
+          id: 'search-marker',
+          lat: coords.lat,
+          lng: coords.lng,
+          address: cleanAddress,
+          price: 0,
+          type: 'primary',
+          status: 'neutral'
+        };
+        setSearchMarker(marker);
+        console.log(`[Search] Created marker for searched address:`, marker);
+
         // Mark that user has manually searched - this prevents auto-centering from overriding
         setHasManualSearch(true);
         // Force a new object reference to ensure React detects the change
@@ -486,7 +501,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
                   mapCenter={mapCenter}
                   zoomLevel={zoomLevel}
                   mapLayer={mapLayer}
-                  mapProperties={mapProperties}
+                  mapProperties={searchMarker ? [...mapProperties, searchMarker] : mapProperties}
                   pointsOfInterest={pointsOfInterest}
                   showPOIs={showPOIs}
                   onPropertyClick={handlePropertyClick}
