@@ -70,11 +70,12 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
   const [showPOIs, setShowPOIs] = useState(true);
   const [searchAddress, setSearchAddress] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [hasManualSearch, setHasManualSearch] = useState(false); // Track if user has manually searched
 
   // Mock map properties data (in real implementation, this would come from backend)
   const [mapProperties, setMapProperties] = useState<MapProperty[]>([]);
   const [pointsOfInterest, setPointsOfInterest] = useState<PointOfInterest[]>([]);
-  
+
   // Geocoding cache to prevent repeated API calls
   const [geocodeCache, setGeocodeCache] = useState<{ [key: string]: { lat: number; lng: number } | null }>({});
 
@@ -188,14 +189,19 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
             status: analysis.meetsCriteria ? 'meets_criteria' : 'does_not_meet',
             details: analysis
           });
-          
-          // Only update map center if it's significantly different or first time
-          const currentDistance = Math.sqrt(
-            Math.pow(coords.lat - mapCenter.lat, 2) + Math.pow(coords.lng - mapCenter.lng, 2)
-          );
-          if (currentDistance > 0.1 || mapCenter.lat === 39.8283) { // Default center
-            setMapCenter(coords);
-            setZoomLevel(12);
+
+          // Only update map center if user hasn't manually searched and it's significantly different or first time
+          if (!hasManualSearch) {
+            const currentDistance = Math.sqrt(
+              Math.pow(coords.lat - mapCenter.lat, 2) + Math.pow(coords.lng - mapCenter.lng, 2)
+            );
+            if (currentDistance > 0.1 || mapCenter.lat === 39.8283) { // Default center
+              console.log('[Map Init] Auto-centering to primary property:', coords);
+              setMapCenter(coords);
+              setZoomLevel(12);
+            }
+          } else {
+            console.log('[Map Init] Skipping auto-center because user has manually searched');
           }
         }
       }
@@ -313,7 +319,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
     if (allAddresses.length > 0) {
       initializeMapData();
     }
-  }, [allAddresses, geocodeAddress, mapCenter.lat]);
+  }, [allAddresses, geocodeAddress, mapCenter.lat, hasManualSearch]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
@@ -345,20 +351,34 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
 
   const handleAddressSearch = async () => {
     if (!searchAddress.trim()) return;
-    
+
     setIsSearching(true);
     try {
+      console.log(`[Search] Searching for address: "${searchAddress}"`);
+
+      // Clear cache for this address to ensure fresh geocoding
+      const cleanAddress = searchAddress.trim();
+      setGeocodeCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[cleanAddress];
+        console.log(`[Search] Cleared cache for "${cleanAddress}"`);
+        return newCache;
+      });
+
       const coords = await geocodeAddress(searchAddress);
       if (coords) {
-        console.log('Address search successful, updating map center:', coords);
+        console.log(`[Search] ✅ Address search successful for "${searchAddress}":`, coords);
+        console.log(`[Search] Updating map center to: (${coords.lat}, ${coords.lng}), zoom: 14`);
+        // Mark that user has manually searched - this prevents auto-centering from overriding
+        setHasManualSearch(true);
         // Force a new object reference to ensure React detects the change
-        setMapCenter({ ...coords });
+        setMapCenter({ lat: coords.lat, lng: coords.lng });
         setZoomLevel(14);
       } else {
-        console.warn('Geocoding returned no coordinates for:', searchAddress);
+        console.warn(`[Search] ⚠️ Geocoding returned no coordinates for: "${searchAddress}"`);
       }
     } catch (error) {
-      console.error('Address search failed:', error);
+      console.error(`[Search] ❌ Address search failed for "${searchAddress}":`, error);
     } finally {
       setIsSearching(false);
     }

@@ -163,7 +163,25 @@ export class GeocodingService {
         }
       }
 
-      // If no city match, use a hash-based approach for consistent coordinates
+      // Check for state-based coordinates
+      const stateCoords = this.getStateBasedCoordinates(cleanAddress);
+      if (stateCoords) {
+        const hash = this.hashString(cleanAddress);
+        // Add variation within the state
+        const latVariation = ((hash % 1000) / 1000 - 0.5) * 2; // ~110 mile variation
+        const lngVariation = ((Math.floor(hash / 1000) % 1000) / 1000 - 0.5) * 2;
+
+        const result = {
+          lat: stateCoords.lat + latVariation,
+          lng: stateCoords.lng + lngVariation,
+          formatted_address: address
+        };
+
+        console.log(`[Fallback] State-based coordinates for "${address}": (${result.lat}, ${result.lng})`);
+        return result;
+      }
+
+      // If no city or state match, use a hash-based approach for consistent coordinates
       // This ensures the same address always gets the same coordinates
       const hash = this.hashString(cleanAddress);
 
@@ -185,6 +203,43 @@ export class GeocodingService {
       console.error('[Fallback] Error:', error);
       return null;
     }
+  }
+
+  // Get approximate center coordinates for US states
+  private getStateBasedCoordinates(address: string): { lat: number; lng: number } | null {
+    const stateMap: { [key: string]: { lat: number; lng: number } } = {
+      // State abbreviations
+      ' ca ': { lat: 36.7783, lng: -119.4179 }, // California
+      ' california': { lat: 36.7783, lng: -119.4179 },
+      ' tx ': { lat: 31.9686, lng: -99.9018 }, // Texas
+      ' texas': { lat: 31.9686, lng: -99.9018 },
+      ' ny ': { lat: 40.7128, lng: -74.0060 }, // New York
+      ' new york': { lat: 40.7128, lng: -74.0060 },
+      ' fl ': { lat: 27.6648, lng: -81.5158 }, // Florida
+      ' florida': { lat: 27.6648, lng: -81.5158 },
+      ' wa ': { lat: 47.7511, lng: -120.7401 }, // Washington
+      ' washington': { lat: 47.7511, lng: -120.7401 },
+      ' az ': { lat: 34.0489, lng: -111.0937 }, // Arizona
+      ' arizona': { lat: 34.0489, lng: -111.0937 },
+      ' or ': { lat: 43.8041, lng: -120.5542 }, // Oregon
+      ' oregon': { lat: 43.8041, lng: -120.5542 },
+      ' co ': { lat: 39.5501, lng: -105.7821 }, // Colorado
+      ' colorado': { lat: 39.5501, lng: -105.7821 },
+      ' nv ': { lat: 38.8026, lng: -116.4194 }, // Nevada
+      ' nevada': { lat: 38.8026, lng: -116.4194 },
+    };
+
+    // Add spaces around address to match state abbreviations correctly
+    const paddedAddress = ` ${address} `;
+
+    for (const [state, coords] of Object.entries(stateMap)) {
+      if (paddedAddress.includes(state)) {
+        console.log(`[Fallback] State detected: "${state.trim()}" in address`);
+        return coords;
+      }
+    }
+
+    return null;
   }
 
   // Simple hash function for consistent coordinate generation
