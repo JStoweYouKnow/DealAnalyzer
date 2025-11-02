@@ -69,6 +69,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
   const [mapLayer, setMapLayer] = useState<'satellite' | 'street' | 'terrain'>('street');
   const [showPOIs, setShowPOIs] = useState(true);
   const [searchAddress, setSearchAddress] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   // Mock map properties data (in real implementation, this would come from backend)
   const [mapProperties, setMapProperties] = useState<MapProperty[]>([]);
@@ -335,10 +336,17 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
   const handleAddressSearch = async () => {
     if (!searchAddress.trim()) return;
     
-    const coords = await geocodeAddress(searchAddress);
-    if (coords) {
-      setMapCenter(coords);
-      setZoomLevel(14);
+    setIsSearching(true);
+    try {
+      const coords = await geocodeAddress(searchAddress);
+      if (coords) {
+        setMapCenter(coords);
+        setZoomLevel(14);
+      }
+    } catch (error) {
+      console.error('Address search failed:', error);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -404,10 +412,19 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
                   placeholder="Search address..."
                   value={searchAddress}
                   onChange={(e) => setSearchAddress(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddressSearch();
+                    }
+                  }}
                   className="flex-1"
                   data-testid="input-address-search"
                 />
-                <Button onClick={handleAddressSearch} data-testid="button-search">
+                <Button 
+                  onClick={handleAddressSearch} 
+                  disabled={isSearching || !searchAddress.trim()}
+                  data-testid="button-search"
+                >
                   <Navigation className="w-4 h-4" />
                 </Button>
               </div>

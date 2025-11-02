@@ -43,9 +43,12 @@ const MapUpdater = ({ mapCenter, zoomLevel }: { mapCenter: { lat: number; lng: n
   const map = useMap();
   
   useEffect(() => {
-    if (mapCenter.lat !== 39.8283 || mapCenter.lng !== -98.5795) {
-      map.setView([mapCenter.lat, mapCenter.lng], zoomLevel);
-    }
+    // Always update map view when center or zoom changes
+    // Use smooth animation for better UX
+    map.setView([mapCenter.lat, mapCenter.lng], zoomLevel, {
+      animate: true,
+      duration: 0.5
+    });
   }, [map, mapCenter.lat, mapCenter.lng, zoomLevel]);
 
   // Invalidate map size after mount to ensure proper rendering
@@ -107,7 +110,7 @@ export function LeafletMap({
     return (
       <div className="w-full h-full" style={{ minHeight: '384px' }}>
         <MapContainer
-        key={`${mapCenter.lat}-${mapCenter.lng}-${zoomLevel}`}
+        key="leaflet-map" // Stable key to prevent unnecessary remounts - MapUpdater handles position changes
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={zoomLevel}
         style={{ height: '100%', width: '100%', minHeight: '384px' }}
