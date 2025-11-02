@@ -414,18 +414,16 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
             </CardHeader>
             <CardContent>
               {/* Leaflet Map Container */}
-              <div className="w-full h-96 rounded-lg overflow-hidden" data-testid="map-container">
-                <div key={`map-wrapper-${Date.now()}`}>
-                  <DynamicMap
-                    mapCenter={mapCenter}
-                    zoomLevel={zoomLevel}
-                    mapLayer={mapLayer}
-                    mapProperties={mapProperties}
-                    pointsOfInterest={pointsOfInterest}
-                    showPOIs={showPOIs}
-                    onPropertyClick={handlePropertyClick}
-                  />
-                </div>
+              <div className="w-full h-96 rounded-lg overflow-hidden relative" data-testid="map-container" style={{ minHeight: '384px' }}>
+                <DynamicMap
+                  mapCenter={mapCenter}
+                  zoomLevel={zoomLevel}
+                  mapLayer={mapLayer}
+                  mapProperties={mapProperties}
+                  pointsOfInterest={pointsOfInterest}
+                  showPOIs={showPOIs}
+                  onPropertyClick={handlePropertyClick}
+                />
               </div>
 
               {/* Map Legend */}

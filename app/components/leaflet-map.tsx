@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-// Import Leaflet CSS - Safe in Next.js because this component is dynamically imported with ssr: false
+// Import Leaflet CSS - Safe because component is dynamically imported with ssr: false
 import 'leaflet/dist/leaflet.css';
 
 interface MapProperty {
@@ -47,6 +47,14 @@ const MapUpdater = ({ mapCenter, zoomLevel }: { mapCenter: { lat: number; lng: n
       map.setView([mapCenter.lat, mapCenter.lng], zoomLevel);
     }
   }, [map, mapCenter.lat, mapCenter.lng, zoomLevel]);
+
+  // Invalidate map size after mount to ensure proper rendering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [map]);
   
   return null;
 };
@@ -61,64 +69,68 @@ export function LeafletMap({
   onPropertyClick
 }: LeafletMapProps) {
   const mapRef = useRef(null);
-  const hasMounted = useRef(false);
+  const [isMounted, setIsMounted] = useState(false);
   
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
   };
 
-  // Fix Leaflet icons on client side only (for serverless compatibility)
+  // Ensure component is mounted on client side only
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      setIsMounted(true);
+      
+      // Fix Leaflet icons after mount
       import('leaflet').then((L) => {
-        delete (L.Icon.Default.prototype as any)._getIconUrl;
-        L.Icon.Default.mergeOptions({
-          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-        });
+        try {
+          delete (L.Icon.Default.prototype as any)._getIconUrl;
+          L.Icon.Default.mergeOptions({
+            iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+          });
+        } catch (err) {
+          console.warn('Failed to fix Leaflet icons:', err);
+        }
+      }).catch(err => {
+        console.warn('Failed to load Leaflet for icon fix:', err);
       });
     }
   }, []);
 
-  useEffect(() => {
-    hasMounted.current = true;
-    return () => {
-      hasMounted.current = false;
-    };
-  }, []);
-
-  // Don't render until mounted
-  if (!hasMounted.current || typeof window === 'undefined') {
+  // Don't render until mounted (prevents SSR/hydration errors)
+  if (!isMounted || typeof window === 'undefined') {
     return <div className="w-full h-96 bg-gray-100 flex items-center justify-center rounded-lg">Loading map...</div>;
   }
 
-  return (
-    <MapContainer
-      key={`${mapCenter.lat}-${mapCenter.lng}-${zoomLevel}`}
-      center={[mapCenter.lat, mapCenter.lng]}
-      zoom={zoomLevel}
-      style={{ height: '100%', width: '100%' }}
-      className="rounded-lg"
-      ref={mapRef}
-    >
-      <MapUpdater mapCenter={mapCenter} zoomLevel={zoomLevel} />
-      <TileLayer
-        url={
-          mapLayer === 'satellite' 
-            ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            : mapLayer === 'terrain'
-            ? "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
-            : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        }
-        attribution={
-          mapLayer === 'satellite'
-            ? '&copy; <a href="https://www.esri.com/">Esri</a>'
-            : mapLayer === 'terrain'
-            ? '&copy; <a href="https://opentopomap.org/">OpenTopoMap</a>'
-            : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }
-      />
+  try {
+    return (
+      <div className="w-full h-full" style={{ minHeight: '384px' }}>
+        <MapContainer
+        key={`${mapCenter.lat}-${mapCenter.lng}-${zoomLevel}`}
+        center={[mapCenter.lat, mapCenter.lng]}
+        zoom={zoomLevel}
+        style={{ height: '100%', width: '100%', minHeight: '384px' }}
+        className="rounded-lg z-0"
+        ref={mapRef}
+      >
+        <MapUpdater mapCenter={mapCenter} zoomLevel={zoomLevel} />
+        <TileLayer
+          url={
+            mapLayer === 'satellite' 
+              ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              : mapLayer === 'terrain'
+              ? "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+              : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          }
+          attribution={
+            mapLayer === 'satellite'
+              ? '&copy; <a href="https://www.esri.com/">Esri</a>'
+              : mapLayer === 'terrain'
+              ? '&copy; <a href="https://opentopomap.org/">OpenTopoMap</a>'
+              : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          }
+        />
 
       {/* Property Markers */}
       {mapProperties.map((property) => (
@@ -166,7 +178,20 @@ export function LeafletMap({
           </Popup>
         </Marker>
       ))}
-    </MapContainer>
-  );
+        </MapContainer>
+      </div>
+    );
+  } catch (error) {
+    console.error('Map rendering error:', error);
+    return (
+      <div className="w-full h-96 bg-red-50 flex items-center justify-center rounded-lg border border-red-200">
+        <div className="text-center p-4">
+          <p className="text-red-800 font-medium mb-2">Map failed to load</p>
+          <p className="text-red-600 text-sm">{error instanceof Error ? error.message : 'Unknown error'}</p>
+        </div>
+      </div>
+    );
+  }
 }
+
 
