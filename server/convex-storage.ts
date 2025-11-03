@@ -4,7 +4,6 @@ import { IStorage } from "./storage";
 
 // Conditional imports for Convex API - only when generated files exist
 let api: any = null;
-let Id: any = null;
 
 // Use dynamic imports to avoid Webpack resolution issues
 let convexInitialized = false;
@@ -15,30 +14,12 @@ async function initializeConvex() {
   }
 
   try {
-    // Use require for Node.js runtime (esbuild won't statically analyze require() calls)
-    // This ensures the imports only happen at runtime, not at build time
-    const path = await import('path');
-    const fs = await import('fs');
-    const { pathToFileURL } = await import('url');
-    
-    // Get the directory of the current file
-    const currentDir = path.dirname(new URL(import.meta.url).pathname);
-    const apiPath = path.join(currentDir, '../convex/_generated/api.js');
-    const dataModelPath = path.join(currentDir, '../convex/_generated/dataModel.js');
-    
-    // Check if files exist before importing
-    if (!fs.existsSync(apiPath) || !fs.existsSync(dataModelPath)) {
-      throw new Error('Convex generated files not found');
-    }
-    
-    // Use dynamic import with file:// URLs to avoid esbuild resolution
-    const [apiModule, dataModelModule] = await Promise.all([
-      import(pathToFileURL(apiPath).href),
-      import(pathToFileURL(dataModelPath).href)
-    ]);
+    // Directly import the generated API file - it should be available at build time
+    // Using dynamic imports with relative paths that work in both Node.js and Next.js
+    // This avoids needing to check file existence with fs/path modules
+    const apiModule = await import('../convex/_generated/api.js');
     
     api = apiModule.api;
-    Id = (dataModelModule.Id ?? dataModelModule.default?.Id);
     convexInitialized = true;
     console.log("Convex API initialized successfully");
     return true;
