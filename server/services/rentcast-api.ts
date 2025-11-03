@@ -1,4 +1,5 @@
 import type { NeighborhoodTrend, ComparableSale, MarketHeatMapData } from '@shared/schema.ts';
+import { rentCastCache } from './rentcast-cache';
 
 interface RentCastPropertyData {
   id: string;
@@ -47,30 +48,40 @@ export class RentCastAPIService {
       throw new Error('RentCast API key not configured');
     }
 
-    const url = new URL(`${this.baseUrl}${endpoint}`);
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        url.searchParams.append(key, value.toString());
-      }
-    });
+    // Create cache key from endpoint and params
+    const cacheKey = rentCastCache.createKey(endpoint, params);
 
-    try {
-      const response = await fetch(url.toString(), {
-        headers: {
-          'X-Api-Key': this.apiKey,
-          'Content-Type': 'application/json'
+    // Use cache with deduplication (saves $$$ on duplicate API calls!)
+    return await rentCastCache.getOrFetch(
+      cacheKey,
+      60 * 60 * 24, // 24 hour TTL for market data
+      async () => {
+        const url = new URL(`${this.baseUrl}${endpoint}`);
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            url.searchParams.append(key, value.toString());
+          }
+        });
+
+        try {
+          const response = await fetch(url.toString(), {
+            headers: {
+              'X-Api-Key': this.apiKey,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`RentCast API error: ${response.status} ${response.statusText}`);
+          }
+
+          return await response.json();
+        } catch (error) {
+          console.error('RentCast API request failed:', error);
+          throw error;
         }
-      });
-
-      if (!response.ok) {
-        throw new Error(`RentCast API error: ${response.status} ${response.statusText}`);
       }
-
-      return await response.json();
-    } catch (error) {
-      console.error('RentCast API request failed:', error);
-      throw error;
-    }
+    );
   }
 
   async getNeighborhoodTrends(city: string, state: string, limit: number = 10): Promise<NeighborhoodTrend[]> {

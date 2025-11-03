@@ -8,5 +8,11 @@
       "maxDuration": 120
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/weekly-digest",
+      "schedule": "0 9 * * 1"
+    }
+  ],
   "regions": ["iad1"]
 }

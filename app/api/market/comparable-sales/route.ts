@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../../server/storage";
 import { rentCastAPI } from "../../../../server/services/rentcast-api";
 
+// Enable Edge Runtime for GET requests (ultra-fast, <100ms globally)
+export const runtime = 'edge';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -47,7 +50,17 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    return NextResponse.json({ success: true, data: sales });
+    return NextResponse.json(
+      { success: true, data: sales },
+      {
+        headers: {
+          // Cache for 1 hour on CDN, allow stale for 2 hours while revalidating
+          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
+          'CDN-Cache-Control': 'public, s-maxage=3600',
+          'Vercel-CDN-Cache-Control': 'public, s-maxage=3600',
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching comparable sales:", error);
     return NextResponse.json(

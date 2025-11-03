@@ -1,3 +1,5 @@
+import { geocodingCache } from './geocoding-cache';
+
 interface GeocodeResult {
   lat: number;
   lng: number;
@@ -71,18 +73,29 @@ export class GeocodingService {
         return null;
       }
 
-      // Try real geocoding with Nominatim (OpenStreetMap) first
+      // 1. Check cache first (Redis/KV or in-memory fallback)
+      const cachedResult = await geocodingCache.get(cleanAddress);
+      if (cachedResult) {
+        console.log(`[Geocoding] ✅ Cache hit: "${address}" -> (${cachedResult.lat}, ${cachedResult.lng})`);
+        return cachedResult;
+      }
+
+      // 2. Try real geocoding with Nominatim (OpenStreetMap)
       const realResult = await this.geocodeWithNominatim(cleanAddress);
       if (realResult) {
         console.log(`[Geocoding] ✅ Nominatim success: "${address}" -> (${realResult.lat}, ${realResult.lng})`);
+        // Cache the result for future requests
+        await geocodingCache.set(cleanAddress, realResult);
         return realResult;
       }
 
-      // Fallback to deterministic coordinates for demo purposes
+      // 3. Fallback to deterministic coordinates for demo purposes
       console.warn(`[Geocoding] ⚠️ Real geocoding failed for "${address}", using fallback coordinates`);
       const fallback = this.getFallbackCoordinates(cleanAddress);
       if (fallback) {
         console.log(`[Geocoding] Fallback result: "${address}" -> (${fallback.lat}, ${fallback.lng})`);
+        // Also cache fallback results to avoid repeated API calls
+        await geocodingCache.set(cleanAddress, fallback);
       }
       return fallback;
 
