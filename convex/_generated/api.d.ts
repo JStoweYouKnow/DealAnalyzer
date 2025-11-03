@@ -11,6 +11,7 @@
 import type * as emailDeals from "../emailDeals.js";
 import type * as messages from "../messages.js";
 import type * as properties from "../properties.js";
+import type * as weeklyDigest from "../weeklyDigest.js";
 
 import type {
   ApiFromModules,
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   emailDeals: typeof emailDeals;
   messages: typeof messages;
   properties: typeof properties;
+  weeklyDigest: typeof weeklyDigest;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 
