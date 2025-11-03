@@ -2,7 +2,28 @@
 // Saves $$$ by preventing duplicate API calls
 
 import { kv } from '@vercel/kv';
-import crypto from 'crypto';
+
+// Helper function to create a hash using Web Crypto API (works in Node.js 18+ and browsers)
+// Uses SHA-256 instead of MD5 (MD5 is not available in Web Crypto API)
+async function hashString(input: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
+}
+
+// Synchronous version using a simple hash for compatibility
+// This is fine for cache keys where cryptographic strength isn't critical
+function hashStringSync(input: string): string {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(16).padStart(16, '0').substring(0, 16);
+}
 
 export class RentCastCache {
   private static readonly CACHE_PREFIX = 'rentcast:';
@@ -84,8 +105,8 @@ export class RentCastCache {
    * Generate cache key from request params
    */
   private static getCacheKey(key: string): string {
-    // Use MD5 hash for consistent, short keys
-    const hash = crypto.createHash('md5').update(key).digest('hex').substring(0, 16);
+    // Use hash for consistent, short keys
+    const hash = hashStringSync(key);
     return `${this.CACHE_PREFIX}${hash}`;
   }
 
@@ -242,7 +263,7 @@ export class RentCastCacheFallback {
   }
 
   private static getCacheKey(key: string): string {
-    const hash = crypto.createHash('md5').update(key).digest('hex').substring(0, 16);
+    const hash = hashStringSync(key);
     return hash;
   }
 

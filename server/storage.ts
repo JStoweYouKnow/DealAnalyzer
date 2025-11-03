@@ -1,5 +1,10 @@
 import { type Property, type DealAnalysis, type InsertProperty, type InsertDealAnalysis, type PropertyComparison, type EmailDeal, type NeighborhoodTrend, type ComparableSale, type MarketHeatMapData, type SavedFilter, type NaturalLanguageSearch, type PropertyClassification, type SmartPropertyRecommendation, type RentPricingRecommendation, type InvestmentTimingAdvice, type AnalysisTemplate, type ApiIntegration, type PhotoAnalysis, type InsertPhotoAnalysis, type InsertNeighborhoodTrend, type InsertComparableSale, type InsertMarketHeatMapData, type InsertSavedFilter, type InsertNaturalLanguageSearch, type InsertPropertyClassification, type InsertSmartPropertyRecommendation, type InsertRentPricingRecommendation, type InsertInvestmentTimingAdvice, type InsertAnalysisTemplate, type InsertApiIntegration } from "@shared/schema";
-import { randomUUID } from "crypto";
+
+// Use Web Crypto API which works in both Node.js 18+ and browser environments
+// This avoids the webpack bundling issue with Node.js 'crypto' module
+function randomUUID(): string {
+  return globalThis.crypto.randomUUID();
+}
 
 export interface IStorage {
   // Property methods
