@@ -8,7 +8,7 @@ import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
 
 export async function POST(request: NextRequest) {
   try {
-    const { dealId, emailContent } = await request.json();
+    const { dealId, emailContent, fundingSource, mortgageValues } = await request.json();
     
     if (!dealId || !emailContent) {
       return NextResponse.json(
@@ -50,41 +50,57 @@ export async function POST(request: NextRequest) {
         }
       : undefined;
     
-    // Fetch current mortgage rate (fallback to 7% on error)
-    const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || emailDeal.extractedProperty?.price || 0;
-    // fundingSource is in propertyData after merge, or default to 'conventional'
-    const propertyFundingSource = propertyData.fundingSource || propertyData.funding_source || 'conventional';
     // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
+    // Use fundingSource from request, or from propertyData, or default to 'conventional'
+    let propertyFundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
     // Validate that propertyFundingSource exists as a key in FUNDING_SOURCE_DOWN_PAYMENTS
-    const isValidFundingSource = propertyFundingSource in FUNDING_SOURCE_DOWN_PAYMENTS;
-    const validatedFundingSource = isValidFundingSource ? propertyFundingSource : 'conventional';
-    const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[validatedFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS] ?? 0.20;
-    const downpayment = purchasePrice * downpaymentPercentage;
-    const loanAmount = purchasePrice - downpayment;
+    if (!Object.prototype.hasOwnProperty.call(FUNDING_SOURCE_DOWN_PAYMENTS, propertyFundingSource)) {
+      propertyFundingSource = 'conventional';
+    }
     
-    // Fetch mortgage rate with error handling
-    let mortgageRate: number;
-    try {
-      const zipCode = propertyData.zip_code || propertyData.zipCode;
-      if (zipCode) {
-        mortgageRate = await getMortgageRate({
-          loan_term: 30,
-          loan_amount: loanAmount,
-          zip_code: zipCode,
-        });
-      } else {
-        console.warn('No zip code found in property data, using default mortgage rate of 7%');
+    // Use mortgage calculator values if provided, otherwise fetch mortgage rate
+    // Note: mortgageRate should be passed directly as a decimal if provided
+    // MortgageValues no longer includes interestRate - use monthlyPayment directly
+    let mortgageRate: number | undefined;
+    if (mortgageValues) {
+      console.log('Using mortgage calculator values:', {
+        loanAmount: mortgageValues.loanAmount,
+        loanTermYears: mortgageValues.loanTermYears,
+        monthlyPayment: mortgageValues.monthlyPayment
+      });
+      // mortgageRate will be undefined when mortgageValues is provided,
+      // and analyzeProperty will use mortgageValues.monthlyPayment directly
+    } else {
+      // Fetch current mortgage rate (fallback to 7% on error)
+      const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || emailDeal.extractedProperty?.price || 0;
+      const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS] || 0.20;
+      const downpayment = purchasePrice * downpaymentPercentage;
+      const loanAmount = purchasePrice - downpayment;
+      
+      // Fetch mortgage rate with error handling
+      try {
+        const zipCode = propertyData.zip_code || propertyData.zipCode;
+        if (zipCode) {
+          mortgageRate = await getMortgageRate({
+            loan_term: 30,
+            loan_amount: loanAmount,
+            zip_code: zipCode,
+          });
+        } else {
+          console.warn('No zip code found in property data, using default mortgage rate of 7%');
+          mortgageRate = 0.07;
+        }
+      } catch (error) {
+        console.error('Error fetching mortgage rate, falling back to 7%:', error);
         mortgageRate = 0.07;
       }
-    } catch (error) {
-      console.error('Error fetching mortgage rate, falling back to 7%:', error);
-      mortgageRate = 0.07;
     }
 
     // Fetch current investment criteria
     const criteria = await loadInvestmentCriteria();
     
-    const analysisData = analyzeProperty(propertyData, strMetrics, undefined, validatedFundingSource as any, mortgageRate, undefined, criteria);
+    // Run TypeScript analysis with optional mortgage values and criteria
+    const analysisData = analyzeProperty(propertyData, strMetrics, undefined, propertyFundingSource as any, mortgageRate, mortgageValues, criteria);
 
     // Run AI analysis if available
     let analysisWithAI = analysisData;
