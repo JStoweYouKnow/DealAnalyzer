@@ -3,6 +3,37 @@ import { NextRequest, NextResponse } from "next/server";
 // Browser-printable HTML report (no Puppeteer needed!)
 // Users can print to PDF directly from their browser (Cmd/Ctrl+P)
 
+/**
+ * Interface for property data used in HTML report generation.
+ * Represents the minimal structure needed for report rendering.
+ */
+export interface ReportProperty {
+  address: string;
+  city?: string;
+  state?: string;
+  propertyType?: string;
+  purchasePrice: number;
+  monthlyRent: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  squareFootage?: number;
+  yearBuilt?: number;
+}
+
+/**
+ * Interface for analysis data used in HTML report generation.
+ * Represents the minimal structure needed for report rendering.
+ */
+export interface ReportAnalysis {
+  property: ReportProperty;
+  totalCashNeeded: number;
+  cashFlow: number;
+  cocReturn: number;
+  capRate: number;
+  passes1PercentRule: boolean;
+  meetsCriteria: boolean;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -15,7 +46,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const htmlContent = generatePrintableHTML(analyses, title || "Deal Analysis Report");
+    // Type assertion: we expect analyses to conform to ReportAnalysis[]
+    // Runtime validation would ideally be done here with a library like Zod
+    const htmlContent = generatePrintableHTML(analyses as ReportAnalysis[], title || "Deal Analysis Report");
 
     return new NextResponse(htmlContent, {
       headers: {
@@ -32,7 +65,25 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generatePrintableHTML(analyses: any[], title: string): string {
+function generatePrintableHTML(analyses: ReportAnalysis[], title: string): string {
+  /**
+   * Escapes HTML special characters to prevent XSS attacks.
+   * Replaces &, <, >, ", ', and / with their HTML entity equivalents.
+   */
+  const escapeHtml = (text: string | number | undefined | null): string => {
+    if (text === null || text === undefined) {
+      return "N/A";
+    }
+    const str = String(text);
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;")
+      .replace(/\//g, "&#x2F;");
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -52,34 +103,34 @@ function generatePrintableHTML(analyses: any[], title: string): string {
     <div class="property-analysis">
       <div class="property-header">
         <span class="property-number">Property ${index + 1}</span>
-        <h2>${analysis.property.address}</h2>
+        <h2>${escapeHtml(analysis.property.address)}</h2>
       </div>
 
       <div class="analysis-grid">
         <div class="card">
           <h3>Property Details</h3>
           <dl>
-            <div><dt>Address:</dt><dd>${analysis.property.address || "N/A"}</dd></div>
-            <div><dt>City, State:</dt><dd>${analysis.property.city || "N/A"}, ${analysis.property.state || "N/A"}</dd></div>
-            <div><dt>Property Type:</dt><dd>${analysis.property.propertyType || "N/A"}</dd></div>
-            <div><dt>Purchase Price:</dt><dd class="highlight">${formatCurrency(analysis.property.purchasePrice || 0)}</dd></div>
-            <div><dt>Monthly Rent:</dt><dd class="highlight">${formatCurrency(analysis.property.monthlyRent || 0)}</dd></div>
-            <div><dt>Bedrooms:</dt><dd>${analysis.property.bedrooms || "N/A"}</dd></div>
-            <div><dt>Bathrooms:</dt><dd>${analysis.property.bathrooms || "N/A"}</dd></div>
-            <div><dt>Square Footage:</dt><dd>${analysis.property.squareFootage?.toLocaleString() || "N/A"}</dd></div>
-            <div><dt>Year Built:</dt><dd>${analysis.property.yearBuilt || "N/A"}</dd></div>
+            <div><dt>Address:</dt><dd>${escapeHtml(analysis.property.address)}</dd></div>
+            <div><dt>City, State:</dt><dd>${escapeHtml(analysis.property.city)}, ${escapeHtml(analysis.property.state)}</dd></div>
+            <div><dt>Property Type:</dt><dd>${escapeHtml(analysis.property.propertyType)}</dd></div>
+            <div><dt>Purchase Price:</dt><dd class="highlight">${escapeHtml(formatCurrency(analysis.property.purchasePrice || 0))}</dd></div>
+            <div><dt>Monthly Rent:</dt><dd class="highlight">${escapeHtml(formatCurrency(analysis.property.monthlyRent || 0))}</dd></div>
+            <div><dt>Bedrooms:</dt><dd>${escapeHtml(analysis.property.bedrooms)}</dd></div>
+            <div><dt>Bathrooms:</dt><dd>${escapeHtml(analysis.property.bathrooms)}</dd></div>
+            <div><dt>Square Footage:</dt><dd>${escapeHtml(analysis.property.squareFootage ? analysis.property.squareFootage.toLocaleString() : null)}</dd></div>
+            <div><dt>Year Built:</dt><dd>${escapeHtml(analysis.property.yearBuilt)}</dd></div>
           </dl>
         </div>
 
         <div class="card">
           <h3>Financial Analysis</h3>
           <dl>
-            <div><dt>Total Cash Needed:</dt><dd class="highlight">${formatCurrency(analysis.totalCashNeeded || 0)}</dd></div>
-            <div><dt>Monthly Cash Flow:</dt><dd class="highlight ${(analysis.cashFlow || 0) >= 0 ? "positive" : "negative"}">${formatCurrency(analysis.cashFlow || 0)}</dd></div>
-            <div><dt>Cash-on-Cash Return:</dt><dd class="highlight">${formatPercent(analysis.cocReturn || 0)}</dd></div>
-            <div><dt>Cap Rate:</dt><dd class="highlight">${formatPercent(analysis.capRate || 0)}</dd></div>
-            <div><dt>Passes 1% Rule:</dt><dd class="badge ${analysis.passes1PercentRule ? "pass" : "fail"}">${analysis.passes1PercentRule ? "✓ Yes" : "✗ No"}</dd></div>
-            <div><dt>Meets Criteria:</dt><dd class="badge ${analysis.meetsCriteria ? "pass" : "fail"}">${analysis.meetsCriteria ? "✓ Yes" : "✗ No"}</dd></div>
+            <div><dt>Total Cash Needed:</dt><dd class="highlight">${escapeHtml(formatCurrency(analysis.totalCashNeeded || 0))}</dd></div>
+            <div><dt>Monthly Cash Flow:</dt><dd class="highlight ${(analysis.cashFlow || 0) >= 0 ? "positive" : "negative"}">${escapeHtml(formatCurrency(analysis.cashFlow || 0))}</dd></div>
+            <div><dt>Cash-on-Cash Return:</dt><dd class="highlight">${escapeHtml(formatPercent(analysis.cocReturn || 0))}</dd></div>
+            <div><dt>Cap Rate:</dt><dd class="highlight">${escapeHtml(formatPercent(analysis.capRate || 0))}</dd></div>
+            <div><dt>Passes 1% Rule:</dt><dd class="badge ${analysis.passes1PercentRule ? "pass" : "fail"}">${escapeHtml(analysis.passes1PercentRule ? "✓ Yes" : "✗ No")}</dd></div>
+            <div><dt>Meets Criteria:</dt><dd class="badge ${analysis.meetsCriteria ? "pass" : "fail"}">${escapeHtml(analysis.meetsCriteria ? "✓ Yes" : "✗ No")}</dd></div>
           </dl>
         </div>
       </div>
@@ -97,7 +148,7 @@ function generatePrintableHTML(analyses: any[], title: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
+  <title>${escapeHtml(title || '')}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -331,7 +382,7 @@ function generatePrintableHTML(analyses: any[], title: string): string {
 
   <div class="header">
     <div class="subtitle">Real Estate Investment Report</div>
-    <h1>${title}</h1>
+    <h1>${escapeHtml(title || '')}</h1>
     <div class="meta">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</div>
   </div>
 

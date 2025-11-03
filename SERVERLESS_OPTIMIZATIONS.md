@@ -335,18 +335,18 @@ Total for typical flow:          75ms      (98.7% faster!)
 **Before:**
 - Geocoding API: 10,000 req × $0.005 = $50
 - RentCast API: 10,000 req × $0.02 = $200
-- Serverless execution: 10,000 × 3s × $0.0000167 = $500
-- **Total: ~$750/month**
+- Serverless execution: 10,000 × 3s × $0.0000167 = $0.501
+- **Total: ~$250.50/month**
 
 **After:**
 - Geocoding API: 100 req × $0.005 = $0.50 (90% cached)
 - RentCast API: 2,000 req × $0.02 = $40 (80% cached)
-- Serverless execution: 10,000 × 0.05s × $0.0000167 = $8.35
+- Serverless execution: 10,000 × 0.05s × $0.0000167 = $0.00835
 - Vercel KV: $10/month (included in Pro plan)
 - Vercel Blob: $5/month (100GB free)
-- **Total: ~$64/month**
+- **Total: ~$55.51/month**
 
-**💰 Savings: $686/month (91% reduction)**
+**💰 Savings: ~$195/month (78% reduction)**
 
 ---
 
@@ -479,7 +479,7 @@ Comparable Sales: 1 hour (Edge CDN)
 - ⚡ Instant cache hits (5-10ms)
 
 ### Cost
-- 💰 91% reduction in API costs
+- 💰 78% reduction in total costs
 - 💰 80-90% fewer RentCast API calls
 - 💰 90% fewer geocoding API calls
 - 💰 Zero PDF generation overhead
@@ -533,5 +533,5 @@ console.log(process.env.BLOB_READ_WRITE_TOKEN ? 'Blob enabled' : 'Using fallback
 
 *Generated: November 3, 2025*
 *Optimization Time: ~2 hours*
-*Cost Savings: ~$686/month at scale*
+*Cost Savings: ~$195/month at scale*
 *Performance Gain: 98.7% faster*

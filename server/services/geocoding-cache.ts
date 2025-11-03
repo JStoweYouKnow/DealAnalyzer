@@ -71,9 +71,17 @@ export class GeocodingCache {
         return 0;
       }
 
-      await kv.del(...keys);
-      console.log(`[Geocoding Cache] ✅ Cleared ${keys.length} keys`);
-      return keys.length;
+      const BATCH_SIZE = 1000;
+      let totalDeleted = 0;
+
+      for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+        const batch = keys.slice(i, i + BATCH_SIZE);
+        await kv.del(...batch);
+        totalDeleted += batch.length;
+      }
+
+      console.log(`[Geocoding Cache] ✅ Cleared ${totalDeleted} keys`);
+      return totalDeleted;
     } catch (error) {
       console.error('[Geocoding Cache] Error clearing cache:', error);
       throw error;
@@ -103,14 +111,59 @@ export class GeocodingCache {
 // Fallback implementation for when KV is not available (development)
 export class GeocodingCacheFallback {
   private static cache = new Map<string, { result: GeocodeResult; expires: number }>();
+  private static cleanupInterval: NodeJS.Timeout | null = null;
+  private static removedKeysCount = 0;
+
+  // Initialize periodic cleanup on class load
+  private static initializeCleanup() {
+    if (this.cleanupInterval !== null) {
+      return; // Already initialized
+    }
+
+    // Run cleanup every hour
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpired();
+    }, 60 * 60 * 1000);
+
+    // Also run cleanup once immediately
+    this.cleanupExpired();
+  }
+
+  // Clean up expired entries
+  private static cleanupExpired(): void {
+    const now = Date.now();
+    let removed = 0;
+
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.expires <= now) {
+        this.cache.delete(key);
+        removed++;
+      }
+    }
+
+    if (removed > 0) {
+      this.removedKeysCount += removed;
+      console.log(`[Geocoding Cache Fallback] 🧹 Cleaned up ${removed} expired entries`);
+    }
+  }
 
   static async get(address: string): Promise<GeocodeResult | null> {
+    // Ensure cleanup is initialized
+    this.initializeCleanup();
+
     const cacheKey = address.toLowerCase().trim();
     const cached = this.cache.get(cacheKey);
 
-    if (cached && cached.expires > Date.now()) {
-      console.log(`[Geocoding Cache Fallback] ✅ HIT for "${address}"`);
-      return cached.result;
+    if (cached) {
+      if (cached.expires > Date.now()) {
+        console.log(`[Geocoding Cache Fallback] ✅ HIT for "${address}"`);
+        return cached.result;
+      } else {
+        // Entry is expired, delete it
+        this.cache.delete(cacheKey);
+        this.removedKeysCount++;
+        console.log(`[Geocoding Cache Fallback] 🗑️ DELETED expired entry for "${address}"`);
+      }
     }
 
     console.log(`[Geocoding Cache Fallback] ❌ MISS for "${address}"`);
@@ -118,6 +171,9 @@ export class GeocodingCacheFallback {
   }
 
   static async set(address: string, result: GeocodeResult): Promise<void> {
+    // Ensure cleanup is initialized
+    this.initializeCleanup();
+
     const cacheKey = address.toLowerCase().trim();
     const expires = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
     this.cache.set(cacheKey, { result, expires });
@@ -127,6 +183,11 @@ export class GeocodingCacheFallback {
   static async clearAll(): Promise<number> {
     const size = this.cache.size;
     this.cache.clear();
+    this.removedKeysCount = 0; // Reset removed keys count when clearing all
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
     return size;
   }
 
@@ -134,6 +195,7 @@ export class GeocodingCacheFallback {
     return {
       totalKeys: this.cache.size,
       estimatedSize: `~${Math.round(this.cache.size * 0.2)}KB`,
+      removedKeysTotal: this.removedKeysCount,
     };
   }
 }

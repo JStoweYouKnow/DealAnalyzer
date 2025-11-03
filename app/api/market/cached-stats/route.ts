@@ -55,21 +55,80 @@ async function getMarketStats(city: string, state: string): Promise<MarketStats>
         const data = await response.json();
         console.log(`[RentCast] ✅ Got data for ${city}, ${state}`);
 
-        // Calculate market score based on multiple factors
-        const priceToRentRatio = data.medianPrice / (data.medianRent * 12);
-        const capRate = (data.medianRent * 12 / data.medianPrice) * 100;
-        const marketScore = Math.min(100, Math.max(0,
-          100 - (priceToRentRatio * 5) + (capRate * 10)
-        ));
+        // Extract and validate medianPrice and medianRent
+        const medianPrice = Number(data.medianPrice);
+        const medianRent = Number(data.medianRent);
+
+        // Check if values are valid and non-zero before performing divisions
+        const isValidPrice = Number.isFinite(medianPrice) && medianPrice > 0;
+        const isValidRent = Number.isFinite(medianRent) && medianRent > 0;
+
+        // Calculate market score based on multiple factors with defensive checks
+        let priceToRentRatio = 0;
+        let capRate = 0;
+        let marketScore = 0;
+
+        if (isValidPrice && isValidRent) {
+          // Both values are valid, safe to perform divisions
+          priceToRentRatio = medianPrice / (medianRent * 12);
+          capRate = (medianRent * 12 / medianPrice) * 100;
+
+          // Only calculate marketScore if ratios are finite
+          if (Number.isFinite(priceToRentRatio) && Number.isFinite(capRate)) {
+            marketScore = Math.min(100, Math.max(0,
+              100 - (priceToRentRatio * 5) + (capRate * 10)
+            ));
+          }
+        }
+        // If values are invalid, priceToRentRatio, capRate, and marketScore remain 0
+
+        // Calculate trend from history data (saleData.history or rentalData.history)
+        let trend: 'up' | 'down' | 'stable' = 'stable';
+        
+        // Try saleData.history first, then fall back to rentalData.history
+        const history = data.saleData?.history ?? data.rentalData?.history;
+        
+        if (history && Array.isArray(history) && history.length >= 2) {
+          const latestIndex = history.length - 1;
+          const previousIndex = latestIndex - 1;
+          
+          // Extract values - handle different possible field names
+          const latestValue = history[latestIndex]?.value ?? 
+                            history[latestIndex]?.price ?? 
+                            history[latestIndex]?.medianPrice ??
+                            history[latestIndex];
+          const previousValue = history[previousIndex]?.value ?? 
+                               history[previousIndex]?.price ?? 
+                               history[previousIndex]?.medianPrice ??
+                               history[previousIndex];
+          
+          // Convert to numbers if they're not already
+          const latest = typeof latestValue === 'number' ? latestValue : Number(latestValue);
+          const previous = typeof previousValue === 'number' ? previousValue : Number(previousValue);
+          
+          // Calculate percent change if we have valid numbers
+          if (Number.isFinite(latest) && Number.isFinite(previous) && previous !== 0) {
+            const percentChange = ((latest - previous) / previous) * 100;
+            
+            // Set trend based on percent change (using a small threshold to avoid floating point issues)
+            if (percentChange > 0.01) {
+              trend = 'up';
+            } else if (percentChange < -0.01) {
+              trend = 'down';
+            } else {
+              trend = 'stable';
+            }
+          }
+        }
 
         return {
           city,
           state,
-          medianPrice: data.medianPrice || 0,
-          medianRent: data.medianRent || 0,
-          averageCapRate: capRate,
+          medianPrice: isValidPrice ? medianPrice : 0,
+          medianRent: isValidRent ? medianRent : 0,
+          averageCapRate: Number.isFinite(capRate) ? capRate : 0,
           marketScore: Math.round(marketScore),
-          trend: data.priceChange > 0 ? 'up' : data.priceChange < 0 ? 'down' : 'stable',
+          trend,
           lastUpdated: new Date().toISOString(),
         };
       } else {

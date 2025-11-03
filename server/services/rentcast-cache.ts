@@ -143,19 +143,75 @@ export class RentCastCache {
 export class RentCastCacheFallback {
   private static cache = new Map<string, { value: any; expires: number }>();
   private static inFlightRequests = new Map<string, Promise<any>>();
+  private static cleanupInterval: NodeJS.Timeout | null = null;
+
+  /**
+   * Initialize periodic cleanup if not already running
+   */
+  private static ensureCleanupRunning(): void {
+    if (this.cleanupInterval === null) {
+      // Run cleanup every 5 minutes
+      this.cleanupInterval = setInterval(() => {
+        this.cleanupExpired();
+      }, 5 * 60 * 1000);
+      
+      // Ensure cleanup runs on process exit
+      if (typeof process !== 'undefined') {
+        process.on('exit', () => {
+          if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+          }
+        });
+      }
+    }
+  }
+
+  /**
+   * Remove expired entries from cache and stuck in-flight requests
+   */
+  private static cleanupExpired(): void {
+    const now = Date.now();
+    let expiredCount = 0;
+
+    // Clean expired cache entries
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.expires <= now) {
+        this.cache.delete(key);
+        expiredCount++;
+      }
+    }
+
+    // Note: inFlightRequests are promises that should complete or error
+    // They're cleaned up in the promise handlers, but we could add a timeout
+    // mechanism here if needed. For now, we rely on promise completion/error.
+
+    if (expiredCount > 0) {
+      console.log(`[RentCast Cache Fallback] 🧹 Cleaned up ${expiredCount} expired entries`);
+    }
+  }
 
   static async getOrFetch<T>(
     key: string,
     ttl: number,
     fetchFn: () => Promise<T>
   ): Promise<T> {
+    // Ensure periodic cleanup is running
+    this.ensureCleanupRunning();
+
     const cacheKey = this.getCacheKey(key);
 
     // Check cache
     const cached = this.cache.get(cacheKey);
-    if (cached && cached.expires > Date.now()) {
-      console.log(`[RentCast Cache Fallback] ✅ HIT: ${key}`);
-      return cached.value;
+    if (cached) {
+      if (cached.expires > Date.now()) {
+        // Valid cache entry
+        console.log(`[RentCast Cache Fallback] ✅ HIT: ${key}`);
+        return cached.value;
+      } else {
+        // Expired entry - delete it and treat as miss
+        this.cache.delete(cacheKey);
+        console.log(`[RentCast Cache Fallback] 🗑️  EXPIRED: ${key} (deleted)`);
+      }
     }
 
     // Check in-flight

@@ -33,15 +33,23 @@ async function sendDigestEmail(data: DigestData): Promise<boolean> {
   console.log(`[Email Digest] Stats:`, data.stats);
 
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
+  const RESEND_FROM = process.env.RESEND_FROM || process.env.EMAIL_FROM;
 
   // If Resend API key is available, send real email
   if (RESEND_API_KEY) {
+    // Validate sender email if API key is present
+    if (!RESEND_FROM || RESEND_FROM.trim() === '') {
+      const errorMsg = '[Email Digest] ❌ RESEND_API_KEY is set but RESEND_FROM (or EMAIL_FROM) is missing or empty. Please set RESEND_FROM environment variable with a valid sender email (e.g., "Deal Analyzer <deals@yourdomain.com>").';
+      console.error(errorMsg);
+      return false;
+    }
+
     try {
       const { Resend } = await import('resend');
       const resend = new Resend(RESEND_API_KEY);
 
       const { data: emailData, error } = await resend.emails.send({
-        from: 'Deal Analyzer <deals@dealanalyzer.com>', // Change to your verified domain
+        from: RESEND_FROM.trim(),
         to: data.email,
         subject: `Your Weekly Real Estate Digest - ${data.topDeals.length} Top Deals`,
         html: generateEmailHTML(data),
@@ -72,6 +80,21 @@ function generateEmailHTML(data: DigestData): string {
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
 
   const formatPercent = (value: number) => `${(value * 100).toFixed(2)}%`;
+
+  // Get base URL from environment variable with fallback
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://yourapp.com')
+    .trim()
+    .replace(/\/+$/, ''); // Remove trailing slashes
+  
+  // Helper to construct URLs without double slashes
+  const buildUrl = (path: string): string => {
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${baseUrl}${cleanPath}`;
+  };
+
+  const currentYear = new Date().getFullYear();
+  const dashboardUrl = buildUrl('/dashboard');
+  const unsubscribeUrl = buildUrl('/unsubscribe');
 
   return `
     <!DOCTYPE html>
@@ -170,7 +193,7 @@ function generateEmailHTML(data: DigestData): string {
         `).join('')}
 
         <div style="text-align: center; margin-top: 30px;">
-          <a href="https://yourapp.com/dashboard" style="display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+          <a href="${dashboardUrl}" style="display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
             View Full Analysis
           </a>
         </div>
@@ -178,8 +201,8 @@ function generateEmailHTML(data: DigestData): string {
 
       <div class="footer">
         <p>You're receiving this because you subscribed to weekly digests.</p>
-        <p><a href="https://yourapp.com/unsubscribe" style="color: #667eea;">Unsubscribe</a></p>
-        <p>© 2024 Deal Analyzer. All rights reserved.</p>
+        <p><a href="${unsubscribeUrl}" style="color: #667eea;">Unsubscribe</a></p>
+        <p>© ${currentYear} Deal Analyzer. All rights reserved.</p>
       </div>
     </body>
     </html>

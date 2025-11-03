@@ -146,9 +146,8 @@ export default function ComparisonPage() {
 
     document.body.appendChild(link);
     link.click();
+    URL.revokeObjectURL(url);
     document.body.removeChild(link);
-
-    console.log('[CSV Export] Downloaded comparison data for', comparisonData.length, 'properties');
   };
 
   return (
