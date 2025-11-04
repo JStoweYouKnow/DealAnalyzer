@@ -290,19 +290,22 @@ export async function POST(request: NextRequest) {
     throw error;
   }
 
-  // Attach userId to validated data before creating the filter
-  validated.userId = userId;
+  // Create filter data with userId included
+  const filterData = {
+    ...validated,
+    userId,
+  };
 
   // Create saved filter (storage operation)
   try {
-    const filter = await storage.createSavedFilter(validated);
+    const filter = await storage.createSavedFilter(filterData);
     return NextResponse.json({ success: true, data: filter });
   } catch (error) {
     // Handle storage/database errors
     logError("Database error creating saved filter in POST /api/filters", {
       error: error instanceof Error ? error.message : String(error),
       errorStack: error instanceof Error ? error.stack : undefined,
-      validatedData: validated,
+      validatedData: filterData,
     });
     return NextResponse.json(
       { success: false, error: "Failed to create saved filter" },
