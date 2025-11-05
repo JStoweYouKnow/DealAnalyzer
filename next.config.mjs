@@ -7,6 +7,12 @@ const nextConfig = {
     },
   },
   serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium-min"],
+  // Ensure chromium-min package files (including brotli files) are included in deployment
+  outputFileTracingIncludes: {
+    '/api/**/*': [
+      'node_modules/@sparticuz/chromium-min/**/*',
+    ],
+  },
   images: {
     domains: ['images.unsplash.com', 'maps.googleapis.com'],
     remotePatterns: [

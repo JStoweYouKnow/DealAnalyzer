@@ -107,9 +107,65 @@ async function makePDF(html: string): Promise<Buffer | null> {
       const chromium = require("@sparticuz/chromium-min");
       const puppeteer = require("puppeteer-core");
 
+      // Configure chromium for serverless environment
+      // Disable graphics mode for serverless environments
+      chromium.setGraphicsMode(false);
+      
+      // Get the executable path - this will extract the binary if needed
+      let executablePath: string;
+      try {
+        // Check if a chromium pack URL is provided via environment variable
+        // This allows downloading the chromium pack from a CDN or GitHub releases
+        const chromiumPackUrl = process.env.CHROMIUM_PACK_URL;
+        
+        if (chromiumPackUrl) {
+          console.log("Using Chromium pack URL from environment variable:", chromiumPackUrl);
+          executablePath = await chromium.executablePath(chromiumPackUrl);
+        } else {
+          // First, try to get the executable path using the default location
+          // If that fails with "does not exist" error, the bin directory is missing
+          executablePath = await chromium.executablePath();
+        }
+        console.log("Chromium executable path:", executablePath);
+      } catch (pathError) {
+        console.error("Error getting chromium executable path:", pathError);
+        const errorMessage = pathError instanceof Error ? pathError.message : String(pathError);
+        
+        // Check if it's the brotli files error
+        if (errorMessage.includes("brotli") || errorMessage.includes("does not exist")) {
+          console.error("Chromium brotli files not found in package.");
+          
+          // Try to use GitHub releases URL as fallback
+          // The latest chromium-pack.x64.tar is available at:
+          // https://github.com/Sparticuz/chromium/releases/latest/download/chromium-v141.0.0-pack.tar
+          // Note: You may need to adjust the version number
+          const fallbackUrl = process.env.CHROMIUM_PACK_URL || 
+            "https://github.com/Sparticuz/chromium/releases/latest/download/chromium-v141.0.0-pack.tar";
+          
+          try {
+            console.log("Attempting to download Chromium pack from:", fallbackUrl);
+            executablePath = await chromium.executablePath(fallbackUrl);
+            console.log("Successfully downloaded Chromium, path:", executablePath);
+          } catch (downloadError) {
+            console.error("Failed to download Chromium pack:", downloadError);
+            throw new Error(
+              `Failed to locate Chromium binary: ${errorMessage}. ` +
+              `The @sparticuz/chromium-min package v141.0.0 does not include the Chromium binary files. ` +
+              `Tried downloading from ${fallbackUrl} but that also failed. ` +
+              `For Vercel deployments, you can:\n` +
+              `1. Set CHROMIUM_PACK_URL environment variable to a valid chromium pack URL\n` +
+              `2. Use a different PDF generation library (e.g., pdfkit, jsPDF)\n` +
+              `3. Use the full @sparticuz/chromium package instead of chromium-min`
+            );
+          }
+        } else {
+          throw new Error(`Failed to get Chromium executable path: ${errorMessage}`);
+        }
+      }
+
       // Assign the browser instance
       browser = await puppeteer.launch({
-        executablePath: await chromium.executablePath(),
+        executablePath,
         headless: chromium.headless,
         ignoreHTTPSErrors: true,
         defaultViewport: chromium.defaultViewport,
