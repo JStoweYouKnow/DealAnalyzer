@@ -7,9 +7,9 @@ const nextConfig = {
     },
   },
   serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium-min"],
-  // Ensure chromium-min package files (including brotli files) are included in deployment
+  // Ensure chromium-min package files (including brotli files) are included only for routes that use puppeteer
   outputFileTracingIncludes: {
-    '/api/**/*': [
+    '/api/generate-report/**/*': [
       'node_modules/@sparticuz/chromium-min/**/*',
     ],
   },
