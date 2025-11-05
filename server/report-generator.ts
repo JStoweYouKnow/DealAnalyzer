@@ -179,7 +179,7 @@ async function generateCSVBuffer(data: ReportData, options: ReportOptions): Prom
   // Prepare CSV data
   const csvData = data.analyses.map((analysis, index) => ({
     'Property #': index + 1,
-    'Address': analysis.property.address || 'N/A',
+    'Address': analysis.property.address || 'Unknown Address',
     'City': analysis.property.city || 'N/A',
     'State': analysis.property.state || 'N/A',
     'Property Type': analysis.property.propertyType || 'N/A',
@@ -221,7 +221,7 @@ async function generateCSVReport(data: ReportData, options: ReportOptions, baseF
   // Prepare CSV data
   const csvData = data.analyses.map((analysis, index) => ({
     'Property #': index + 1,
-    'Address': analysis.property.address || 'N/A',
+    'Address': analysis.property.address || 'Unknown Address',
     'City': analysis.property.city || 'N/A',
     'State': analysis.property.state || 'N/A',
     'Property Type': analysis.property.propertyType || 'N/A',
@@ -290,13 +290,13 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
       <p class="text-xs font-semibold leading-7 text-indigo-600">
         Property Analysis ${index + 1}
       </p>
-      <h1 class="mt-2 text-3xl font-bold tracking-tight text-gray-900">${analysis.property.address}</h1>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-gray-900">${analysis.property.address || 'Unknown Address'}</h1>
       
       <div class="mt-6 grid grid-cols-2 gap-6">
         <div class="p-4 border border-gray-200 rounded-lg">
           <h3 class="text-sm font-semibold text-indigo-600 mb-4">Property Details</h3>
           <dl class="space-y-2 text-sm">
-            <div class="flex justify-between"><dt class="font-medium">Address:</dt><dd>${analysis.property.address || 'N/A'}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Address:</dt><dd>${analysis.property.address || 'Unknown Address'}</dd></div>
             <div class="flex justify-between"><dt class="font-medium">City, State:</dt><dd>${analysis.property.city || 'N/A'}, ${analysis.property.state || 'N/A'}</dd></div>
             <div class="flex justify-between"><dt class="font-medium">Property Type:</dt><dd>${analysis.property.propertyType || 'N/A'}</dd></div>
             <div class="flex justify-between"><dt class="font-medium">Purchase Price:</dt><dd class="font-semibold">${formatCurrency(analysis.property.purchasePrice || 0)}</dd></div>
@@ -350,8 +350,8 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
         <dl class="space-y-2 text-sm">
           <div class="flex justify-between"><dt class="font-medium">Total Properties Analyzed:</dt><dd class="font-semibold">${data.analyses.length}</dd></div>
           <div class="flex justify-between"><dt class="font-medium">Properties Meeting Criteria:</dt><dd class="font-semibold text-green-600">${data.analyses.filter(a => a.meetsCriteria).length}</dd></div>
-          <div class="flex justify-between"><dt class="font-medium">Average Cash Flow:</dt><dd class="font-semibold">${formatCurrency(data.analyses.reduce((sum, a) => sum + a.cashFlow, 0) / data.analyses.length)}</dd></div>
-          <div class="flex justify-between"><dt class="font-medium">Average COC Return:</dt><dd class="font-semibold">${formatPercent(data.analyses.reduce((sum, a) => sum + a.cocReturn, 0) / data.analyses.length)}</dd></div>
+          <div class="flex justify-between"><dt class="font-medium">Average Cash Flow:</dt><dd class="font-semibold">${data.analyses.length > 0 ? formatCurrency(data.analyses.reduce((sum, a) => sum + (a.cashFlow || 0), 0) / data.analyses.length) : formatCurrency(0)}</dd></div>
+          <div class="flex justify-between"><dt class="font-medium">Average COC Return:</dt><dd class="font-semibold">${data.analyses.length > 0 ? formatPercent(data.analyses.reduce((sum, a) => sum + (a.cocReturn || 0), 0) / data.analyses.length) : formatPercent(0)}</dd></div>
         </dl>
       </div>
     </body>

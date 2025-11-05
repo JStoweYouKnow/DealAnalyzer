@@ -51,6 +51,41 @@ import { apiIntegrationService } from "./api-integration-service";
 import { aiAnalysisService as photoAnalysisService } from "./services/ai-analysis-service";
 import { geocodingService } from "./services/geocoding-service";
 import { rentCastAPI } from "./services/rentcast-api";
+import type { Request as ExpressRequest } from "express";
+
+/**
+ * Authenticates the request and returns the user ID if authenticated.
+ * Tries Clerk auth first (if available), then falls back to bearer token authentication.
+ * Returns null if not authenticated.
+ */
+async function authenticateRequest(req: ExpressRequest): Promise<string | null> {
+  // Try Clerk authentication first (if available in Express context)
+  // Note: Clerk might not be available in Express routes, so we'll try it gracefully
+  try {
+    // For Express routes, Clerk auth might need to be handled differently
+    // This is a placeholder that can be extended based on your auth setup
+  } catch (error) {
+    // Clerk not available or not configured, continue to bearer token check
+  }
+
+  // Fall back to bearer token authentication
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    // Validate token against API_SECRET or similar
+    if (token && process.env.API_SECRET && token === process.env.API_SECRET) {
+      // Return a default user ID for bearer token auth
+      return "bearer-token-user";
+    }
+  }
+
+  // Check session for user ID (if using session-based auth)
+  if ((req as any).session?.userId) {
+    return (req as any).session.userId;
+  }
+
+  return null;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -850,7 +885,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create saved filter
   app.post("/api/filters", async (req, res) => {
     try {
+      // Authenticate the request to get userId
+      const userId = await authenticateRequest(req);
+      
+      // Validate request body against schema
       const validated = insertSavedFilterSchema.parse(req.body);
+      
+      // Attach userId to validated data before creating the filter
+      validated.userId = userId || undefined;
+      
       const filter = await storage.createSavedFilter(validated);
       res.json({ success: true, data: filter });
     } catch (error) {

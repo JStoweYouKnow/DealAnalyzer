@@ -398,6 +398,7 @@ export const savedFilterSchema = z.object({
     meetsCriteria: z.boolean().optional(),
     investmentGrade: z.array(z.enum(['A', 'B', 'C', 'D'])).optional(),
   }),
+  userId: z.string().optional(), // User who created the filter
   isSystem: z.boolean().default(false), // System filters vs user-created
   usageCount: z.number().default(0),
   createdAt: z.date(),

@@ -55,8 +55,8 @@ export interface IStorage {
   deleteSavedFilter(id: string): Promise<boolean>;
   incrementFilterUsage(id: string): Promise<void>;
   
-  searchNaturalLanguage(query: string): Promise<NaturalLanguageSearch>;
-  getSearchHistory(): Promise<NaturalLanguageSearch[]>;
+  searchNaturalLanguage(query: string, userId?: string): Promise<NaturalLanguageSearch>;
+  getSearchHistory(userId?: string): Promise<NaturalLanguageSearch[]>;
   
   getPropertyClassification(propertyId: string): Promise<PropertyClassification | undefined>;
   createPropertyClassification(classification: InsertPropertyClassification): Promise<PropertyClassification>;
@@ -109,6 +109,7 @@ export class MemStorage implements IStorage {
   private marketHeatMapData: Map<string, MarketHeatMapData>;
   private savedFilters: Map<string, SavedFilter>;
   private searchHistory: Map<string, NaturalLanguageSearch>;
+  private searchHistoryByUser: Map<string, string>; // Maps search ID to userId
   private propertyClassifications: Map<string, PropertyClassification>;
   private smartPropertyRecommendations: Map<string, SmartPropertyRecommendation>;
   private rentPricingRecommendations: Map<string, RentPricingRecommendation>;
@@ -127,6 +128,7 @@ export class MemStorage implements IStorage {
     this.marketHeatMapData = new Map();
     this.savedFilters = new Map();
     this.searchHistory = new Map();
+    this.searchHistoryByUser = new Map();
     this.propertyClassifications = new Map();
     this.smartPropertyRecommendations = new Map();
     this.rentPricingRecommendations = new Map();
@@ -429,7 +431,7 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async searchNaturalLanguage(query: string): Promise<NaturalLanguageSearch> {
+  async searchNaturalLanguage(query: string, userId?: string): Promise<NaturalLanguageSearch> {
     const parsedCriteria = this.parseNaturalLanguageQuery(query);
     const results = await this.searchProperties(parsedCriteria);
     
@@ -443,11 +445,29 @@ export class MemStorage implements IStorage {
     };
     
     this.searchHistory.set(id, search);
+    // Track userId for this search if provided
+    if (userId) {
+      this.searchHistoryByUser.set(id, userId);
+    }
     return search;
   }
 
-  async getSearchHistory(): Promise<NaturalLanguageSearch[]> {
-    return Array.from(this.searchHistory.values())
+  async getSearchHistory(userId?: string): Promise<NaturalLanguageSearch[]> {
+    const allSearches = Array.from(this.searchHistory.values());
+    
+    // If userId is provided, filter to only that user's searches
+    if (userId) {
+      const userSearches = allSearches.filter(search => {
+        const searchUserId = search.id ? this.searchHistoryByUser.get(search.id) : undefined;
+        return searchUserId === userId;
+      });
+      return userSearches
+        .sort((a, b) => b.searchDate.getTime() - a.searchDate.getTime())
+        .slice(0, 50); // Keep last 50 searches
+    }
+    
+    // If no userId provided, return all searches (backwards compatibility)
+    return allSearches
       .sort((a, b) => b.searchDate.getTime() - a.searchDate.getTime())
       .slice(0, 50); // Keep last 50 searches
   }
