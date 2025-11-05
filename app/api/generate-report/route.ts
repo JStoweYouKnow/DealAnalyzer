@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
               
               // Merge extracted property data with normalization
               // Normalize snake_case keys to camelCase because external sources may provide snake_case
-              // Merge uses parsed data first, then extractedProperty overrides (Object.assign applies right-to-left)
+              // Merge uses parsed data first, then extractedProperty overrides (Object.assign applies left-to-right, so normalizedExtracted passed after propertyData will override parsed values; the last argument wins)
               if (emailDeal.extractedProperty) {
                 const normalizedExtracted = normalizeKeysToCamelCase(emailDeal.extractedProperty);
                 Object.assign(propertyData, normalizedExtracted);
@@ -215,11 +215,22 @@ export async function POST(request: NextRequest) {
     
     // Validate PDF buffer starts with PDF magic bytes
     if (options.format === 'pdf') {
+      // Double-check the content type matches what was requested
+      if (result.contentType !== 'application/pdf') {
+        console.error("Content type mismatch: requested PDF but got", result.contentType);
+        return NextResponse.json(
+          { success: false, error: `Expected PDF but got ${result.contentType}` },
+          { status: 500 }
+        );
+      }
+      
       const pdfHeader = result.buffer.slice(0, 4).toString('ascii');
       if (pdfHeader !== '%PDF') {
-        console.error("Invalid PDF buffer, header:", pdfHeader);
+        console.error("Invalid PDF buffer, header:", pdfHeader, "buffer length:", result.buffer.length);
+        // Log first 100 bytes for debugging
+        console.error("First 100 bytes:", result.buffer.slice(0, 100).toString('hex'));
         return NextResponse.json(
-          { success: false, error: "Generated PDF is invalid" },
+          { success: false, error: `Generated PDF is invalid: expected '%PDF' header but got '${pdfHeader}'` },
           { status: 500 }
         );
       }

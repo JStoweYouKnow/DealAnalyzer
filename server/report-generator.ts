@@ -39,29 +39,25 @@ export async function generateReportBuffer(data: ReportData, options: ReportOpti
   const baseFileName = `${options.title.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}`;
   
   if (options.format === 'pdf') {
-    try {
-      const htmlContent = generateHTMLReport(data, options);
-      const pdfBuffer = await makePDF(htmlContent);
-      
-      if (!pdfBuffer) {
-        throw new Error('Failed to generate PDF');
-      }
-      
-      return {
-        buffer: pdfBuffer,
-        fileName: `${baseFileName}.pdf`,
-        contentType: 'application/pdf'
-      };
-    } catch (error) {
-      console.warn('PDF generation failed, falling back to CSV:', error);
-      // Fallback to CSV if PDF fails
-      const csvBuffer = await generateCSVBuffer(data, options);
-      return {
-        buffer: csvBuffer,
-        fileName: `${baseFileName}.csv`,
-        contentType: 'text/csv'
-      };
+    const htmlContent = generateHTMLReport(data, options);
+    const pdfBuffer = await makePDF(htmlContent);
+    
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error('Failed to generate PDF: buffer is empty or null');
     }
+    
+    // Validate PDF buffer has correct header
+    const pdfHeader = pdfBuffer.slice(0, 4).toString('ascii');
+    if (pdfHeader !== '%PDF') {
+      console.error('Invalid PDF buffer generated, header:', pdfHeader, 'buffer length:', pdfBuffer.length);
+      throw new Error(`Invalid PDF buffer: expected '%PDF' header but got '${pdfHeader}'`);
+    }
+    
+    return {
+      buffer: pdfBuffer,
+      fileName: `${baseFileName}.pdf`,
+      contentType: 'application/pdf'
+    };
   } else {
     const csvBuffer = await generateCSVBuffer(data, options);
     return {
@@ -160,12 +156,30 @@ async function makePDF(html: string): Promise<Buffer | null> {
       });
 
       console.log("PDF generated, buffer size:", pdfBuffer.length);
+      
+      // Validate the PDF buffer before returning
+      if (!pdfBuffer || pdfBuffer.length === 0) {
+        console.error("PDF buffer is empty or null");
+        await browser.close();
+        throw new Error('Generated PDF buffer is empty');
+      }
+      
+      // Check PDF header (pdfBuffer from Puppeteer is already a Buffer)
+      const buffer = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer);
+      const header = buffer.slice(0, 4).toString('ascii');
+      if (header !== '%PDF') {
+        console.error("Invalid PDF header:", header, "Buffer length:", pdfBuffer.length);
+        await browser.close();
+        throw new Error(`Invalid PDF header: expected '%PDF' but got '${header}'`);
+      }
+      
       await browser.close();
 
       return pdfBuffer as Buffer;
     }
 
-    return null;
+    // If browser wasn't launched, this is an error condition
+    throw new Error('Browser was not launched - cannot generate PDF');
   } catch (error) {
     console.error("Error during PDF generation:", error);
     if (browser) {
