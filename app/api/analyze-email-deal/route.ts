@@ -34,6 +34,14 @@ export async function POST(request: NextRequest) {
       Object.assign(propertyData, emailDeal.extractedProperty);
     }
     
+    // Ensure purchasePrice is set in propertyData (extractedProperty may have 'price' instead of 'purchasePrice')
+    // This handles the case where extractedProperty has 'price' but analyzeProperty expects 'purchasePrice'
+    const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || propertyData.price || emailDeal.extractedProperty?.price || 0;
+    if (purchasePrice > 0) {
+      propertyData.purchasePrice = purchasePrice;
+      propertyData.purchase_price = purchasePrice;
+    }
+    
     // Prepare STR metrics if available
     // Convert occupancy rate from percentage (0-100) to decimal (0-1) if needed
     let occupancyRate = emailDeal.extractedProperty?.occupancyRate;
@@ -72,7 +80,7 @@ export async function POST(request: NextRequest) {
       // and analyzeProperty will use mortgageValues.monthlyPayment directly
     } else {
       // Fetch current mortgage rate (fallback to 7% on error)
-      const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || emailDeal.extractedProperty?.price || 0;
+      // Use the purchasePrice we extracted and set above (already defined above)
       const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS] || 0.20;
       const downpayment = purchasePrice * downpaymentPercentage;
       const loanAmount = purchasePrice - downpayment;

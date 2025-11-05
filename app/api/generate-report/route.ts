@@ -94,7 +94,17 @@ export async function POST(request: NextRequest) {
               
               // Validate essential fields after merging
               // Check both parsed data (propertyData) and extractedProperty fallbacks
+              // Note: extractedProperty may have 'price' (not 'purchasePrice'), so check both
               const purchasePrice = propertyData.purchasePrice || propertyData.price || emailDeal.extractedProperty?.price || 0;
+              
+              // Ensure purchasePrice is set in propertyData for analyzeProperty (which expects purchasePrice)
+              // This handles the case where extractedProperty has 'price' but not 'purchasePrice'
+              if (purchasePrice > 0) {
+                propertyData.purchasePrice = purchasePrice;
+                // Also set purchase_price for backward compatibility
+                propertyData.purchase_price = purchasePrice;
+              }
+              
               const adr = propertyData.adr || emailDeal.extractedProperty?.adr || 0;
               let occupancyRate = propertyData.occupancyRate || emailDeal.extractedProperty?.occupancyRate;
               
