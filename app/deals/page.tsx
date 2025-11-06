@@ -377,8 +377,9 @@ export default function DealsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // If analysisId exists, use it; otherwise use dealId
-          ...(analysisId ? { analysisIds: [analysisId] } : { dealIds: [dealId] }),
+          // Always use dealId for email deals since the analysis is stored on the deal
+          // The backend will retrieve the analysis from the email deal if it exists
+          dealIds: [dealId],
           format,
           title: 'Property Analysis Report'
         }),
@@ -1237,11 +1238,15 @@ export default function DealsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => generateReportMutation.mutate({ 
-                                dealId: deal.id, 
-                                analysisId: deal.analysis?.id,
-                                format: 'pdf' 
-                              })}
+                              onClick={() => {
+                                // Use analysisId if available, otherwise use dealId
+                                // The backend will use the analysisId if provided, or fall back to dealId
+                                generateReportMutation.mutate({ 
+                                  dealId: deal.id, 
+                                  analysisId: deal.analysis?.id || deal.analysis?.propertyId,
+                                  format: 'pdf' 
+                                });
+                              }}
                               disabled={generateReportMutation.isPending}
                               data-testid={`button-report-pdf-${deal.id}`}
                             >
@@ -1251,11 +1256,15 @@ export default function DealsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => generateReportMutation.mutate({ 
-                                dealId: deal.id, 
-                                analysisId: deal.analysis?.id,
-                                format: 'csv' 
-                              })}
+                              onClick={() => {
+                                // Use analysisId if available, otherwise use dealId
+                                // The backend will use the analysisId if provided, or fall back to dealId
+                                generateReportMutation.mutate({ 
+                                  dealId: deal.id, 
+                                  analysisId: deal.analysis?.id || deal.analysis?.propertyId,
+                                  format: 'csv' 
+                                });
+                              }}
                               disabled={generateReportMutation.isPending}
                               data-testid={`button-report-csv-${deal.id}`}
                             >
