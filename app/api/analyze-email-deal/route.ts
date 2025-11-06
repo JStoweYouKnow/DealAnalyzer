@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../server/storage";
 import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
-import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
-import { getMortgageRate } from "../../../server/mortgage-rate-service";
 import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
 
@@ -85,10 +83,11 @@ export async function POST(request: NextRequest) {
       const downpayment = purchasePrice * downpaymentPercentage;
       const loanAmount = purchasePrice - downpayment;
       
-      // Fetch mortgage rate with error handling
+      // Fetch mortgage rate with error handling (lazy import to avoid build-time evaluation)
       try {
         const zipCode = propertyData.zip_code || propertyData.zipCode;
         if (zipCode) {
+          const { getMortgageRate } = await import("../../../server/mortgage-rate-service");
           mortgageRate = await getMortgageRate({
             loan_term: 30,
             loan_amount: loanAmount,
@@ -110,10 +109,11 @@ export async function POST(request: NextRequest) {
     // Run TypeScript analysis with optional mortgage values and criteria
     const analysisData = analyzeProperty(propertyData, strMetrics, undefined, propertyFundingSource as any, mortgageRate, mortgageValues, criteria);
 
-    // Run AI analysis if available
+    // Run AI analysis if available (lazy import to avoid build-time evaluation)
     let analysisWithAI = analysisData;
     try {
       if (process.env.OPENAI_API_KEY) {
+        const { aiAnalysisService: coreAiService } = await import("../../../server/ai-service");
         const aiAnalysis = await coreAiService.analyzeProperty(analysisData.property as any);
         analysisWithAI = {
           ...analysisData,
