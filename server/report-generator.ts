@@ -182,8 +182,12 @@ async function makePDF(html: string): Promise<Buffer | null> {
       const puppeteer = require("puppeteer-core");
 
       // Configure chromium for serverless environment
-      // Disable graphics mode for serverless environments
-      chromium.setGraphicsMode(false);
+      // Disable graphics mode for serverless environments (if method exists)
+      if (typeof chromium.setGraphicsMode === 'function') {
+        chromium.setGraphicsMode(false);
+      } else {
+        console.log('setGraphicsMode not available in this chromium version, skipping');
+      }
       
       // Get the executable path - this will extract the binary if needed
       const executablePath = await resolveChromiumExecutablePath(chromium);
