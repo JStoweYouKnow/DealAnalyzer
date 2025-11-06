@@ -60,7 +60,9 @@ export async function POST() {
     // Search for real estate emails (limit to 10 to avoid timeouts on serverless)
     // Process in smaller batches to stay within timeout limits
     const maxEmails = 10;
+    console.log(`Starting email search for up to ${maxEmails} emails...`);
     const emailDeals = await emailMonitoringService.searchRealEstateEmails(maxEmails);
+    console.log(`Email search completed. Found ${emailDeals.length} emails after filtering.`);
     
     // Store new deals in storage, checking for duplicates
     const storedDeals = [];

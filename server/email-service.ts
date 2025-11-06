@@ -116,7 +116,8 @@ export class EmailMonitoringService {
     try {
       // Search query specifically for trusted real estate platforms, excluding meetups and zoom
       const query = 'from:(zillow.com OR redfin.com OR realtor.com OR mls.com OR homes.com OR trulia.com OR hotpads.com OR apartments.com OR rent.com OR loopnet.com OR crexi.com OR rocketmortgage.com OR quickenloans.com OR compass.com OR coldwellbanker.com OR remax.com OR kw.com OR century21.com OR sothebysrealty.com OR bhhsnymetro.com OR "MLS" OR "Multiple Listing Service") -from:(meetup.com OR eventbrite.com OR zoom.us) -subject:(meetup OR "meet up" OR networking OR event OR "real estate meetup" OR "investor meetup" OR zoom OR "zoom meeting")';
-      
+
+      console.log(`Searching Gmail with query: ${query.substring(0, 100)}...`);
       const response = await this.gmail.users.messages.list({
         userId: 'me',
         q: query,
@@ -124,19 +125,26 @@ export class EmailMonitoringService {
       });
 
       const messages = response.data.messages || [];
+      console.log(`Gmail API returned ${messages.length} messages matching the search query`);
       const emailDeals: EmailDeal[] = [];
+      let filteredCount = 0;
 
       for (const message of messages) {
         try {
           const email = await this.getEmailDetails(message.id);
           if (email) {
+            console.log(`✓ Email ${message.id} passed filters: "${email.subject.substring(0, 50)}..."`);
             emailDeals.push(email);
+          } else {
+            filteredCount++;
+            console.log(`✗ Email ${message.id} filtered out by isRealEstateEmail check`);
           }
         } catch (error) {
           console.error(`Error processing email ${message.id}:`, error);
         }
       }
 
+      console.log(`Final result: ${emailDeals.length} emails passed filters, ${filteredCount} were filtered out`);
       return emailDeals;
     } catch (error) {
       console.error('Error searching emails:', error);
@@ -529,7 +537,7 @@ export class EmailMonitoringService {
 
     // Exclude meetup, event, and zoom-related emails
     const meetupExclusions = [
-      'meetup', 'meet up', 'networking', 'event', 'webinar', 'workshop', 
+      'meetup', 'meet up', 'networking', 'event', 'webinar', 'workshop',
       'seminar', 'conference', 'gathering', 'rsvp', 'attending', 'join us',
       'real estate meetup', 'investor meetup', 'rei meetup', 'investment club',
       'zoom.us', 'zoom meeting', 'zoom link', 'join zoom', 'zoom call',
@@ -538,32 +546,52 @@ export class EmailMonitoringService {
 
     const combined = `${subject} ${content}`.toLowerCase();
     const senderLower = sender.toLowerCase();
-    
+
+    console.log(`\n=== Filtering Email ===`);
+    console.log(`Subject: ${subject.substring(0, 80)}`);
+    console.log(`Sender: ${sender}`);
+
     // Exclude meetup platforms and content
     if (senderLower.includes('meetup.com') || senderLower.includes('eventbrite.com')) {
+      console.log(`❌ Rejected: Meetup/Eventbrite platform`);
       return false;
     }
-    
+
     // Exclude emails with meetup keywords
-    const hasMeetupContent = meetupExclusions.some(keyword => 
+    const hasMeetupContent = meetupExclusions.some(keyword =>
       combined.includes(keyword) || senderLower.includes(keyword)
     );
     if (hasMeetupContent) {
+      const matchedKeyword = meetupExclusions.find(keyword =>
+        combined.includes(keyword) || senderLower.includes(keyword)
+      );
+      console.log(`❌ Rejected: Contains meetup keyword "${matchedKeyword}"`);
       return false;
     }
 
     const isDomainTrusted = trustedDomains.some(domain => senderLower.includes(domain));
-    
+    console.log(`Trusted domain check: ${isDomainTrusted}`);
+
     // If from trusted domain, check for real estate content
     if (isDomainTrusted) {
       const realEstateKeywords = [
-        'listing', 'property', 'for sale', 'new listing', 'price', 'bedroom', 
+        'listing', 'property', 'for sale', 'new listing', 'price', 'bedroom',
         'bathroom', 'sqft', 'square feet', 'home', 'house', 'condo', 'townhome'
       ];
-      
-      return realEstateKeywords.some(keyword => combined.includes(keyword));
+
+      const hasRealEstateContent = realEstateKeywords.some(keyword => combined.includes(keyword));
+      if (hasRealEstateContent) {
+        const matchedKeyword = realEstateKeywords.find(keyword => combined.includes(keyword));
+        console.log(`✅ Accepted: Trusted domain with real estate keyword "${matchedKeyword}"`);
+        return true;
+      } else {
+        console.log(`❌ Rejected: Trusted domain but missing real estate keywords`);
+        console.log(`Content preview: ${combined.substring(0, 200)}...`);
+        return false;
+      }
     }
-    
+
+    console.log(`❌ Rejected: Not from trusted domain`);
     return false;
   }
 
