@@ -3,6 +3,16 @@ import { cookies } from "next/headers";
 
 export async function GET() {
   try {
+    // Get user ID from authentication (try Clerk first, then fallback)
+    let userId: string | null = null;
+    try {
+      const { auth } = await import("@clerk/nextjs/server");
+      const authResult = await auth();
+      userId = authResult?.userId || null;
+    } catch (error) {
+      // Clerk not available or not configured
+    }
+
     const cookieStore = await cookies();
 
     // Debug: Log all cookies (only in development)
@@ -12,12 +22,32 @@ export async function GET() {
     }
 
     const gmailTokensCookie = cookieStore.get('gmailTokens');
-    const isConnected = !!gmailTokensCookie;
+    let isConnected = !!gmailTokensCookie;
+    
+    // If no cookie but we have userId, check database
+    if (!isConnected && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
+      try {
+        const { ConvexHttpClient } = await import('convex/browser');
+        const apiModule = await import('../../../convex/_generated/api');
+        const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+        
+        const dbTokens = await convexClient.query(apiModule.api.userOAuthTokens.getTokens, { userId });
+        isConnected = !!dbTokens;
+        
+        if (isConnected) {
+          console.log('[Gmail Status Check] Found tokens in database');
+        }
+      } catch (error) {
+        console.error('[Gmail Status Check] Error checking database:', error);
+      }
+    }
 
     console.log('[Gmail Status Check]', {
-      hasCookie: isConnected,
+      hasCookie: !!gmailTokensCookie,
+      hasDbTokens: isConnected && !gmailTokensCookie,
       cookieExists: !!gmailTokensCookie,
-      cookieValue: gmailTokensCookie ? 'PRESENT' : 'MISSING'
+      cookieValue: gmailTokensCookie ? 'PRESENT' : 'MISSING',
+      userId: userId ? 'PRESENT' : 'MISSING'
     });
 
     return NextResponse.json({

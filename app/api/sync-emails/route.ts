@@ -21,18 +21,71 @@ export async function POST() {
       // Clerk not available or not configured
     }
 
-    // Check if user has Gmail tokens
+    // Check if user has Gmail tokens - first check cookies, then database
     const cookieStore = await cookies();
-    const gmailTokensCookie = cookieStore.get('gmailTokens');
+    let gmailTokensCookie = cookieStore.get('gmailTokens');
+    let gmailTokens: any = null;
     
-    if (!gmailTokensCookie) {
+    // Try to get tokens from cookie first
+    if (gmailTokensCookie) {
+      try {
+        gmailTokens = JSON.parse(gmailTokensCookie.value);
+      } catch (error) {
+        console.error('[Sync Emails] Error parsing cookie tokens:', error);
+        gmailTokens = null;
+      }
+    }
+    
+    // If no tokens in cookie and we have userId, try database
+    if (!gmailTokens && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
+      try {
+        const { ConvexHttpClient } = await import('convex/browser');
+        const apiModule = await import('../../../convex/_generated/api');
+        const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+        
+        const dbTokens = await convexClient.query(apiModule.api.userOAuthTokens.getTokens, { userId });
+        
+        if (dbTokens) {
+          console.log('[Sync Emails] Found tokens in database, using them');
+          gmailTokens = {
+            access_token: dbTokens.accessToken,
+            refresh_token: dbTokens.refreshToken,
+            scope: dbTokens.scope,
+            token_type: dbTokens.tokenType || 'Bearer',
+            expiry_date: dbTokens.expiryDate,
+          };
+          
+          // Refresh the cookie with tokens from database
+          const tokenData = {
+            access_token: gmailTokens.access_token,
+            refresh_token: gmailTokens.refresh_token,
+            scope: gmailTokens.scope || '',
+            token_type: gmailTokens.token_type || 'Bearer',
+            expiry_date: gmailTokens.expiry_date,
+          };
+          
+          cookieStore.set('gmailTokens', JSON.stringify(tokenData), {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 24 * 60 * 60, // 24 hours
+            path: '/',
+          });
+          
+          console.log('[Sync Emails] Refreshed cookie with tokens from database');
+        }
+      } catch (error) {
+        console.error('[Sync Emails] Error retrieving tokens from database:', error);
+      }
+    }
+    
+    // If still no tokens, return error
+    if (!gmailTokens) {
       return NextResponse.json(
         { success: false, error: "Gmail not connected. Please connect your Gmail account first." },
         { status: 401 }
       );
     }
-
-    const gmailTokens = JSON.parse(gmailTokensCookie.value);
 
     // Set credentials for email service with userId and token metadata
     // The OAuth2 client will automatically refresh tokens if needed

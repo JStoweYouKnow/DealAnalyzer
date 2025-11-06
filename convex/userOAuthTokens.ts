@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 
 // Upsert user OAuth tokens
 export const upsertTokens = mutation({
@@ -44,6 +44,31 @@ export const upsertTokens = mutation({
       });
       return tokenId;
     }
+  },
+});
+
+// Get user OAuth tokens by userId
+export const getTokens = query({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const tokens = await ctx.db
+      .query("userOAuthTokens")
+      .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+      .first();
+    
+    if (!tokens) {
+      return null;
+    }
+    
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      scope: tokens.scope,
+      expiryDate: tokens.expiryDate,
+      tokenType: tokens.tokenType,
+    };
   },
 });
 
