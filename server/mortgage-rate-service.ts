@@ -2,7 +2,17 @@
  * Service for fetching current mortgage rates from API Ninjas
  */
 
-const API_NINJAS_API_KEY = process.env.API_NINJAS_API_KEY || 'U30sqfOKlZDcHzhkBGfSBA==6uHTEcCZeXWi2guq';
+// Get API key from environment variable - fail fast if missing
+const API_NINJAS_API_KEY = process.env.API_NINJAS_API_KEY;
+if (!API_NINJAS_API_KEY) {
+  throw new Error(
+    'API_NINJAS_API_KEY environment variable is required but not set. ' +
+    'Please configure it in your environment variables or secrets manager.'
+  );
+}
+// TypeScript type assertion: we know it's defined after the check above
+const API_KEY: string = API_NINJAS_API_KEY;
+
 const API_NINJAS_BASE_URL = 'https://api.api-ninjas.com/v1/mortgagerate';
 
 // Consistent prefix for all mortgage rate cache keys
@@ -27,17 +37,43 @@ export interface MortgageRateResponse {
 import { mortgageRateCache, getCachedOrFetch } from '../app/lib/cache-service';
 
 /**
+ * Helper function to normalize rate to decimal format
+ * Treat any numeric value > 1 as a percentage (divide by 100)
+ * Leave values between 0 and 1 untouched (already decimal)
+ */
+function normalizeRate(value: number): number {
+  // Handle invalid values
+  if (isNaN(value) || !isFinite(value)) {
+    throw new Error(`Invalid mortgage rate: ${value} (NaN or non-finite)`);
+  }
+  
+  if (value > 1) {
+    return value / 100;
+  } else if (value > 0 && value <= 1) {
+    return value;
+  } else {
+    // Unexpected value (negative) - log error and use fallback
+    console.error(
+      `Unexpected mortgage rate value ${value} from API (negative). ` +
+      `Expected format: percentage (e.g., 7.0) or decimal (e.g., 0.07). ` +
+      `Using default fallback of 0.07 (7%).`
+    );
+    return 0.07;
+  }
+}
+
+/**
  * Fetches current mortgage rate from API Ninjas
  * Uses caching to avoid excessive API calls
  */
 export async function getMortgageRate(params?: MortgageRateParams): Promise<number> {
   // Create cache key from all parameters that affect the API response
   // Use default placeholders for missing values to ensure deterministic key generation
-  const zip = params?.zip_code || 'null';
-  const amount = params?.loan_amount?.toString() || 'null';
-  const term = params?.loan_term?.toString() || 'null';
-  const score = params?.credit_score?.toString() || 'null';
-  const downPayment = params?.down_payment?.toString() || 'null';
+  const zip = params?.zip_code || '_missing_';
+  const amount = params?.loan_amount?.toString() || '_missing_';
+  const term = params?.loan_term?.toString() || '_missing_';
+  const score = params?.credit_score?.toString() || '_missing_';
+  const downPayment = params?.down_payment?.toString() || '_missing_';
   const cacheKey = `${MORTGAGE_RATE_CACHE_KEY_PREFIX}${zip}-${amount}-${term}-${score}-${downPayment}`;
   
   try {
@@ -58,77 +94,46 @@ export async function getMortgageRate(params?: MortgageRateParams): Promise<numb
         console.log('Fetching mortgage rate from API Ninjas...');
         const response = await fetch(url, {
           headers: {
-            'X-Api-Key': API_NINJAS_API_KEY,
+            'X-Api-Key': API_KEY,
           },
         });
 
         if (!response.ok) {
-          throw new Error(`API Ninjas returned status ${response.status}`);
+          throw new Error(`API Ninjas returned ${response.status}: ${response.statusText}`);
         }
 
         const data: MortgageRateResponse = await response.json();
         
-        // Helper function to normalize rate to decimal format
-        // Treat any numeric value > 1 as a percentage (divide by 100)
-        // Leave values between 0 and 1 untouched (already decimal)
-        function normalizeRate(value: number): number {
-          // Handle invalid values
-          if (isNaN(value) || !isFinite(value)) {
-            console.error(
-              `Invalid mortgage rate value ${value} from API (NaN or non-finite). ` +
-              `Using default fallback of 0.07 (7%).`
-            );
-            return 0.07;
-          }
-          
-          // Treat any numeric value > 1 as a percentage (divide by 100)
-          // Leave values between 0 and 1 untouched (already decimal)
-          if (value > 1) {
-            return value / 100;
-          } else if (value >= 0 && value <= 1) {
-            return value;
-          } else {
-            // Unexpected value (negative) - log error and use fallback
-            console.error(
-              `Unexpected mortgage rate value ${value} from API (negative). ` +
-              `Expected format: percentage (e.g., 7.0) or decimal (e.g., 0.07). ` +
-              `Using default fallback of 0.07 (7%).`
-            );
-            return 0.07;
-          }
-        }
-        
         // Extract rate - API may return 'rate' or 'apr'
         // Normalize both values if they exist, then pick the first available
         let rate: number | undefined;
+        let rawRate: number | undefined; // Capture raw API value before normalization
         
         // Normalize data.rate if it exists
         if (data.rate !== undefined && data.rate !== null) {
+          rawRate = data.rate; // Capture raw value before normalization
           rate = normalizeRate(data.rate);
         }
         
         // Normalize data.apr if it exists and rate wasn't found
         if (rate === undefined && data.apr !== undefined && data.apr !== null) {
+          rawRate = data.apr; // Capture raw value before normalization
           rate = normalizeRate(data.apr);
         }
         
         // Use fallback if neither rate nor apr is available
         if (rate === undefined) {
           rate = 0.07; // Default fallback rate as decimal (7%)
+          rawRate = undefined; // No raw value when using fallback
         }
         
         const normalizedRate = rate;
         
-        // Validate normalized rate is within sane range (0 < rate < 1) and is a valid number
-        if (isNaN(normalizedRate) || !isFinite(normalizedRate)) {
-          const errorMsg = `Normalized mortgage rate ${normalizedRate} is invalid (NaN or non-finite). ` +
-                          `Original rate value: ${rate}`;
-          console.error(errorMsg);
-          throw new Error(errorMsg);
-        }
-        if (normalizedRate <= 0 || normalizedRate >= 1) {
-          const errorMsg = `Normalized mortgage rate ${normalizedRate} is out of valid range (expected: 0 < rate < 1). ` +
-                          `Original rate value: ${rate}`;
+        // Validate normalized rate is within sane range (0 < rate < 1)
+        // Note: normalizeRate already handles NaN/non-finite and <= 0 cases
+        if (normalizedRate >= 1) {
+          const errorMsg = `Mortgage rate ${rawRate !== undefined ? rawRate : 'N/A (fallback)'} is out of valid range (expected: 0 < rate < 1 after normalization). ` +
+                          `Normalized value: ${normalizedRate}`;
           console.error(errorMsg);
           throw new Error(errorMsg);
         }
@@ -136,11 +141,11 @@ export async function getMortgageRate(params?: MortgageRateParams): Promise<numb
         // Additional validation: warn on unusually high or low rates
         if (normalizedRate > 0.15) {
           console.warn(`Unusually high mortgage rate detected: ${normalizedRate} (${normalizedRate * 100}%). ` +
-                      `Original value: ${rate}. Please verify API response.`);
+                      `Original value: ${rawRate !== undefined ? rawRate : 'N/A (fallback)'}. Please verify API response.`);
         }
         if (normalizedRate < 0.01) {
           console.warn(`Unusually low mortgage rate detected: ${normalizedRate} (${normalizedRate * 100}%). ` +
-                      `Original value: ${rate}. Please verify API response.`);
+                      `Original value: ${rawRate !== undefined ? rawRate : 'N/A (fallback)'}. Please verify API response.`);
         }
 
         console.log('Fetched mortgage rate:', normalizedRate, `(${normalizedRate * 100}%)`, 'from API Ninjas');

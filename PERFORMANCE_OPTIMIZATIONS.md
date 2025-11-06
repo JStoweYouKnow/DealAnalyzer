@@ -36,7 +36,7 @@ npm install --save \
 ```
 
 **Why:**
-- `pdf2json` - Faster PDF parsing (2-3x faster than pdfjs-dist for text extraction)
+- `pdf2json` - Faster PDF parsing for structured text extraction from typical server-side PDFs (~20% faster in most workloads, results vary by PDF complexity and size)
 - `pdf-lib` - Fast PDF manipulation when needed
 
 **Alternative:** Keep `pdfjs-dist` but add caching for parsed PDFs
@@ -45,15 +45,15 @@ npm install --save \
 
 ```bash
 npm install --save \
-  worker_threads \
   @parallely/concurrent \
   async
 ```
 
 **Why:**
-- `worker_threads` - CPU-intensive calculations in separate threads
 - `@parallely/concurrent` - Easy parallel execution
 - `async` - Better async utilities (parallel, waterfall, etc.)
+
+**Note:** `worker_threads` is a built-in Node.js module (available in Node.js 12.0.0+) and does not need to be installed via npm. It can be imported directly for CPU-intensive calculations in separate threads.
 
 ### 4. **Database Optimization**
 
@@ -102,7 +102,7 @@ import pLimit from 'p-limit';
 const limit = pLimit(3); // Max 3 concurrent API calls
 
 export async function POST(request: NextRequest) {
-  const body = await req.json();
+  const body = await request.json();
   const propertyData = parseEmailContent(body.emailContent);
   
   // Run independent operations in parallel
@@ -128,71 +128,473 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-### Example 2: Caching Layer
+### Example 2: Caching Layer with Invalidation, Stampede Prevention, and Observability
 
 ```typescript
 import NodeCache from 'node-cache';
+import { EventEmitter } from 'events';
 
+// Cache instance with extended metadata
 const cache = new NodeCache({ 
   stdTTL: 3600, // 1 hour default
   checkperiod: 600 // Check for expired keys every 10 minutes
 });
 
-export async function loadInvestmentCriteria() {
-  const cacheKey = 'investment-criteria';
-  const cached = cache.get(cacheKey);
+// Event-driven invalidation (pub/sub pattern)
+const cacheEvents = new EventEmitter();
+
+// Observability: metrics tracking
+const metrics = {
+  cache_hit: 0,
+  cache_miss: 0,
+  cache_refresh: 0,
+  cache_stampede_prevented: 0
+};
+
+// Stampede prevention: track in-flight refreshes per key
+const refreshPromises = new Map<string, Promise<any>>();
+
+// Event-driven invalidation: subscribe to upstream changes
+cacheEvents.on('invalidate', (pattern: string) => {
+  if (pattern === 'investment-criteria') {
+    cache.del('investment-criteria');
+    metrics.cache_refresh++;
+  } else if (pattern.startsWith('mortgage-rate-')) {
+    // Pattern-based invalidation for zip codes
+    const keys = cache.keys().filter(k => k.startsWith(pattern));
+    keys.forEach(key => cache.del(key));
+    metrics.cache_refresh += keys.length;
+  }
+});
+
+// Probabilistic early expiration (xFetch pattern)
+function computeEarlyExpiry(ttl: number): number {
+  // Refresh 10-20% before expiration (probabilistic early expiry)
+  const earlyWindow = ttl * (0.1 + Math.random() * 0.1);
+  return ttl - earlyWindow;
+}
+
+// Stampede-safe cache get with singleflight pattern
+async function getOrRefresh<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  ttl: number = 3600,
+  earlyExpiryRatio: number = 0.15
+): Promise<T> {
+  const cached = cache.get<{ value: T; expiresAt: number; refreshAt: number }>(key);
   
   if (cached) {
-    return cached;
+    const now = Date.now();
+    const isExpired = now >= cached.expiresAt;
+    const shouldRefreshEarly = now >= cached.refreshAt && !isExpired;
+    
+    if (!isExpired && !shouldRefreshEarly) {
+      metrics.cache_hit++;
+      return cached.value;
+    }
+    
+    // Early refresh: serve stale while refreshing in background
+    if (shouldRefreshEarly && !isExpired) {
+      metrics.cache_refresh++;
+      // Refresh in background without blocking
+      refreshInBackground(key, fetcher, ttl, earlyExpiryRatio);
+      return cached.value; // Return stale data
+    }
   }
   
-  const criteria = DEFAULT_CRITERIA; // or fetch from DB
-  cache.set(cacheKey, criteria, 7200); // Cache for 2 hours
-  return criteria;
+  // Cache miss: check if refresh is already in-flight (stampede prevention)
+  if (refreshPromises.has(key)) {
+    metrics.cache_stampede_prevented++;
+    return refreshPromises.get(key)!;
+  }
+  
+  metrics.cache_miss++;
+  
+  // Singleflight: only first miss triggers refresh, others await
+  const refreshPromise = (async () => {
+    try {
+      const value = await fetcher();
+      const now = Date.now();
+      const expiresAt = now + (ttl * 1000);
+      const refreshAt = now + (ttl * 1000 * (1 - earlyExpiryRatio));
+      
+      cache.set(key, { value, expiresAt, refreshAt }, ttl);
+      
+      // Log refresh reason and TTL
+      console.log(`[Cache] Refreshed key="${key}" ttl=${ttl}s reason=${cached ? 'early-expiry' : 'miss'}`);
+      
+      return value;
+    } finally {
+      refreshPromises.delete(key);
+    }
+  })();
+  
+  refreshPromises.set(key, refreshPromise);
+  return refreshPromise;
+}
+
+// Background refresh for early expiry
+async function refreshInBackground<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  ttl: number,
+  earlyExpiryRatio: number
+): Promise<void> {
+  if (refreshPromises.has(key)) return; // Already refreshing
+  
+  const refreshPromise = (async () => {
+    try {
+      const value = await fetcher();
+      const now = Date.now();
+      const expiresAt = now + (ttl * 1000);
+      const refreshAt = now + (ttl * 1000 * (1 - earlyExpiryRatio));
+      
+      cache.set(key, { value, expiresAt, refreshAt }, ttl);
+      console.log(`[Cache] Background refresh key="${key}" ttl=${ttl}s reason=early-expiry`);
+    } catch (error) {
+      console.error(`[Cache] Background refresh failed key="${key}"`, error);
+    } finally {
+      refreshPromises.delete(key);
+    }
+  })();
+  
+  refreshPromises.set(key, refreshPromise);
+}
+
+export async function loadInvestmentCriteria() {
+  return getOrRefresh(
+    'investment-criteria',
+    async () => {
+      // Fetch from DB or use default
+      return DEFAULT_CRITERIA;
+    },
+    7200 // 2 hours TTL
+  );
 }
 
 export async function getMortgageRate(params: MortgageRateParams) {
   const cacheKey = `mortgage-rate-${params.zip_code}-${params.loan_amount}`;
-  const cached = cache.get<number>(cacheKey);
   
-  if (cached) {
-    return cached;
-  }
-  
-  // Fetch from API
-  const rate = await fetchMortgageRateFromAPI(params);
-  cache.set(cacheKey, rate, 3600); // Cache for 1 hour
-  return rate;
+  return getOrRefresh(
+    cacheKey,
+    async () => {
+      return await fetchMortgageRateFromAPI(params);
+    },
+    3600 // 1 hour TTL
+  );
+}
+
+// Invalidation hooks: call these when upstream data changes
+export function invalidateInvestmentCriteria() {
+  cacheEvents.emit('invalidate', 'investment-criteria');
+}
+
+export function invalidateMortgageRatesForZip(zipCode: string) {
+  cacheEvents.emit('invalidate', `mortgage-rate-${zipCode}`);
+}
+
+// Export metrics for monitoring
+export function getCacheMetrics() {
+  return {
+    ...metrics,
+    cache_size: cache.keys().length,
+    cache_keys: cache.keys()
+  };
 }
 ```
 
+**Usage Notes:**
+
+1. **Event-Driven Invalidation**: Call `invalidateInvestmentCriteria()` or `invalidateMortgageRatesForZip()` when:
+   - User updates investment criteria in settings
+   - Mortgage rate API indicates rate changes for a zip code
+   - Database updates affect cached data
+
+2. **Stampede Prevention**: The `getOrRefresh` function uses a singleflight pattern:
+   - Only the first cache miss triggers a backend fetch
+   - Concurrent requests for the same key await the in-flight refresh
+   - Prevents thundering herd when cache expires
+
+3. **Probabilistic Early Expiration**: 
+   - Items refresh 10-20% before expiration (configurable via `earlyExpiryRatio`)
+   - Stale data served immediately while refresh happens in background
+   - Reduces latency spikes when cache expires
+
+4. **Observability**: 
+   - Metrics exported via `getCacheMetrics()` for monitoring dashboards
+   - Logs include key, TTL, and refresh reason (miss/early-expiry)
+   - Track `cache_hit`, `cache_miss`, `cache_refresh`, and `cache_stampede_prevented` counters
+
 ### Example 3: Worker Threads for Heavy Calculations
+
+**⚠️ Important:** Always use timeouts, proper cleanup, and worker pools for production. The basic example below shows manual worker management, but prefer a worker pool library (see "Recommended: Worker Pool" section).
+
+#### Basic Implementation (with Timeout and Cleanup)
 
 ```typescript
 // worker.ts
 import { parentPort, workerData } from 'worker_threads';
 import { analyzeProperty } from './property-analyzer';
 
-const result = analyzeProperty(workerData.propertyData, ...);
-parentPort?.postMessage(result);
+try {
+  const result = analyzeProperty(workerData.propertyData, ...);
+  parentPort?.postMessage({ success: true, data: result });
+} catch (error) {
+  parentPort?.postMessage({ success: false, error: error.message });
+}
 
 // main.ts
 import { Worker } from 'worker_threads';
+import { analyzeProperty } from './property-analyzer';
 
-function analyzePropertyInWorker(propertyData: any): Promise<PropertyAnalysis> {
+interface WorkerMessage {
+  success: boolean;
+  data?: PropertyAnalysis;
+  error?: string;
+}
+
+function analyzePropertyInWorker(
+  propertyData: any,
+  timeoutMs: number = 30000,
+  fallbackToMainThread: boolean = true
+): Promise<PropertyAnalysis> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker('./worker.js', {
-      workerData: { propertyData }
-    });
-    
-    worker.on('message', resolve);
-    worker.on('error', reject);
-    worker.on('exit', (code) => {
-      if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
-    });
+    let worker: Worker | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isResolved = false;
+
+    // Cleanup function to ensure resources are released
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      if (worker) {
+        // Remove all listeners to prevent memory leaks
+        worker.removeAllListeners();
+        // Terminate the worker if it's still running
+        if (worker.threadId !== -1) {
+          worker.terminate().catch(() => {
+            // Worker may already be terminated, ignore errors
+          });
+        }
+        worker = null;
+      }
+    };
+
+    // Handle successful completion
+    const handleSuccess = (result: PropertyAnalysis) => {
+      if (isResolved) return;
+      isResolved = true;
+      cleanup();
+      resolve(result);
+    };
+
+    // Handle errors with fallback strategy
+    const handleError = (error: Error) => {
+      if (isResolved) return;
+      isResolved = true;
+      cleanup();
+
+      // Fallback strategy: retry on main thread if enabled
+      if (fallbackToMainThread) {
+        console.warn(`Worker failed, falling back to main thread: ${error.message}`);
+        try {
+          const result = analyzeProperty(propertyData);
+          resolve(result);
+        } catch (fallbackError) {
+          reject(new Error(`Worker failed and main thread fallback failed: ${fallbackError.message}`));
+        }
+      } else {
+        reject(error);
+      }
+    };
+
+    try {
+      worker = new Worker('./worker.js', {
+        workerData: { propertyData }
+      });
+
+      // Handle worker messages
+      worker.on('message', (message: WorkerMessage) => {
+        if (message.success && message.data) {
+          handleSuccess(message.data);
+        } else {
+          handleError(new Error(message.error || 'Worker returned error'));
+        }
+      });
+
+      // Handle worker errors - ensure cleanup and propagate to caller
+      worker.on('error', (error: Error) => {
+        handleError(new Error(`Worker error: ${error.message}`));
+      });
+
+      // Handle worker exit - ensure cleanup and check exit code
+      worker.on('exit', (code: number) => {
+        if (!isResolved) {
+          if (code !== 0) {
+            handleError(new Error(`Worker stopped with exit code ${code}`));
+          } else {
+            // Worker exited without sending a message (shouldn't happen, but handle gracefully)
+            handleError(new Error('Worker exited without sending result'));
+          }
+        }
+      });
+
+      // Set timeout to reject and terminate hung workers
+      timeoutId = setTimeout(() => {
+        if (!isResolved) {
+          handleError(new Error(`Worker timeout after ${timeoutMs}ms`));
+        }
+      }, timeoutMs);
+
+    } catch (error) {
+      // If worker creation fails, use fallback
+      handleError(error instanceof Error ? error : new Error('Failed to create worker'));
+    }
   });
 }
 ```
+
+#### Recommended: Worker Pool (Using piscina)
+
+**Install:** `npm install piscina`
+
+```typescript
+// worker.ts (same as above)
+import { parentPort, workerData } from 'worker_threads';
+import { analyzeProperty } from './property-analyzer';
+
+try {
+  const result = analyzeProperty(workerData.propertyData, ...);
+  parentPort?.postMessage({ success: true, data: result });
+} catch (error) {
+  parentPort?.postMessage({ success: false, error: error.message });
+}
+
+// main.ts with worker pool
+import Piscina from 'piscina';
+import { analyzeProperty } from './property-analyzer';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Create worker pool with concurrency limits and timeouts
+const workerPool = new Piscina({
+  filename: __dirname + '/worker.js',
+  maxThreads: Math.max(1, Math.floor(require('os').cpus().length / 2)), // Use half of CPU cores
+  minThreads: 1,
+  idleTimeout: 30000, // Terminate idle workers after 30s
+  maxQueue: 100, // Max queued tasks
+  concurrentTasksPerWorker: 1, // One task per worker at a time
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  await workerPool.destroy();
+});
+
+process.on('SIGINT', async () => {
+  await workerPool.destroy();
+});
+
+async function analyzePropertyInWorker(
+  propertyData: any,
+  timeoutMs: number = 30000,
+  fallbackToMainThread: boolean = true
+): Promise<PropertyAnalysis> {
+  try {
+    // Run in worker pool with timeout
+    const result = await Promise.race([
+      workerPool.run({ propertyData }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Worker timeout after ${timeoutMs}ms`)), timeoutMs)
+      ),
+    ]);
+
+    return result as PropertyAnalysis;
+  } catch (error) {
+    // Fallback strategy: run on main thread or return graceful error
+    if (fallbackToMainThread) {
+      console.warn(`Worker pool failed, falling back to main thread: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      try {
+        return analyzeProperty(propertyData);
+      } catch (fallbackError) {
+        throw new Error(`Worker pool failed and main thread fallback failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
+      }
+    } else {
+      // Return graceful error instead of crashing
+      throw new Error(`Worker pool error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+}
+
+// Handle worker pool errors
+workerPool.on('error', (error: Error) => {
+  console.error('Worker pool error:', error);
+  // Optionally: emit to error tracking service (e.g., Sentry)
+});
+
+// Optional: Monitor worker pool metrics
+workerPool.on('drain', () => {
+  console.log('Worker pool queue drained');
+});
+```
+
+#### Alternative: Worker Pool with node-worker-threads-pool
+
+**Install:** `npm install node-worker-threads-pool`
+
+```typescript
+import { StaticPool } from 'node-worker-threads-pool';
+import { analyzeProperty } from './property-analyzer';
+
+const workerPool = new StaticPool({
+  size: Math.max(1, Math.floor(require('os').cpus().length / 2)),
+  task: './worker.js',
+});
+
+async function analyzePropertyInWorker(
+  propertyData: any,
+  timeoutMs: number = 30000,
+  fallbackToMainThread: boolean = true
+): Promise<PropertyAnalysis> {
+  try {
+    const result = await Promise.race([
+      workerPool.exec({ propertyData }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Worker timeout after ${timeoutMs}ms`)), timeoutMs)
+      ),
+    ]);
+    return result as PropertyAnalysis;
+  } catch (error) {
+    if (fallbackToMainThread) {
+      console.warn(`Worker pool failed, falling back to main thread`);
+      return analyzeProperty(propertyData);
+    }
+    throw error;
+  }
+}
+
+// Cleanup on shutdown
+process.on('SIGTERM', () => workerPool.destroy());
+process.on('SIGINT', () => workerPool.destroy());
+```
+
+#### Key Best Practices:
+
+1. **Always use timeouts**: Prevent hung workers from blocking indefinitely
+2. **Explicitly terminate workers**: Call `worker.terminate()` or use pool cleanup methods
+3. **Handle 'error' events**: Ensure errors are caught and propagated to callers
+4. **Handle 'exit' events**: Check exit codes and clean up resources
+5. **Use worker pools**: Reuse workers and limit concurrency (piscina or node-worker-threads-pool)
+6. **Implement fallback strategy**: Retry on main thread or return graceful errors
+7. **Clean up listeners**: Remove event listeners to prevent memory leaks
+8. **Monitor pool health**: Track queue size, worker availability, and errors
+9. **Graceful shutdown**: Properly destroy pools on process termination
+10. **Limit concurrency**: Use half of CPU cores or configure based on workload
 
 ### Example 4: Faster PDF Parsing
 
@@ -242,11 +644,13 @@ async function analyzeMultipleProperties(properties: Property[]) {
 
 ## Performance Improvements Expected
 
-- **Parallel API Calls**: 40-60% faster for endpoints making multiple API calls
-- **Caching**: 80-90% faster for repeated operations (criteria loading, mortgage rates)
-- **Worker Threads**: 30-50% faster for CPU-intensive calculations
-- **Faster PDF Parsing**: 2-3x faster PDF extraction
-- **Batch Processing**: 5-10x faster for multiple property analyses
+Note: Performance improvements are workload-dependent and may vary based on system resources, data size, and usage patterns.
+
+- **Parallel API Calls**: Significant improvement for endpoints making multiple independent API calls (typically 40-60% faster, depending on network latency and call dependencies)
+- **Caching**: Substantial speedup for repeated operations (typically 80-90% faster for cached criteria loading, mortgage rates, and other frequently accessed data)
+- **Worker Threads**: Improved performance for CPU-intensive calculations (typically 30-50% faster for heavy computational tasks, depending on CPU cores and workload)
+- **Faster PDF Parsing**: Improved PDF text extraction performance (~20% faster for structured text extraction from typical server-side PDFs, results vary by PDF complexity and size)
+- **Batch Processing**: Significant improvement for processing multiple items in parallel (typically 5-10x faster for multiple property analyses, depending on concurrency limits and system resources)
 
 ## Quick Wins (Implement First)
 

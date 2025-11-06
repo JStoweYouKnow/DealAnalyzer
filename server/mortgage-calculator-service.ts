@@ -2,7 +2,17 @@
  * Service for calculating mortgage payments using API Ninjas
  */
 
-const API_NINJAS_API_KEY = process.env.API_NINJAS_API_KEY || 'U30sqfOKlZDcHzhkBGfSBA==6uHTEcCZeXWi2guq';
+// Get API key from environment variable - fail fast if missing
+const API_NINJAS_API_KEY = process.env.API_NINJAS_API_KEY;
+if (!API_NINJAS_API_KEY) {
+  throw new Error(
+    'API_NINJAS_API_KEY environment variable is required but not set. ' +
+    'Please configure it in your environment variables or secrets manager.'
+  );
+}
+// TypeScript type assertion: we know it's defined after the check above
+const API_KEY: string = API_NINJAS_API_KEY;
+
 const API_NINJAS_BASE_URL = 'https://api.api-ninjas.com/v1/mortgagecalculator';
 
 export interface MortgageCalculatorParams {
@@ -38,7 +48,7 @@ export async function calculateMortgage(
     
     const response = await fetch(url, {
       headers: {
-        'X-Api-Key': API_NINJAS_API_KEY,
+        'X-Api-Key': API_KEY,
       },
     });
 

@@ -2,6 +2,7 @@
 import type { Property, FundingSource, MortgageValues } from "../../shared/schema";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../shared/schema";
 import { parseEmailContentOptimized } from './optimizations';
+import { logger } from './logger';
 
 export interface PropertyAnalysis {
   propertyId: string;
@@ -118,7 +119,7 @@ export function analyzeProperty(
     if (loanPercentage > 0) {
       purchasePrice = mortgageValues.loanAmount / loanPercentage;
       calculatedDownpayment = purchasePrice - mortgageValues.loanAmount;
-      console.log('BACKUP: Calculated purchase price from mortgage loan amount:', {
+      logger.debug('BACKUP: Calculated purchase price from mortgage loan amount:', {
         loanAmount: mortgageValues.loanAmount,
         fundingSource: propertyFundingSource,
         downpaymentPercentage,
@@ -133,7 +134,7 @@ export function analyzeProperty(
       // Fallback if down payment is 100% (cash purchase)
       purchasePrice = mortgageValues.loanAmount;
       calculatedDownpayment = 0;
-      console.warn('Cash purchase detected (100% down), using loan amount as purchase price');
+      logger.warn('Cash purchase detected (100% down), using loan amount as purchase price');
     }
   } else {
     // No purchase price and no mortgage values - can't calculate
@@ -195,7 +196,7 @@ export function analyzeProperty(
   } else if (mortgageValues && mortgageValues.monthlyPayment > 0) {
     // Use the monthly payment from mortgage calculator
     monthlyMortgagePayment = mortgageValues.monthlyPayment;
-    console.log('Using mortgage calculator monthly payment:', monthlyMortgagePayment);
+    logger.debug('Using mortgage calculator monthly payment:', monthlyMortgagePayment);
   } else {
     // Calculate mortgage payment using loan amount and interest rate
     const loanAmount = purchasePrice - calculatedDownpayment;
@@ -249,7 +250,7 @@ export function analyzeProperty(
     providedOther
   );
 
-  console.log('Monthly Expenses Calculation:', {
+  logger.debug('Monthly Expenses Calculation:', {
     provided: !!monthlyExpenses,
     mortgage: monthlyMortgagePayment,
     propertyTax: estimatedPropertyTax,
@@ -333,7 +334,7 @@ export function analyzeProperty(
     capMeetsMinimum
   );
 
-  console.log('Criteria Check:', {
+  logger.debug('Criteria Check:', {
     purchasePrice,
     maxPrice: analysisCriteria.max_purchase_price,
     priceMeets: purchasePrice <= analysisCriteria.max_purchase_price,

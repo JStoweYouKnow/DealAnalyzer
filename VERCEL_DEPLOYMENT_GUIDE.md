@@ -48,6 +48,7 @@ NEXT_PUBLIC_CONVEX_URL=https://strong-condor-993.convex.cloud
 ```
 OPENAI_API_KEY=sk-proj-your_openai_api_key_here
 RENTCAST_API_KEY=your_rentcast_api_key_here
+API_NINJAS_API_KEY=your_api_ninjas_api_key_here
 ```
 
 ### 📧 **Gmail Integration**

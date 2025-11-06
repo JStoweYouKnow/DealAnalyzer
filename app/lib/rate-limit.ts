@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Lazy Redis client initialization to avoid connection attempts at module load
 let redis: Redis | null = null;
+let warnedRedisUnavailable = false;
 
 /**
  * Get Redis client instance, initializing it only when both env vars are present.
@@ -29,57 +30,155 @@ function getRedis(): Redis | null {
   return redis;
 }
 
-// Lazy rate limiters - only created when Redis is available
-function getGeneralRateLimit(): Ratelimit | null {
-  const redisClient = getRedis();
-  if (!redisClient) {
-    return null;
+// Module-scoped cached singletons for rate limiters
+let cachedGeneralRateLimit: Ratelimit | null = null;
+let cachedExpensiveRateLimit: Ratelimit | null = null;
+let cachedStrictRateLimit: Ratelimit | null = null;
+
+// Module-scoped pending promises to coordinate concurrent initialization
+let cachedGeneralRateLimitPromise: Promise<Ratelimit | null> | null = null;
+let cachedExpensiveRateLimitPromise: Promise<Ratelimit | null> | null = null;
+let cachedStrictRateLimitPromise: Promise<Ratelimit | null> | null = null;
+
+// Lazy rate limiters - only created when Redis is available, cached after first creation
+// Uses async pattern with pending promises to prevent race conditions
+async function getGeneralRateLimit(): Promise<Ratelimit | null> {
+  // If instance exists, return it
+  if (cachedGeneralRateLimit !== null) {
+    return cachedGeneralRateLimit;
   }
-  return new Ratelimit({
-    redis: redisClient,
-    limiter: Ratelimit.slidingWindow(100, '1 m'), // 100 requests per minute
-    analytics: true,
-    prefix: '@upstash/ratelimit/general',
-  });
+  
+  // If pending promise exists, await it and return the resolved instance
+  if (cachedGeneralRateLimitPromise !== null) {
+    return await cachedGeneralRateLimitPromise;
+  }
+  
+  // Otherwise, create and assign a new pending promise
+  cachedGeneralRateLimitPromise = (async () => {
+    const redisClient = getRedis();
+    if (!redisClient) {
+      cachedGeneralRateLimitPromise = null;
+      return null;
+    }
+    
+    try {
+      const instance = new Ratelimit({
+        redis: redisClient,
+        limiter: Ratelimit.slidingWindow(100, '1 m'), // 100 requests per minute
+        analytics: true,
+        prefix: '@upstash/ratelimit/general',
+      });
+      
+      // Assign the cached instance on success
+      cachedGeneralRateLimit = instance;
+      cachedGeneralRateLimitPromise = null;
+      return instance;
+    } catch (error) {
+      console.error('Failed to instantiate general rate limiter:', error);
+      // Clear the pending promise on error
+      cachedGeneralRateLimitPromise = null;
+      return null;
+    }
+  })();
+  
+  return await cachedGeneralRateLimitPromise;
 }
 
-function getExpensiveRateLimit(): Ratelimit | null {
-  const redisClient = getRedis();
-  if (!redisClient) {
-    return null;
+async function getExpensiveRateLimit(): Promise<Ratelimit | null> {
+  // If instance exists, return it
+  if (cachedExpensiveRateLimit !== null) {
+    return cachedExpensiveRateLimit;
   }
-  return new Ratelimit({
-    redis: redisClient,
-    limiter: Ratelimit.slidingWindow(10, '1 m'), // 10 requests per minute for expensive operations
-    analytics: true,
-    prefix: '@upstash/ratelimit/expensive',
-  });
+  
+  // If pending promise exists, await it and return the resolved instance
+  if (cachedExpensiveRateLimitPromise !== null) {
+    return await cachedExpensiveRateLimitPromise;
+  }
+  
+  // Otherwise, create and assign a new pending promise
+  cachedExpensiveRateLimitPromise = (async () => {
+    const redisClient = getRedis();
+    if (!redisClient) {
+      cachedExpensiveRateLimitPromise = null;
+      return null;
+    }
+    
+    try {
+      const instance = new Ratelimit({
+        redis: redisClient,
+        limiter: Ratelimit.slidingWindow(10, '1 m'), // 10 requests per minute for expensive operations
+        analytics: true,
+        prefix: '@upstash/ratelimit/expensive',
+      });
+      
+      // Assign the cached instance on success
+      cachedExpensiveRateLimit = instance;
+      cachedExpensiveRateLimitPromise = null;
+      return instance;
+    } catch (error) {
+      console.error('Failed to instantiate expensive rate limiter:', error);
+      // Clear the pending promise on error
+      cachedExpensiveRateLimitPromise = null;
+      return null;
+    }
+  })();
+  
+  return await cachedExpensiveRateLimitPromise;
 }
 
-function getStrictRateLimit(): Ratelimit | null {
-  const redisClient = getRedis();
-  if (!redisClient) {
-    return null;
+async function getStrictRateLimit(): Promise<Ratelimit | null> {
+  // If instance exists, return it
+  if (cachedStrictRateLimit !== null) {
+    return cachedStrictRateLimit;
   }
-  return new Ratelimit({
-    redis: redisClient,
-    limiter: Ratelimit.slidingWindow(5, '1 m'), // 5 requests per minute for very expensive operations
-    analytics: true,
-    prefix: '@upstash/ratelimit/strict',
-  });
+  
+  // If pending promise exists, await it and return the resolved instance
+  if (cachedStrictRateLimitPromise !== null) {
+    return await cachedStrictRateLimitPromise;
+  }
+  
+  // Otherwise, create and assign a new pending promise
+  cachedStrictRateLimitPromise = (async () => {
+    const redisClient = getRedis();
+    if (!redisClient) {
+      cachedStrictRateLimitPromise = null;
+      return null;
+    }
+    
+    try {
+      const instance = new Ratelimit({
+        redis: redisClient,
+        limiter: Ratelimit.slidingWindow(5, '1 m'), // 5 requests per minute for very expensive operations
+        analytics: true,
+        prefix: '@upstash/ratelimit/strict',
+      });
+      
+      // Assign the cached instance on success
+      cachedStrictRateLimit = instance;
+      cachedStrictRateLimitPromise = null;
+      return instance;
+    } catch (error) {
+      console.error('Failed to instantiate strict rate limiter:', error);
+      // Clear the pending promise on error
+      cachedStrictRateLimitPromise = null;
+      return null;
+    }
+  })();
+  
+  return await cachedStrictRateLimitPromise;
 }
 
 // Export getter functions for backward compatibility
-export function generalRateLimit(): Ratelimit | null {
-  return getGeneralRateLimit();
+export async function generalRateLimit(): Promise<Ratelimit | null> {
+  return await getGeneralRateLimit();
 }
 
-export function expensiveRateLimit(): Ratelimit | null {
-  return getExpensiveRateLimit();
+export async function expensiveRateLimit(): Promise<Ratelimit | null> {
+  return await getExpensiveRateLimit();
 }
 
-export function strictRateLimit(): Ratelimit | null {
-  return getStrictRateLimit();
+export async function strictRateLimit(): Promise<Ratelimit | null> {
+  return await getStrictRateLimit();
 }
 
 // Get client identifier (IP address or user ID)
@@ -94,17 +193,26 @@ function getIdentifier(request: NextRequest): string {
 // Rate limit middleware wrapper
 export async function withRateLimit(
   request: NextRequest,
-  limiterGetter: (() => Ratelimit | null) | Ratelimit = generalRateLimit,
+  limiterGetter: (() => Promise<Ratelimit | null> | Ratelimit | null) | Ratelimit = generalRateLimit,
   handler: (request: NextRequest) => Promise<NextResponse>
 ): Promise<NextResponse> {
   // Get the limiter (support both function and direct instance for backward compatibility)
-  const limiter = typeof limiterGetter === 'function' 
+  // Functions can now return either Promise<Ratelimit | null> or Ratelimit | null
+  const limiterResult = typeof limiterGetter === 'function' 
     ? limiterGetter() 
     : limiterGetter;
+  
+  // Await if it's a promise, otherwise use directly
+  const limiter = limiterResult instanceof Promise
+    ? await limiterResult
+    : limiterResult;
 
   // Skip rate limiting if Redis is not available (fallback to no-op limiter)
   if (!limiter) {
-    console.warn('Rate limiting disabled: Redis not available');
+    if (!warnedRedisUnavailable) {
+      warnedRedisUnavailable = true;
+      console.warn('Rate limiting disabled: Redis not available');
+    }
     return handler(request);
   }
 

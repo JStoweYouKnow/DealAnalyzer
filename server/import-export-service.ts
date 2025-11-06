@@ -215,7 +215,8 @@ export class ImportExportService {
     const analyses = await this.getAnalysesForExport(request.propertyIds);
     
     const ExcelJSModule = await getExcelJS();
-    const workbook = new ExcelJSModule.Workbook();
+    const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+    const workbook = new ExcelJS.Workbook();
     
     if (request.templateType === 'biggerpockets') {
       await this.addBiggerPocketsSheet(workbook, analyses);
