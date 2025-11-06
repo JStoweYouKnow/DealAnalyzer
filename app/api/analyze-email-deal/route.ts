@@ -16,13 +16,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the email deal
+    console.log(`[analyze-email-deal] Looking for email deal with ID: ${dealId}`);
     const emailDeal = await storage.getEmailDeal(dealId);
     if (!emailDeal) {
+      // Log available deals for debugging (limit to first 10 to avoid spam)
+      try {
+        const allDeals = await storage.getEmailDeals();
+        console.log(`[analyze-email-deal] Total deals in storage: ${allDeals.length}`);
+        console.log(`[analyze-email-deal] Available deal IDs (first 10):`, allDeals.slice(0, 10).map(d => d.id));
+      } catch (err) {
+        console.error('[analyze-email-deal] Error fetching deals list:', err);
+      }
+      
       return NextResponse.json(
-        { success: false, error: "Email deal not found" },
+        { 
+          success: false, 
+          error: `Email deal not found with ID: ${dealId}`,
+          suggestion: "Please refresh the deals list and try again. The deal may have been deleted or the ID may be incorrect."
+        },
         { status: 404 }
       );
     }
+    console.log(`[analyze-email-deal] Found email deal: ${emailDeal.id}`);
 
     // Parse and analyze the email content using TypeScript
     const propertyData = parseEmailContent(emailContent);

@@ -85,9 +85,16 @@ export default function DealsPage() {
     onSuccess: async (data) => {
       console.log('Sync response:', data);
       if (data.success) {
-        // Invalidate and immediately refetch to ensure fresh data
-        await queryClient.invalidateQueries({ queryKey: ['/api/email-deals'] });
+        // Force immediate refetch by using refetchQueries
+        // This ensures the query refetches immediately even with staleTime: Infinity
+        // Remove exact: true to match any query that starts with this key
+        await queryClient.refetchQueries({ 
+          queryKey: ['/api/email-deals']
+        });
+        
+        // Also trigger the refetch from the useQuery hook directly as a backup
         await refetch();
+        
         toast({
           title: "Emails Synced",
           description: `Found ${data.data?.length || 0} new real estate emails`,
@@ -101,6 +108,7 @@ export default function DealsPage() {
       }
     },
     onError: (error: Error) => {
+      console.error('Sync error:', error);
       toast({
         title: "Sync Failed",
         description: error.message,
@@ -112,6 +120,14 @@ export default function DealsPage() {
   // Analyze deal mutation
   const analyzeDealMutation = useMutation({
     mutationFn: async (deal: EmailDeal) => {
+      // Validate deal has required data
+      if (!deal.id) {
+        throw new Error('Deal ID is missing. Please refresh the deals list and try again.');
+      }
+      if (!deal.emailContent) {
+        throw new Error('Email content is missing. Cannot analyze this deal.');
+      }
+      
       const response = await apiRequest('POST', '/api/analyze-email-deal', {
         dealId: deal.id,
         emailContent: deal.emailContent
@@ -125,7 +141,57 @@ export default function DealsPage() {
           title: "Deal Analyzed",
           description: "Property analysis completed successfully",
         });
+      } else {
+        toast({
+          title: "Analysis Failed",
+          description: data.error || "Failed to analyze email deal",
+          variant: "destructive",
+        });
       }
+    },
+    onError: (error: Error) => {
+      console.error('Error analyzing deal:', error);
+      // Extract meaningful error message
+      let errorMessage = error.message;
+      
+      // Try to parse error response if it's a JSON error
+      try {
+        // The apiRequest throws errors with status codes, try to extract more info
+        const errorMatch = errorMessage.match(/(\d+):\s*(.+)/);
+        if (errorMatch) {
+          const statusCode = errorMatch[1];
+          const errorText = errorMatch[2];
+          
+          // Try to parse JSON error response
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.error || errorMessage;
+            if (errorJson.suggestion) {
+              errorMessage += ` ${errorJson.suggestion}`;
+            }
+          } catch {
+            // Not JSON, use the text as is
+            errorMessage = errorText;
+          }
+          
+          // Add user-friendly messages based on status code
+          if (statusCode === '404') {
+            errorMessage = 'Email deal not found. ' + (errorMessage.includes('suggestion') ? '' : 'The deal may have been deleted or the ID is incorrect. Please refresh the deals list and try again.');
+          } else if (statusCode === '400') {
+            errorMessage = 'Invalid request. ' + (errorMessage.includes('required') ? '' : 'Please check that the deal has all required information.');
+          } else if (statusCode === '500') {
+            errorMessage = 'Server error occurred. Please try again later.';
+          }
+        }
+      } catch {
+        // If parsing fails, use original error message
+      }
+      
+      toast({
+        title: "Analysis Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
   });
 
@@ -494,12 +560,25 @@ export default function DealsPage() {
                 Connect Gmail
               </Button>
               <Button
-                onClick={() => syncEmailsMutation.mutate()}
+                onClick={() => {
+                  if (!syncEmailsMutation.isPending) {
+                    syncEmailsMutation.mutate();
+                  }
+                }}
                 disabled={syncEmailsMutation.isPending}
                 size="sm"
               >
-                <i className="fas fa-sync mr-2"></i>
-                {syncEmailsMutation.isPending ? 'Syncing...' : 'Sync Emails'}
+                {syncEmailsMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-sync mr-2"></i>
+                    Sync Emails
+                  </>
+                )}
               </Button>
             </div>
           </div>
