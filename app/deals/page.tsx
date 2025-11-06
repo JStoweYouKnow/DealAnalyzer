@@ -33,6 +33,7 @@ export default function DealsPage() {
   const queryClient = useQueryClient();
 
   // Fetch email deals
+  // Override staleTime to allow refetching after sync
   const { data: emailDeals = [], isLoading, refetch } = useQuery<EmailDeal[]>({
     queryKey: ['/api/email-deals'],
     queryFn: async () => {
@@ -40,7 +41,8 @@ export default function DealsPage() {
       const data = await response.json();
       console.log('Email deals response:', data);
       return Array.isArray(data) ? data : data.data || [];
-    }
+    },
+    staleTime: 0, // Allow refetching immediately (overrides global staleTime: Infinity)
   });
 
   // Connect Gmail mutation
@@ -85,30 +87,25 @@ export default function DealsPage() {
     onSuccess: async (data) => {
       console.log('Sync response:', data);
       if (data.success) {
-        // Get current deals from cache
-        const currentDeals = queryClient.getQueryData<EmailDeal[]>(['/api/email-deals']) || [];
-        
-        // Merge new deals with existing ones, avoiding duplicates
-        const newDealIds = new Set(data.data?.map(d => d.id) || []);
-        const existingDeals = currentDeals.filter(d => !newDealIds.has(d.id));
-        const updatedDeals = [...(data.data || []), ...existingDeals];
-        
-        // Update the cache directly with merged data
-        queryClient.setQueryData(['/api/email-deals'], updatedDeals);
-        
-        // Also invalidate and refetch to ensure we have the latest from server
+        // Invalidate the query to mark it as stale
         queryClient.invalidateQueries({ 
           queryKey: ['/api/email-deals']
         });
         
-        // Force a refetch to get the complete list from server
+        // Force immediate refetch using the refetch function from useQuery
+        // This is more reliable than refetchQueries when staleTime is overridden
+        const refetchResult = await refetch();
+        console.log('Refetch after sync:', refetchResult);
+        
+        // Also use refetchQueries as backup
         await queryClient.refetchQueries({ 
-          queryKey: ['/api/email-deals']
+          queryKey: ['/api/email-deals'],
+          type: 'active'
         });
         
         toast({
           title: "Emails Synced",
-          description: `Found ${data.data?.length || 0} new real estate emails`,
+          description: `Found ${data.data?.length || 0} new real estate emails. Refreshing dashboard...`,
         });
       } else {
         toast({
