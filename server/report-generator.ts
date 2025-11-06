@@ -192,14 +192,29 @@ async function makePDF(html: string): Promise<Buffer | null> {
       // Get the executable path - this will extract the binary if needed
       const executablePath = await resolveChromiumExecutablePath(chromium);
 
-      // Assign the browser instance
-      browser = await puppeteer.launch({
+      // Build launch options with fallbacks for properties that might not exist
+      const launchOptions: any = {
         executablePath,
-        headless: chromium.headless,
+        headless: chromium.headless !== undefined ? chromium.headless : true,
         ignoreHTTPSErrors: true,
-        defaultViewport: chromium.defaultViewport,
-        args: [...chromium.args, "--hide-scrollbars", "--disable-web-security"],
-      });
+        args: [
+          ...(chromium.args || []),
+          "--hide-scrollbars",
+          "--disable-web-security",
+          "--no-sandbox",
+          "--disable-setuid-sandbox"
+        ],
+      };
+
+      // Add defaultViewport if available
+      if (chromium.defaultViewport) {
+        launchOptions.defaultViewport = chromium.defaultViewport;
+      } else {
+        launchOptions.defaultViewport = { width: 1280, height: 720 };
+      }
+
+      // Assign the browser instance
+      browser = await puppeteer.launch(launchOptions);
       console.log("Browser launched successfully");
     } catch (error) {
       console.error("Error launching browser:", error);

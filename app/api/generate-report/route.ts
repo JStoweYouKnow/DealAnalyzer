@@ -262,8 +262,18 @@ export async function POST(request: NextRequest) {
     const errorStack = error instanceof Error ? error.stack : undefined;
     console.error("Error stack:", errorStack);
     
+    // Log more details about the error for debugging
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+    }
+    
     return NextResponse.json(
-      { success: false, error: `Failed to generate report: ${errorMessage}` },
+      { 
+        success: false, 
+        error: `Failed to generate report: ${errorMessage}`,
+        details: process.env.NODE_ENV === 'development' ? errorStack : undefined
+      },
       { status: 500 }
     );
   }
