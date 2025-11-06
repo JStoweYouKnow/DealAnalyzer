@@ -10,9 +10,8 @@ const nextConfig = {
   reactStrictMode: true,
   // Enable compression for better performance
   compress: true,
-  // Optimize production builds
-  swcMinify: true,
   // Enable experimental features for better performance
+  // Note: swcMinify is enabled by default in Next.js 13+ and no longer needs to be specified
   experimental: {
     serverActions: {
       bodySizeLimit: '50mb',
