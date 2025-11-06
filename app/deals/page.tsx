@@ -82,10 +82,12 @@ export default function DealsPage() {
       const response = await apiRequest('POST', '/api/sync-emails');
       return response.json() as Promise<EmailMonitoringResponse>;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       console.log('Sync response:', data);
       if (data.success) {
-        queryClient.invalidateQueries({ queryKey: ['/api/email-deals'] });
+        // Invalidate and immediately refetch to ensure fresh data
+        await queryClient.invalidateQueries({ queryKey: ['/api/email-deals'] });
+        await refetch();
         toast({
           title: "Emails Synced",
           description: `Found ${data.data?.length || 0} new real estate emails`,

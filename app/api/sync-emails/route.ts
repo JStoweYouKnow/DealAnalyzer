@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { emailMonitoringService } from "../../../server/email-service";
 import { storage } from "../../../server/storage";
 import { cookies } from "next/headers";
+import { google } from "googleapis";
 import type { EmailMonitoringResponse } from "../../../shared/schema";
 
 export async function POST() {
@@ -20,6 +21,33 @@ export async function POST() {
     const gmailTokens = JSON.parse(gmailTokensCookie.value);
 
     // Set credentials for email service
+    // The OAuth2 client will automatically refresh tokens if needed
+    const auth = new google.auth.OAuth2(
+      process.env.GMAIL_CLIENT_ID,
+      process.env.GMAIL_CLIENT_SECRET,
+      process.env.GMAIL_REDIRECT_URI
+    );
+    
+    auth.setCredentials({
+      access_token: gmailTokens.access_token,
+      refresh_token: gmailTokens.refresh_token
+    });
+
+    // Handle token refresh events
+    auth.on('tokens', (tokens) => {
+      if (tokens.access_token) {
+        // Update cookies with new access token if refreshed
+        gmailTokens.access_token = tokens.access_token;
+        cookieStore.set('gmailTokens', JSON.stringify(gmailTokens), {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 24 * 60 * 60 // 24 hours
+        });
+        console.log('Access token refreshed and saved to cookies');
+      }
+    });
+
     await emailMonitoringService.setCredentials(
       gmailTokens.access_token,
       gmailTokens.refresh_token

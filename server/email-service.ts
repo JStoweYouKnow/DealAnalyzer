@@ -67,6 +67,18 @@ export class EmailMonitoringService {
       refresh_token: refreshToken
     });
     
+    // Configure automatic token refresh
+    auth.on('tokens', (tokens) => {
+      if (tokens.refresh_token) {
+        // Store the new refresh token if provided
+        console.log('New refresh token received');
+      }
+      if (tokens.access_token) {
+        // Access token was refreshed
+        console.log('Access token refreshed');
+      }
+    });
+    
     this.gmail = google.gmail({ version: 'v1', auth });
   }
 
