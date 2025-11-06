@@ -3,11 +3,18 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Define public routes that don't require authentication
+// Authentication is currently disabled - all routes are public
 const isPublicRoute = createRouteMatcher([
+  '/',
+  '/deals',
+  '/market',
+  '/search',
+  '/comparison',
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/health',
   '/api/gmail-callback', // OAuth callback must be public
+  '/api/(.*)', // All API routes are public
 ]);
 
 export default clerkMiddleware(async (auth, request: NextRequest) => {
@@ -16,6 +23,9 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
     return NextResponse.next();
   }
 
+  // Authentication is currently disabled - allow all routes through
+  // If you want to re-enable authentication, uncomment the code below:
+  /*
   // Protect all other routes
   const { userId } = await auth();
   
@@ -25,6 +35,7 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
     signInUrl.searchParams.set('redirect_url', request.url);
     return NextResponse.redirect(signInUrl);
   }
+  */
 
   return NextResponse.next();
 });
