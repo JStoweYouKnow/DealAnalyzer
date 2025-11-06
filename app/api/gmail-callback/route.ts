@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
             accessToken: tokens.access_token,
             refreshToken: tokens.refresh_token,
             scope: tokens.scope,
-            expiryDate: tokens.expiry_date,
+            expiryDate: tokens.expiry_date ?? undefined,
             tokenType: tokens.token_type || 'Bearer',
           });
           
