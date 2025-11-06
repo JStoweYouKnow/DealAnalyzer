@@ -5,6 +5,10 @@ import { cookies } from "next/headers";
 import { google } from "googleapis";
 import type { EmailMonitoringResponse } from "../../../shared/schema";
 
+// Increase timeout for this route (Vercel Pro allows up to 60s, Hobby is 10s)
+export const maxDuration = 60; // 60 seconds
+export const runtime = 'nodejs'; // Use Node.js runtime
+
 export async function POST() {
   try {
     // Check if user has Gmail tokens
@@ -53,31 +57,51 @@ export async function POST() {
       gmailTokens.refresh_token
     );
 
-    // Search for real estate emails (limit to 25 to avoid timeouts)
-    const emailDeals = await emailMonitoringService.searchRealEstateEmails(25);
+    // Search for real estate emails (limit to 10 to avoid timeouts on serverless)
+    // Process in smaller batches to stay within timeout limits
+    const maxEmails = 10;
+    const emailDeals = await emailMonitoringService.searchRealEstateEmails(maxEmails);
     
     // Store new deals in storage, checking for duplicates
     const storedDeals = [];
     console.log(`Syncing ${emailDeals.length} email deals from Gmail`);
     
-    for (const deal of emailDeals) {
-      console.log(`Processing deal: ${deal.id} - "${deal.subject?.substring(0, 50)}..."`);
+    // Process emails with timeout protection
+    const startTime = Date.now();
+    const maxProcessingTime = 45000; // 45 seconds (leave 5s buffer for response)
+    
+    for (let i = 0; i < emailDeals.length; i++) {
+      // Check if we're running out of time
+      if (Date.now() - startTime > maxProcessingTime) {
+        console.log(`Timeout approaching, processed ${i} of ${emailDeals.length} emails`);
+        break;
+      }
       
-      // Check if deal already exists by ID
-      const existingDeal = await storage.getEmailDeal(deal.id);
+      const deal = emailDeals[i];
+      console.log(`Processing deal ${i + 1}/${emailDeals.length}: ${deal.id} - "${deal.subject?.substring(0, 50)}..."`);
       
-      // Generate content hash for duplicate detection
-      const contentHash = emailMonitoringService.generateContentHash(deal.subject, deal.sender, deal.emailContent);
-      const duplicateByHash = await storage.findEmailDealByContentHash(contentHash);
-      
-      if (!existingDeal && !duplicateByHash) {
-        console.log(`Creating new email deal with ID: ${deal.id}`);
-        const dealWithHash = { ...deal, contentHash };
-        const storedDeal = await storage.createEmailDeal(dealWithHash);
-        console.log(`Stored deal with final ID: ${storedDeal.id}`);
-        storedDeals.push(storedDeal);
-      } else {
-        console.log(`Skipping duplicate deal: ${deal.id}`);
+      try {
+        // Check if deal already exists by ID (parallel check)
+        const [existingDeal, contentHash] = await Promise.all([
+          storage.getEmailDeal(deal.id),
+          Promise.resolve(emailMonitoringService.generateContentHash(deal.subject, deal.sender, deal.emailContent))
+        ]);
+        
+        // Check for duplicate by hash
+        const duplicateByHash = await storage.findEmailDealByContentHash(contentHash);
+        
+        if (!existingDeal && !duplicateByHash) {
+          console.log(`Creating new email deal with ID: ${deal.id}`);
+          const dealWithHash = { ...deal, contentHash };
+          const storedDeal = await storage.createEmailDeal(dealWithHash);
+          console.log(`Stored deal with final ID: ${storedDeal.id}`);
+          storedDeals.push(storedDeal);
+        } else {
+          console.log(`Skipping duplicate deal: ${deal.id}`);
+        }
+      } catch (error) {
+        console.error(`Error processing deal ${deal.id}:`, error);
+        // Continue with next deal instead of failing completely
       }
     }
     
