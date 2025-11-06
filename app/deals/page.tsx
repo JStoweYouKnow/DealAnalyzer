@@ -85,15 +85,26 @@ export default function DealsPage() {
     onSuccess: async (data) => {
       console.log('Sync response:', data);
       if (data.success) {
-        // Force immediate refetch by using refetchQueries
-        // This ensures the query refetches immediately even with staleTime: Infinity
-        // Remove exact: true to match any query that starts with this key
-        await queryClient.refetchQueries({ 
+        // Get current deals from cache
+        const currentDeals = queryClient.getQueryData<EmailDeal[]>(['/api/email-deals']) || [];
+        
+        // Merge new deals with existing ones, avoiding duplicates
+        const newDealIds = new Set(data.data?.map(d => d.id) || []);
+        const existingDeals = currentDeals.filter(d => !newDealIds.has(d.id));
+        const updatedDeals = [...(data.data || []), ...existingDeals];
+        
+        // Update the cache directly with merged data
+        queryClient.setQueryData(['/api/email-deals'], updatedDeals);
+        
+        // Also invalidate and refetch to ensure we have the latest from server
+        queryClient.invalidateQueries({ 
           queryKey: ['/api/email-deals']
         });
         
-        // Also trigger the refetch from the useQuery hook directly as a backup
-        await refetch();
+        // Force a refetch to get the complete list from server
+        await queryClient.refetchQueries({ 
+          queryKey: ['/api/email-deals']
+        });
         
         toast({
           title: "Emails Synced",
