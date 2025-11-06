@@ -5,9 +5,11 @@ export async function GET() {
   try {
     const cookieStore = await cookies();
 
-    // Debug: Log all cookies
-    const allCookies = cookieStore.getAll();
-    console.log('[Gmail Status Check] All cookies:', allCookies.map(c => c.name));
+    // Debug: Log all cookies (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      const allCookies = cookieStore.getAll();
+      console.log('[Gmail Status Check] All cookies:', allCookies.map(c => c.name));
+    }
 
     const gmailTokensCookie = cookieStore.get('gmailTokens');
     const isConnected = !!gmailTokensCookie;

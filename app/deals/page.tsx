@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,12 @@ export default function DealsPage() {
   const [mortgageResults, setMortgageResults] = useState<{[key: string]: {monthly_payment: number, total_interest_paid: number, total_paid: number}}>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Coordination flag to prevent race conditions between postMessage handler and polling
+  const isSyncingRef = useRef<boolean>(false);
+  
+  // Ref to store the sync mutation function (set after mutation is defined)
+  const syncMutateRef = useRef<(() => void) | null>(null);
 
   // Listen for auth success message from popup
   useEffect(() => {
@@ -41,26 +47,36 @@ export default function DealsPage() {
       }
 
       if (event.data?.type === 'GMAIL_AUTH_SUCCESS') {
-        console.log('🎉 Received auth success message from popup!');
+        try {
+          console.log('🎉 Received auth success message from popup!');
 
-        // Wait a brief moment for cookie to propagate
-        await new Promise(resolve => setTimeout(resolve, 500));
+          // Wait a brief moment for cookie to propagate
+          await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Force status check
-        queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
-        const status = await refetchGmailStatus();
+          // Force status check
+          queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
+          const status = await refetchGmailStatus();
 
-        console.log('Auth success - status check result:', status.data);
+          console.log('Auth success - status check result:', status.data);
 
-        if (status.data?.connected) {
-          console.log('✅ Gmail connected! Starting auto-sync...');
+          if (status.data?.connected) {
+            console.log('✅ Gmail connected! Starting auto-sync...');
+            // Use the helper function via ref to trigger sync with coordination
+            if (syncMutateRef.current) {
+              syncMutateRef.current();
+            }
+          } else {
+            console.log('⚠️ Auth success message received but status still shows disconnected');
+          }
+        } catch (error) {
+          console.error('❌ Error handling Gmail auth success:', error);
           toast({
-            title: "Gmail Connected",
-            description: "Automatically syncing your emails...",
+            title: "Connection Error",
+            description: "Failed to verify Gmail connection. Please try again.",
+            variant: "destructive",
           });
-          syncEmailsMutation.mutate();
-        } else {
-          console.log('⚠️ Auth success message received but status still shows disconnected');
+          // Ensure queries are still invalidated even on error
+          queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
         }
       }
     };
@@ -133,12 +149,10 @@ export default function DealsPage() {
           if (status.data?.connected === true) {
             console.log('✅ Gmail connected! Starting auto-sync...');
             clearInterval(pollInterval);
-            toast({
-              title: "Gmail Connected",
-              description: "Automatically syncing your emails...",
-            });
-            // Automatically trigger sync after successful connection
-            syncEmailsMutation.mutate();
+            // Use the helper function via ref to trigger sync with coordination
+            if (syncMutateRef.current) {
+              syncMutateRef.current();
+            }
           }
         } catch (error) {
           console.error('❌ Error polling Gmail status:', error);
@@ -222,8 +236,39 @@ export default function DealsPage() {
           variant: "destructive",
         });
       }
+    },
+    onSettled: () => {
+      // Always clear the coordination flag when mutation completes (success or error)
+      isSyncingRef.current = false;
     }
   });
+  
+  // Helper function to atomically trigger sync with toast (prevents duplicate syncs)
+  // Defined after mutation so it can access syncEmailsMutation
+  const triggerSyncWithToast = useCallback(() => {
+    // Atomically check and set the flag
+    if (isSyncingRef.current) {
+      console.log('⏸️ Sync already in progress, skipping duplicate trigger');
+      return;
+    }
+    
+    // Set flag immediately before mutation
+    isSyncingRef.current = true;
+    
+    // Show toast
+    toast({
+      title: "Gmail Connected",
+      description: "Automatically syncing your emails...",
+    });
+    
+    // Trigger sync
+    syncEmailsMutation.mutate();
+  }, [syncEmailsMutation, toast]);
+  
+  // Store the helper function in a ref so it can be accessed by the message handler and polling logic
+  useEffect(() => {
+    syncMutateRef.current = triggerSyncWithToast;
+  }, [triggerSyncWithToast]);
 
   // Analyze deal mutation
   const analyzeDealMutation = useMutation({

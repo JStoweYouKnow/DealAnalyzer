@@ -309,4 +309,15 @@ export default defineSchema({
   })
     .index("by_property_id", ["propertyId"])
     .index("by_analysis_date", ["analysisDate"]),
+
+  userOAuthTokens: defineTable({
+    userId: v.string(),
+    accessToken: v.string(),
+    refreshToken: v.string(),
+    scope: v.optional(v.string()),
+    expiryDate: v.optional(v.number()), // timestamp
+    tokenType: v.optional(v.string()),
+    updatedAt: v.number(), // timestamp
+  })
+    .index("by_user_id", ["userId"]),
 });

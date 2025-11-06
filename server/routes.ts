@@ -639,6 +639,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sync emails endpoint
   app.post("/api/sync-emails", async (req, res) => {
     try {
+      // Get user ID from authentication
+      const userId = await authenticateRequest(req);
+
       // Check if user has Gmail tokens
       if (!req.session.gmailTokens) {
         res.status(401).json({
@@ -648,10 +651,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Set credentials for email service
+      // Set credentials for email service with userId and token metadata
       await emailMonitoringService.setCredentials(
         req.session.gmailTokens.access_token,
-        req.session.gmailTokens.refresh_token
+        req.session.gmailTokens.refresh_token,
+        userId || undefined,
+        req.session.gmailTokens.scope,
+        req.session.gmailTokens.expiry_date,
+        req.session.gmailTokens.token_type
       );
 
       // Search for real estate emails

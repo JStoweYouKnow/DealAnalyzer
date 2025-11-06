@@ -14,6 +14,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get user ID from authentication (try Clerk first, then fallback)
+    let userId: string | null = null;
+    try {
+      const { auth } = await import("@clerk/nextjs/server");
+      const authResult = await auth();
+      userId = authResult?.userId || null;
+    } catch (error) {
+      // Clerk not available or not configured
+    }
+
     const tokens = await emailMonitoringService.getTokens(code);
 
     console.log('[Gmail Callback] Received tokens, setting cookie...');
@@ -38,12 +48,39 @@ export async function GET(request: NextRequest) {
 
     console.log('[Gmail Callback] Cookie set successfully');
 
+    // Persist tokens to database if userId is available and we have both tokens
+    if (userId && tokens.access_token && tokens.refresh_token) {
+      try {
+        // Initialize Convex client for token persistence
+        if (process.env.NEXT_PUBLIC_CONVEX_URL) {
+          const { ConvexHttpClient } = await import('convex/browser');
+          const apiModule = await import('../../../convex/_generated/api');
+          const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+          
+          await convexClient.mutation(apiModule.api.userOAuthTokens.upsertTokens, {
+            userId,
+            accessToken: tokens.access_token,
+            refreshToken: tokens.refresh_token,
+            scope: tokens.scope,
+            expiryDate: tokens.expiry_date,
+            tokenType: tokens.token_type || 'Bearer',
+          });
+          
+          console.log('[Gmail Callback] Tokens persisted to database');
+        }
+      } catch (error) {
+        console.error('[Gmail Callback] Error persisting tokens to database:', error);
+        // Don't fail the callback if persistence fails - cookies are still set
+      }
+    }
+
     // Verify cookie was set
     const verifyGmailTokensCookie = cookieStore.get('gmailTokens');
     console.log('[Gmail Callback] Cookie verification:', {
       cookieSet: !!verifyGmailTokensCookie,
       hasAccessToken: !!tokens.access_token,
       hasRefreshToken: !!tokens.refresh_token,
+      userIdSet: !!userId,
     });
     
   // Return a success page that closes the popup

@@ -2,6 +2,78 @@ import { google } from 'googleapis';
 import type { DealAnalysis } from '@shared/schema';
 import { aiQualityScoringService } from './ai-scoring-service';
 
+// Lazy import Convex client for token persistence
+let convexClient: any = null;
+let convexApi: any = null;
+
+async function initializeConvexForTokens() {
+  if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
+    return false;
+  }
+
+  try {
+    if (!convexClient) {
+      const { ConvexHttpClient } = await import('convex/browser');
+      convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+    }
+
+    if (!convexApi) {
+      const apiModule = await import('../convex/_generated/api');
+      convexApi = apiModule.api;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize Convex for token persistence:', error);
+    return false;
+  }
+}
+
+async function persistTokens(
+  userId: string,
+  accessToken: string,
+  refreshToken: string | undefined,
+  scope: string | undefined,
+  expiryDate: number | undefined,
+  tokenType: string | undefined
+) {
+  try {
+    const initialized = await initializeConvexForTokens();
+    if (!initialized || !convexClient || !convexApi) {
+      console.error('Convex not available for token persistence');
+      return;
+    }
+
+    // Only persist if we have both access token and refresh token
+    // If refresh token is not provided, we keep the existing one
+    if (!accessToken) {
+      console.warn('Attempted to persist tokens without access token');
+      return;
+    }
+
+    // If refresh token is not provided in the new tokens, we need to fetch the existing one
+    // For now, we'll require refreshToken to be passed
+    if (!refreshToken) {
+      console.warn('Refresh token not provided in token update, skipping persistence');
+      return;
+    }
+
+    await convexClient.mutation(convexApi.userOAuthTokens.upsertTokens, {
+      userId,
+      accessToken,
+      refreshToken,
+      scope,
+      expiryDate,
+      tokenType: tokenType || 'Bearer',
+    });
+
+    console.log(`Tokens persisted successfully for user ${userId.substring(0, 8)}...`);
+  } catch (error) {
+    console.error('Error persisting tokens to database:', error);
+    // Don't throw - token refresh should continue even if persistence fails
+  }
+}
+
 export interface EmailDeal {
   id: string;
   subject: string;
@@ -55,29 +127,88 @@ export class EmailMonitoringService {
   }
 
   // Set up OAuth credentials
-  async setCredentials(accessToken: string, refreshToken: string) {
+  async setCredentials(accessToken: string, refreshToken: string, userId?: string, scope?: string, expiryDate?: number, tokenType?: string) {
     const auth = new google.auth.OAuth2(
       process.env.GMAIL_CLIENT_ID,
       process.env.GMAIL_CLIENT_SECRET,
       process.env.GMAIL_REDIRECT_URI
     );
     
+    // Store the current refresh token so we can preserve it if not updated
+    let currentRefreshToken = refreshToken;
+    let currentScope: string | undefined = scope;
+    let currentExpiryDate: number | undefined = expiryDate;
+    let currentTokenType: string | undefined = tokenType;
+    
     auth.setCredentials({
       access_token: accessToken,
       refresh_token: refreshToken
     });
     
+    // Persist initial tokens if userId is provided
+    if (userId && accessToken && refreshToken) {
+      try {
+        await persistTokens(
+          userId,
+          accessToken,
+          refreshToken,
+          currentScope,
+          currentExpiryDate,
+          currentTokenType
+        );
+      } catch (error) {
+        console.error('Error persisting initial tokens:', error);
+        // Continue even if initial persistence fails
+      }
+    }
+    
     // Configure automatic token refresh
-    auth.on('tokens', (tokens) => {
-      if (tokens.refresh_token) {
-        // Store the new refresh token if provided
-        console.log('New refresh token received');
-      }
-      if (tokens.access_token) {
-        // Access token was refreshed
-        console.log('Access token refreshed');
-      }
-    });
+    if (userId) {
+      auth.on('tokens', async (tokens) => {
+        try {
+          // Update current refresh token if a new one is provided
+          if (tokens.refresh_token) {
+            currentRefreshToken = tokens.refresh_token;
+            console.log('New refresh token received for user');
+          }
+          
+          // Update scope if provided
+          if (tokens.scope) {
+            currentScope = tokens.scope;
+          }
+          
+          // Update expiry date if provided
+          if (tokens.expiry_date) {
+            currentExpiryDate = tokens.expiry_date;
+          }
+          
+          // Update token type if provided
+          if (tokens.token_type) {
+            currentTokenType = tokens.token_type;
+          }
+          
+          // Always persist when access token is refreshed
+          // Use the current refresh token (which may have been updated above)
+          if (tokens.access_token && currentRefreshToken) {
+            await persistTokens(
+              userId,
+              tokens.access_token,
+              currentRefreshToken,
+              currentScope,
+              currentExpiryDate,
+              currentTokenType
+            );
+            console.log('Access token refreshed and persisted for user');
+          }
+        } catch (error) {
+          console.error('Error handling token refresh event:', error);
+          // Don't throw - we want token refresh to continue even if persistence fails
+        }
+      });
+    } else {
+      // Log warning if userId is not provided
+      console.warn('setCredentials called without userId - tokens will not be persisted');
+    }
     
     this.gmail = google.gmail({ version: 'v1', auth });
   }

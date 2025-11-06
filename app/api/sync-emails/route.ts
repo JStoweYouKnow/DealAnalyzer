@@ -11,6 +11,16 @@ export const runtime = 'nodejs'; // Use Node.js runtime
 
 export async function POST() {
   try {
+    // Get user ID from authentication (try Clerk first, then fallback)
+    let userId: string | null = null;
+    try {
+      const { auth } = await import("@clerk/nextjs/server");
+      const authResult = await auth();
+      userId = authResult?.userId || null;
+    } catch (error) {
+      // Clerk not available or not configured
+    }
+
     // Check if user has Gmail tokens
     const cookieStore = await cookies();
     const gmailTokensCookie = cookieStore.get('gmailTokens');
@@ -24,37 +34,15 @@ export async function POST() {
 
     const gmailTokens = JSON.parse(gmailTokensCookie.value);
 
-    // Set credentials for email service
+    // Set credentials for email service with userId and token metadata
     // The OAuth2 client will automatically refresh tokens if needed
-    const auth = new google.auth.OAuth2(
-      process.env.GMAIL_CLIENT_ID,
-      process.env.GMAIL_CLIENT_SECRET,
-      process.env.GMAIL_REDIRECT_URI
-    );
-    
-    auth.setCredentials({
-      access_token: gmailTokens.access_token,
-      refresh_token: gmailTokens.refresh_token
-    });
-
-    // Handle token refresh events
-    auth.on('tokens', (tokens) => {
-      if (tokens.access_token) {
-        // Update cookies with new access token if refreshed
-        gmailTokens.access_token = tokens.access_token;
-        cookieStore.set('gmailTokens', JSON.stringify(gmailTokens), {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 24 * 60 * 60 // 24 hours
-        });
-        console.log('Access token refreshed and saved to cookies');
-      }
-    });
-
     await emailMonitoringService.setCredentials(
       gmailTokens.access_token,
-      gmailTokens.refresh_token
+      gmailTokens.refresh_token,
+      userId || undefined,
+      gmailTokens.scope,
+      gmailTokens.expiry_date,
+      gmailTokens.token_type
     );
 
     // Search for real estate emails (limit to 10 to avoid timeouts on serverless)
