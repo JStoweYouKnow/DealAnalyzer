@@ -535,10 +535,10 @@ export class EmailMonitoringService {
       'century21.com', 'sothebysrealty.com', 'rocketmortgage.com', 'quickenloans.com'
     ];
 
-    // Exclude meetup, event, and zoom-related emails
+    // Exclude meetup, event, and zoom-related emails (be specific to avoid false positives)
     const meetupExclusions = [
-      'meetup', 'meet up', 'networking', 'event', 'webinar', 'workshop',
-      'seminar', 'conference', 'gathering', 'rsvp', 'attending', 'join us',
+      'meetup', 'meet up', 'networking event', 'webinar', 'workshop',
+      'seminar', 'conference', 'gathering', 'rsvp', 'attending', 'join us for',
       'real estate meetup', 'investor meetup', 'rei meetup', 'investment club',
       'zoom.us', 'zoom meeting', 'zoom link', 'join zoom', 'zoom call',
       'microsoft teams', 'teams meeting', 'google meet', 'meet.google.com'
@@ -572,23 +572,12 @@ export class EmailMonitoringService {
     const isDomainTrusted = trustedDomains.some(domain => senderLower.includes(domain));
     console.log(`Trusted domain check: ${isDomainTrusted}`);
 
-    // If from trusted domain, check for real estate content
+    // Accept ALL emails from trusted real estate domains
+    // The Gmail search query already filters for these specific domains,
+    // and we've already excluded meetup/event content, so we can trust the rest
     if (isDomainTrusted) {
-      const realEstateKeywords = [
-        'listing', 'property', 'for sale', 'new listing', 'price', 'bedroom',
-        'bathroom', 'sqft', 'square feet', 'home', 'house', 'condo', 'townhome'
-      ];
-
-      const hasRealEstateContent = realEstateKeywords.some(keyword => combined.includes(keyword));
-      if (hasRealEstateContent) {
-        const matchedKeyword = realEstateKeywords.find(keyword => combined.includes(keyword));
-        console.log(`✅ Accepted: Trusted domain with real estate keyword "${matchedKeyword}"`);
-        return true;
-      } else {
-        console.log(`❌ Rejected: Trusted domain but missing real estate keywords`);
-        console.log(`Content preview: ${combined.substring(0, 200)}...`);
-        return false;
-      }
+      console.log(`✅ Accepted: Email from trusted real estate domain`);
+      return true;
     }
 
     console.log(`❌ Rejected: Not from trusted domain`);
