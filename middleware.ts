@@ -19,7 +19,7 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   // Protect all other routes
   const { userId } = await auth();
   
-  if (!userId && !isPublicRoute(request)) {
+  if (!userId) {
     // Redirect to sign-in for protected routes
     const signInUrl = new URL('/sign-in', request.url);
     signInUrl.searchParams.set('redirect_url', request.url);

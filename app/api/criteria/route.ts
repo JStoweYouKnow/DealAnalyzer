@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadInvestmentCriteria, DEFAULT_CRITERIA } from "../../../server/services/criteria-service";
 import { updateCriteriaRequestSchema } from "../../../shared/schema";
 import type { CriteriaResponse } from "../../../shared/schema";
+import { criteriaCache } from "../../lib/cache-service";
 
 export async function GET() {
   try {
@@ -64,6 +65,9 @@ export async function PUT(request: Request) {
       cocMinimum: updatedCriteria.coc_minimum_min,
       capMinimum: updatedCriteria.cap_minimum,
     });
+    
+    // Invalidate cache so subsequent reads fetch fresh data
+    criteriaCache.del('investment-criteria');
     
     return NextResponse.json({
       success: true,

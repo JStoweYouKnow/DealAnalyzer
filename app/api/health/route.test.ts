@@ -19,7 +19,8 @@ describe('GET /api/health', () => {
 
     // Check if timestamp is valid ISO string
     const timestamp = new Date(data.timestamp);
-    expect(timestamp.getTime()).not.toBeNaN();
+    const ms = timestamp.getTime();
+    expect(Number.isFinite(ms)).toBe(true);
   });
 });
 

@@ -83,7 +83,7 @@ export class ImportExportService {
   private async parseExcelFile(filePath: string): Promise<any[]> {
     const ExcelJSModule = await getExcelJS();
     const ExcelJS = ExcelJSModule.default || ExcelJSModule;
-    const Workbook = ExcelJS?.Workbook || ExcelJS;
+    const Workbook = ExcelJS.Workbook;
     const workbook = new Workbook();
     await workbook.xlsx.readFile(filePath);
     const worksheet = workbook.worksheets[0];
@@ -215,9 +215,7 @@ export class ImportExportService {
     const analyses = await this.getAnalysesForExport(request.propertyIds);
     
     const ExcelJSModule = await getExcelJS();
-    const ExcelJS = ExcelJSModule.default || ExcelJSModule;
-    const Workbook = ExcelJS.Workbook || ExcelJS;
-    const workbook = new Workbook();
+    const workbook = new ExcelJSModule.Workbook();
     
     if (request.templateType === 'biggerpockets') {
       await this.addBiggerPocketsSheet(workbook, analyses);

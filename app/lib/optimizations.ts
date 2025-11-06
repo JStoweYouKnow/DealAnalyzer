@@ -42,10 +42,29 @@ export function clearMemoizationCache(): void {
 }
 
 /**
+ * Type for parsed property data from email content
+ */
+export interface ParsedProperty {
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  propertyType: string;
+  purchasePrice: number;
+  monthlyRent: number;
+  bedrooms: number;
+  bathrooms: number;
+  squareFootage: number;
+  yearBuilt: number;
+  description: string;
+  listingUrl: string;
+}
+
+/**
  * Optimized string parsing - extract multiple values in one pass
  */
-export function parseEmailContentOptimized(emailContent: string): any {
-  const property: any = {
+export function parseEmailContentOptimized(emailContent: string): ParsedProperty {
+  const property: ParsedProperty = {
     address: "",
     city: "Unknown",
     state: "Unknown",

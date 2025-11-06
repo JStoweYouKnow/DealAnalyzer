@@ -1,4 +1,9 @@
 import { withSentryConfig } from "@sentry/nextjs";
+import bundleAnalyzer from "@next/bundle-analyzer";
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -61,40 +66,9 @@ const nextConfig = {
       },
     ];
   },
-  webpack: (config, { isServer, dev }) => {
-    // Optimize production builds
-    if (!dev) {
-      config.optimization = {
-        ...config.optimization,
-        moduleIds: 'deterministic',
-        runtimeChunk: 'single',
-        splitChunks: {
-          chunks: 'all',
-          cacheGroups: {
-            default: false,
-            vendors: false,
-            // Vendor chunk for better caching
-            vendor: {
-              name: 'vendor',
-              chunks: 'all',
-              test: /node_modules/,
-              priority: 20,
-            },
-            // Common chunk for shared code
-            common: {
-              name: 'common',
-              minChunks: 2,
-              chunks: 'all',
-              priority: 10,
-              reuseExistingChunk: true,
-              enforce: true,
-            },
-          },
-        },
-      };
-    }
-
+  webpack: (config, { isServer }) => {
     // Fix for Leaflet in serverless environments
+    // Only apply to client builds (not server-side)
     if (!isServer) {
       // Handle Leaflet's Node.js dependencies for client-side builds
       // These modules are not available in browser/serverless environments
@@ -111,12 +85,15 @@ const nextConfig = {
   // Webpack will automatically use them
 };
 
+// Wrap with bundle analyzer if ANALYZE env var is set
+let configWithAnalyzer = withBundleAnalyzer(nextConfig);
+
 // Wrap with Sentry config if DSN is provided
 export default process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN
-  ? withSentryConfig(nextConfig, {
+  ? withSentryConfig(configWithAnalyzer, {
       silent: true,
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
     })
-  : nextConfig;
+  : configWithAnalyzer;
 

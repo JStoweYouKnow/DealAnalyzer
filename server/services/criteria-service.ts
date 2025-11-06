@@ -32,14 +32,19 @@ import { criteriaCache, getCachedOrFetch } from '../../app/lib/cache-service';
 export async function loadInvestmentCriteria(): Promise<CriteriaResponse> {
   // Always use default criteria - Python backend is no longer used
   // Criteria can be updated via the API PUT endpoint if needed in the future
-  return getCachedOrFetch(
-    criteriaCache,
-    'investment-criteria',
-    async () => {
-      console.log("Loading investment criteria - using default values");
-      return DEFAULT_CRITERIA;
-    }
-  );
+  try {
+    return await getCachedOrFetch(
+      criteriaCache,
+      'investment-criteria',
+      async () => {
+        console.log("Loading investment criteria - using default values");
+        return DEFAULT_CRITERIA;
+      }
+    );
+  } catch (error) {
+    console.error("Error loading investment criteria from cache:", error);
+    return DEFAULT_CRITERIA;
+  }
 }
 
 // Note: This function is no longer used - criteria updates are handled directly in the API route

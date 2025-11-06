@@ -2,33 +2,85 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Initialize Redis client (uses UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN from env)
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-});
+// Lazy Redis client initialization to avoid connection attempts at module load
+let redis: Redis | null = null;
 
-// Create rate limiters with different limits for different endpoint types
-export const generalRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(100, '1 m'), // 100 requests per minute
-  analytics: true,
-  prefix: '@upstash/ratelimit/general',
-});
+/**
+ * Get Redis client instance, initializing it only when both env vars are present.
+ * Returns null if Redis credentials are missing (no connection attempt is made).
+ */
+function getRedis(): Redis | null {
+  if (redis !== null) {
+    return redis;
+  }
 
-export const expensiveRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(10, '1 m'), // 10 requests per minute for expensive operations
-  analytics: true,
-  prefix: '@upstash/ratelimit/expensive',
-});
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-export const strictRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, '1 m'), // 5 requests per minute for very expensive operations
-  analytics: true,
-  prefix: '@upstash/ratelimit/strict',
-});
+  if (!url || !token) {
+    return null;
+  }
+
+  redis = new Redis({
+    url,
+    token,
+  });
+
+  return redis;
+}
+
+// Lazy rate limiters - only created when Redis is available
+function getGeneralRateLimit(): Ratelimit | null {
+  const redisClient = getRedis();
+  if (!redisClient) {
+    return null;
+  }
+  return new Ratelimit({
+    redis: redisClient,
+    limiter: Ratelimit.slidingWindow(100, '1 m'), // 100 requests per minute
+    analytics: true,
+    prefix: '@upstash/ratelimit/general',
+  });
+}
+
+function getExpensiveRateLimit(): Ratelimit | null {
+  const redisClient = getRedis();
+  if (!redisClient) {
+    return null;
+  }
+  return new Ratelimit({
+    redis: redisClient,
+    limiter: Ratelimit.slidingWindow(10, '1 m'), // 10 requests per minute for expensive operations
+    analytics: true,
+    prefix: '@upstash/ratelimit/expensive',
+  });
+}
+
+function getStrictRateLimit(): Ratelimit | null {
+  const redisClient = getRedis();
+  if (!redisClient) {
+    return null;
+  }
+  return new Ratelimit({
+    redis: redisClient,
+    limiter: Ratelimit.slidingWindow(5, '1 m'), // 5 requests per minute for very expensive operations
+    analytics: true,
+    prefix: '@upstash/ratelimit/strict',
+  });
+}
+
+// Export getter functions for backward compatibility
+export function generalRateLimit(): Ratelimit | null {
+  return getGeneralRateLimit();
+}
+
+export function expensiveRateLimit(): Ratelimit | null {
+  return getExpensiveRateLimit();
+}
+
+export function strictRateLimit(): Ratelimit | null {
+  return getStrictRateLimit();
+}
 
 // Get client identifier (IP address or user ID)
 function getIdentifier(request: NextRequest): string {
@@ -42,12 +94,17 @@ function getIdentifier(request: NextRequest): string {
 // Rate limit middleware wrapper
 export async function withRateLimit(
   request: NextRequest,
-  limiter: Ratelimit = generalRateLimit,
+  limiterGetter: (() => Ratelimit | null) | Ratelimit = generalRateLimit,
   handler: (request: NextRequest) => Promise<NextResponse>
 ): Promise<NextResponse> {
-  // Skip rate limiting if Redis is not configured (development)
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    console.warn('Rate limiting disabled: UPSTASH_REDIS credentials not configured');
+  // Get the limiter (support both function and direct instance for backward compatibility)
+  const limiter = typeof limiterGetter === 'function' 
+    ? limiterGetter() 
+    : limiterGetter;
+
+  // Skip rate limiting if Redis is not available (fallback to no-op limiter)
+  if (!limiter) {
+    console.warn('Rate limiting disabled: Redis not available');
     return handler(request);
   }
 
@@ -81,4 +138,7 @@ export async function withRateLimit(
 
   return response;
 }
+
+// Export getRedis for external use if needed
+export { getRedis };
 

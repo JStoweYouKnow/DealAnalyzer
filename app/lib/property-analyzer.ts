@@ -274,7 +274,19 @@ export function analyzeProperty(
   const cocMeetsMinimum = cocReturn >= analysisCriteria.coc_minimum_min;
 
   // Cap Rate
-  const netOperatingIncome = monthlyRent * 12;
+  // Calculate annual operating expenses (excluding mortgage/debt service)
+  const annualOperatingExpenses = (
+    estimatedPropertyTax * 12 +
+    estimatedInsurance * 12 +
+    estimatedVacancy * 12 +
+    actualMaintenanceReserve * 12 +
+    estimatedPropertyManagement * 12 +
+    providedUtilities * 12 +
+    providedCleaning * 12 +
+    providedSupplies * 12 +
+    providedOther * 12
+  );
+  const netOperatingIncome = (monthlyRent * 12) - annualOperatingExpenses;
   const capRate = purchasePrice > 0 ? netOperatingIncome / purchasePrice : 0;
   const capMeetsBenchmark = capRate >= analysisCriteria.cap_benchmark_min;
   const capMeetsMinimum = capRate >= analysisCriteria.cap_minimum;

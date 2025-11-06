@@ -32,7 +32,35 @@ describe('analyzeProperty', () => {
     
     expect(result.capRate).toBeDefined();
     if (result.property?.purchasePrice && result.property?.monthlyRent) {
-      const expectedCapRate = (result.property.monthlyRent * 12) / result.property.purchasePrice;
+      // Calculate annual operating expenses (excluding mortgage/debt service)
+      // Using default estimates from the implementation
+      const purchasePrice = result.property.purchasePrice;
+      const monthlyRent = result.property.monthlyRent;
+      const estimatedPropertyTax = purchasePrice * 0.012 / 12; // 1.2% annually default
+      const estimatedInsurance = 100.0; // Default $100/month
+      const estimatedVacancy = monthlyRent * 0.05; // 5% of gross rents
+      const estimatedPropertyManagement = monthlyRent * 0.10; // 10% of gross rents default
+      const estimatedMaintenanceReserve = monthlyRent * 0.05; // 5% maintenance reserve percentage
+      const providedUtilities = 0;
+      const providedCleaning = 0;
+      const providedSupplies = 0;
+      const providedOther = 0;
+      
+      const annualOperatingExpenses = (
+        estimatedPropertyTax * 12 +
+        estimatedInsurance * 12 +
+        estimatedVacancy * 12 +
+        estimatedMaintenanceReserve * 12 +
+        estimatedPropertyManagement * 12 +
+        providedUtilities * 12 +
+        providedCleaning * 12 +
+        providedSupplies * 12 +
+        providedOther * 12
+      );
+      
+      const netOperatingIncome = (monthlyRent * 12) - annualOperatingExpenses;
+      const expectedCapRate = purchasePrice > 0 ? netOperatingIncome / purchasePrice : 0;
+      
       expect(Math.abs(result.capRate - expectedCapRate)).toBeLessThan(0.01);
     }
   });

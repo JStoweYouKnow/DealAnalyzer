@@ -24,11 +24,9 @@ export async function parallelMap<T, R>(
   mapper: (item: T, index: number) => Promise<R>,
   options?: { concurrency?: number }
 ): Promise<R[]> {
-  const limit = options?.concurrency 
-    ? pLimit(options.concurrency)
-    : analysisLimit;
+  const concurrency = options?.concurrency ?? 10;
     
-  return pMap(items, mapper, { concurrency: 5 });
+  return pMap(items, mapper, { concurrency });
 }
 
 /**
