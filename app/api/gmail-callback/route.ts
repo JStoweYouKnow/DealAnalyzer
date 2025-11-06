@@ -37,6 +37,14 @@ export async function GET(request: NextRequest) {
     });
 
     console.log('[Gmail Callback] Cookie set successfully');
+
+    // Verify cookie was set
+    const verifyGmailTokensCookie = cookieStore.get('gmailTokens');
+    console.log('[Gmail Callback] Cookie verification:', {
+      cookieSet: !!verifyGmailTokensCookie,
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+    });
     
   // Return a success page that closes the popup
   // The main window is already polling for connection status, so we just close this popup
@@ -84,6 +92,16 @@ export async function GET(request: NextRequest) {
           <p>This window will close automatically...</p>
         </div>
         <script>
+          // Notify parent window that auth is complete
+          if (window.opener && !window.opener.closed) {
+            try {
+              window.opener.postMessage({ type: 'GMAIL_AUTH_SUCCESS' }, window.location.origin);
+              console.log('Notified parent window of successful auth');
+            } catch (error) {
+              console.error('Error notifying parent:', error);
+            }
+          }
+
           // Close this popup window after a short delay
           setTimeout(() => {
             window.close();

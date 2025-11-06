@@ -4,10 +4,19 @@ import { cookies } from "next/headers";
 export async function GET() {
   try {
     const cookieStore = await cookies();
+
+    // Debug: Log all cookies
+    const allCookies = cookieStore.getAll();
+    console.log('[Gmail Status Check] All cookies:', allCookies.map(c => c.name));
+
     const gmailTokensCookie = cookieStore.get('gmailTokens');
     const isConnected = !!gmailTokensCookie;
 
-    console.log(`[Gmail Status Check] Connected: ${isConnected}`);
+    console.log('[Gmail Status Check]', {
+      hasCookie: isConnected,
+      cookieExists: !!gmailTokensCookie,
+      cookieValue: gmailTokensCookie ? 'PRESENT' : 'MISSING'
+    });
 
     return NextResponse.json({
       success: true,

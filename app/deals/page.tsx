@@ -32,6 +32,43 @@ export default function DealsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Listen for auth success message from popup
+  useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
+      if (event.data?.type === 'GMAIL_AUTH_SUCCESS') {
+        console.log('🎉 Received auth success message from popup!');
+
+        // Wait a brief moment for cookie to propagate
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Force status check
+        queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
+        const status = await refetchGmailStatus();
+
+        console.log('Auth success - status check result:', status.data);
+
+        if (status.data?.connected) {
+          console.log('✅ Gmail connected! Starting auto-sync...');
+          toast({
+            title: "Gmail Connected",
+            description: "Automatically syncing your emails...",
+          });
+          syncEmailsMutation.mutate();
+        } else {
+          console.log('⚠️ Auth success message received but status still shows disconnected');
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch email deals
   // Override staleTime to allow refetching after sync
   const { data: emailDeals = [], isLoading, refetch } = useQuery<EmailDeal[]>({
