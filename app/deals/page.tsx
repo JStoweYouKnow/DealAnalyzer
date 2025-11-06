@@ -45,6 +45,16 @@ export default function DealsPage() {
     staleTime: 0, // Allow refetching immediately (overrides global staleTime: Infinity)
   });
 
+  // Check Gmail connection status
+  const { data: gmailStatus, refetch: refetchGmailStatus } = useQuery({
+    queryKey: ['/api/gmail-status'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/gmail-status');
+      return response.json();
+    },
+    refetchOnWindowFocus: true, // Refetch when user returns to tab (after OAuth)
+  });
+
   // Connect Gmail mutation
   const connectGmailMutation = useMutation({
     mutationFn: async () => {
@@ -65,8 +75,24 @@ export default function DealsPage() {
     onSuccess: () => {
       toast({
         title: "Gmail Connection Initiated",
-        description: "Complete the authentication in the new window.",
+        description: "Complete the authentication in the new window, then return here.",
       });
+      // Poll for connection status after user returns
+      const pollInterval = setInterval(async () => {
+        const status = await refetchGmailStatus();
+        if (status.data?.connected) {
+          clearInterval(pollInterval);
+          toast({
+            title: "Gmail Connected",
+            description: "Automatically syncing your emails...",
+          });
+          // Automatically trigger sync after successful connection
+          syncEmailsMutation.mutate();
+        }
+      }, 2000);
+
+      // Stop polling after 5 minutes
+      setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
     },
     onError: (error: Error) => {
       console.error("Gmail connection error:", error);
@@ -88,21 +114,21 @@ export default function DealsPage() {
       console.log('Sync response:', data);
       if (data.success) {
         // Invalidate the query to mark it as stale
-        queryClient.invalidateQueries({ 
+        queryClient.invalidateQueries({
           queryKey: ['/api/email-deals']
         });
-        
+
         // Force immediate refetch using the refetch function from useQuery
         // This is more reliable than refetchQueries when staleTime is overridden
         const refetchResult = await refetch();
         console.log('Refetch after sync:', refetchResult);
-        
+
         // Also use refetchQueries as backup
-        await queryClient.refetchQueries({ 
+        await queryClient.refetchQueries({
           queryKey: ['/api/email-deals'],
           type: 'active'
         });
-        
+
         toast({
           title: "Emails Synced",
           description: `Found ${data.data?.length || 0} new real estate emails. Refreshing dashboard...`,
@@ -115,13 +141,25 @@ export default function DealsPage() {
         });
       }
     },
-    onError: (error: Error) => {
+    onError: async (error: Error) => {
       console.error('Sync error:', error);
-      toast({
-        title: "Sync Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+
+      // Check if error is 401 (not connected)
+      if (error.message.includes('401') || error.message.includes('not connected')) {
+        // Refresh Gmail status
+        await refetchGmailStatus();
+        toast({
+          title: "Gmail Not Connected",
+          description: "Please connect your Gmail account to sync emails.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     }
   });
 
@@ -560,26 +598,31 @@ export default function DealsPage() {
             
             <div className="flex items-center space-x-4">
               <Button
-                onClick={() => connectGmailMutation.mutate()}
-                variant="outline"
-                size="sm"
-              >
-                <i className="fas fa-envelope mr-2"></i>
-                Connect Gmail
-              </Button>
-              <Button
                 onClick={() => {
-                  if (!syncEmailsMutation.isPending) {
+                  // If not connected, connect first. Otherwise, sync.
+                  if (!gmailStatus?.connected) {
+                    connectGmailMutation.mutate();
+                  } else if (!syncEmailsMutation.isPending) {
                     syncEmailsMutation.mutate();
                   }
                 }}
-                disabled={syncEmailsMutation.isPending}
+                disabled={syncEmailsMutation.isPending || connectGmailMutation.isPending}
                 size="sm"
               >
                 {syncEmailsMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Syncing...
+                  </>
+                ) : connectGmailMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Connecting...
+                  </>
+                ) : !gmailStatus?.connected ? (
+                  <>
+                    <i className="fas fa-envelope mr-2"></i>
+                    Connect & Sync Gmail
                   </>
                 ) : (
                   <>
@@ -649,12 +692,16 @@ export default function DealsPage() {
                 <i className="fas fa-inbox text-4xl text-muted-foreground mb-4"></i>
                 <h3 className="text-lg font-semibold mb-2">No Deals Found</h3>
                 <p className="text-muted-foreground mb-4">
-                  Connect your Gmail account and sync emails to start finding real estate deals
+                  {!gmailStatus?.connected
+                    ? "Connect your Gmail account to start finding real estate deals"
+                    : "Click the button above to sync your emails and find real estate deals"}
                 </p>
-                <Button onClick={() => connectGmailMutation.mutate()}>
-                  <i className="fas fa-envelope mr-2"></i>
-                  Connect Gmail
-                </Button>
+                {!gmailStatus?.connected && (
+                  <Button onClick={() => connectGmailMutation.mutate()}>
+                    <i className="fas fa-envelope mr-2"></i>
+                    Connect Gmail
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
