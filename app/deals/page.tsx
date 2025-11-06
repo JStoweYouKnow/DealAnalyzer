@@ -50,8 +50,11 @@ export default function DealsPage() {
     queryKey: ['/api/gmail-status'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/gmail-status');
-      return response.json();
+      const data = await response.json();
+      console.log('Gmail status check:', data);
+      return data;
     },
+    staleTime: 0, // Always allow refetching
     refetchOnWindowFocus: true, // Refetch when user returns to tab (after OAuth)
   });
 
@@ -61,12 +64,25 @@ export default function DealsPage() {
       const response = await apiRequest('GET', '/api/gmail-auth-url');
       const data = await response.json();
       if (data.success && data.authUrl) {
-        // Open in new tab to avoid iframe restrictions
-        window.open(data.authUrl, '_blank');
+        // Open in popup to avoid iframe restrictions
+        const popup = window.open(data.authUrl, 'gmail-auth', 'width=600,height=700');
         toast({
           title: "Connecting to Gmail",
           description: "Redirecting to Google authentication...",
         });
+
+        // Check when popup closes
+        if (popup) {
+          const popupCheckInterval = setInterval(() => {
+            if (popup.closed) {
+              clearInterval(popupCheckInterval);
+              console.log('OAuth popup closed, checking connection status...');
+              // Force immediate status check
+              queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
+              refetchGmailStatus();
+            }
+          }, 500);
+        }
       } else {
         throw new Error(data.error || "Failed to get Gmail auth URL");
       }
@@ -77,22 +93,42 @@ export default function DealsPage() {
         title: "Gmail Connection Initiated",
         description: "Complete the authentication in the new window, then return here.",
       });
+
       // Poll for connection status after user returns
+      let pollCount = 0;
+      const maxPolls = 150; // 5 minutes at 2-second intervals
+
       const pollInterval = setInterval(async () => {
-        const status = await refetchGmailStatus();
-        if (status.data?.connected) {
+        pollCount++;
+        console.log(`Polling for Gmail connection... attempt ${pollCount}/${maxPolls}`);
+
+        try {
+          // Force a fresh query by invalidating first
+          queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
+          const status = await refetchGmailStatus();
+
+          console.log('Poll result:', status.data);
+
+          if (status.data?.connected) {
+            console.log('Gmail connected! Starting auto-sync...');
+            clearInterval(pollInterval);
+            toast({
+              title: "Gmail Connected",
+              description: "Automatically syncing your emails...",
+            });
+            // Automatically trigger sync after successful connection
+            syncEmailsMutation.mutate();
+          }
+        } catch (error) {
+          console.error('Error polling Gmail status:', error);
+        }
+
+        // Stop polling after max attempts
+        if (pollCount >= maxPolls) {
+          console.log('Stopped polling - max attempts reached');
           clearInterval(pollInterval);
-          toast({
-            title: "Gmail Connected",
-            description: "Automatically syncing your emails...",
-          });
-          // Automatically trigger sync after successful connection
-          syncEmailsMutation.mutate();
         }
       }, 2000);
-
-      // Stop polling after 5 minutes
-      setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
     },
     onError: (error: Error) => {
       console.error("Gmail connection error:", error);

@@ -15,21 +15,28 @@ export async function GET(request: NextRequest) {
     }
 
     const tokens = await emailMonitoringService.getTokens(code);
-    
+
+    console.log('[Gmail Callback] Received tokens, setting cookie...');
+
     // Store tokens in cookie
     const cookieStore = await cookies();
-    cookieStore.set('gmailTokens', JSON.stringify({
+    const tokenData = {
       access_token: tokens.access_token || '',
       refresh_token: tokens.refresh_token || '',
       scope: tokens.scope || '',
       token_type: tokens.token_type || 'Bearer',
       expiry_date: tokens.expiry_date || undefined
-    }), {
+    };
+
+    cookieStore.set('gmailTokens', JSON.stringify(tokenData), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 24 * 60 * 60 // 24 hours
+      maxAge: 24 * 60 * 60, // 24 hours
+      path: '/', // Ensure cookie is available across the entire domain
     });
+
+    console.log('[Gmail Callback] Cookie set successfully');
     
   // Return a success page that closes the popup
   // The main window is already polling for connection status, so we just close this popup

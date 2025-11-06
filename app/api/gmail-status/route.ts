@@ -5,10 +5,13 @@ export async function GET() {
   try {
     const cookieStore = await cookies();
     const gmailTokensCookie = cookieStore.get('gmailTokens');
+    const isConnected = !!gmailTokensCookie;
+
+    console.log(`[Gmail Status Check] Connected: ${isConnected}`);
 
     return NextResponse.json({
       success: true,
-      connected: !!gmailTokensCookie
+      connected: isConnected
     });
   } catch (error) {
     console.error("Error checking Gmail status:", error);
