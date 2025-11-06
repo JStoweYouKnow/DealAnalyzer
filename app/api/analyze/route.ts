@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { analyzePropertyRequestSchema, FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
 import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
 import { storage } from "../../../server/storage";
-import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
+import { getAiService } from "../../lib/lazy-load";
 import { getMortgageRate } from "../../../server/mortgage-rate-service";
 import { loadInvestmentCriteria, DEFAULT_CRITERIA } from "../../../server/services/criteria-service";
+import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
+import { runInParallel, apiLimit, heavyLimit } from "../../lib/parallel-utils";
 
 export async function POST(request: NextRequest) {
+  return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
-    const body = await request.json();
+    const body = await req.json();
     const validation = analyzePropertyRequestSchema.safeParse(body);
     
     if (!validation.success) {
@@ -33,10 +36,17 @@ export async function POST(request: NextRequest) {
       propertyFundingSource = 'conventional';
     }
     
-    // Use mortgage calculator values if provided, otherwise fetch mortgage rate
+    const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
+    const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS] || 0.20;
+    const downpayment = purchasePrice * downpaymentPercentage;
+    const loanAmount = purchasePrice - downpayment;
+    
+    // Use mortgage calculator values if provided, otherwise fetch mortgage rate and criteria in parallel
     // Note: mortgageRate should be passed directly as a decimal if provided
     // MortgageValues no longer includes interestRate - use monthlyPayment directly
     let mortgageRate: number | undefined;
+    let criteria;
+    
     if (mortgageValues) {
       console.log('Using mortgage calculator values:', {
         loanAmount: mortgageValues.loanAmount,
@@ -45,51 +55,33 @@ export async function POST(request: NextRequest) {
       });
       // mortgageRate will be undefined when mortgageValues is provided,
       // and analyzeProperty will use mortgageValues.monthlyPayment directly
-    } else {
-      // Fetch current mortgage rate (fallback to 7% on error)
-      const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || 0;
-      const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS] || 0.20;
-      const downpayment = purchasePrice * downpaymentPercentage;
-      const loanAmount = purchasePrice - downpayment;
       
-      // Fetch mortgage rate with error handling
-      try {
-        const zipCode = propertyData.zip_code || propertyData.zipCode;
-        if (zipCode) {
-          mortgageRate = await getMortgageRate({
-            loan_term: 30,
-            loan_amount: loanAmount,
-            zip_code: zipCode,
-          });
-        } else {
-          console.warn('No zip code found in property data, using default mortgage rate of 7%');
-          mortgageRate = 0.07;
-        }
-      } catch (error) {
-        console.error('Error fetching mortgage rate, falling back to 7%:', error);
-        mortgageRate = 0.07;
-      }
-    }
-
-    // Fetch current investment criteria with error handling
-    let criteria;
-    try {
-      criteria = await loadInvestmentCriteria();
-      console.log('Using criteria for analysis:', {
-        maxPurchasePrice: criteria.max_purchase_price,
-        cocMinimum: criteria.coc_minimum_min,
-        capMinimum: criteria.cap_minimum,
+      // Only fetch criteria in parallel
+      criteria = await apiLimit(() => loadInvestmentCriteria().catch(() => DEFAULT_CRITERIA));
+    } else {
+      // Fetch mortgage rate and criteria in parallel (they're independent)
+      const zipCode = propertyData.zip_code || propertyData.zipCode;
+      
+      const { mortgageRate: fetchedRate, criteria: fetchedCriteria } = await runInParallel({
+        mortgageRate: zipCode && loanAmount > 0
+          ? apiLimit(() => getMortgageRate({
+              loan_term: 30,
+              loan_amount: loanAmount,
+              zip_code: zipCode,
+            }).catch(() => 0.07)) // Fallback to 7% on error
+          : Promise.resolve(0.07),
+        criteria: apiLimit(() => loadInvestmentCriteria().catch(() => DEFAULT_CRITERIA)),
       });
-    } catch (error) {
-      console.error('Error loading investment criteria, falling back to default criteria:', error);
-      // Use default criteria as fallback
-      criteria = DEFAULT_CRITERIA;
-      console.log('Using default criteria for analysis:', {
-        maxPurchasePrice: criteria.max_purchase_price,
-        cocMinimum: criteria.coc_minimum_min,
-        capMinimum: criteria.cap_minimum,
-      });
+      
+      mortgageRate = fetchedRate;
+      criteria = fetchedCriteria;
     }
+    
+    console.log('Using criteria for analysis:', {
+      maxPurchasePrice: criteria.max_purchase_price,
+      cocMinimum: criteria.coc_minimum_min,
+      capMinimum: criteria.cap_minimum,
+    });
 
     // Run TypeScript analysis with optional mortgage values and criteria
     const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, propertyFundingSource, mortgageRate, mortgageValues, criteria);
@@ -102,11 +94,14 @@ export async function POST(request: NextRequest) {
       totalMonthlyExpenses: analysisData.totalMonthlyExpenses,
     });
     
-    // Run AI analysis if available
+    // Run AI analysis if available (lazy loaded for better initial performance)
     let analysisWithAI = analysisData;
     try {
       if (process.env.OPENAI_API_KEY) {
-        const aiAnalysis = await coreAiService.analyzeProperty(analysisData.property as any);
+        // Lazy load AI service only when needed
+        const { aiAnalysisService: coreAiService } = await getAiService();
+        // Use heavyLimit for AI operations (they're expensive)
+        const aiAnalysis = await heavyLimit(() => coreAiService.analyzeProperty(analysisData.property as any));
         analysisWithAI = {
           ...analysisData,
           aiAnalysis
@@ -130,4 +125,5 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  });
 }

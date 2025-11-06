@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../server/storage";
 import { generateReportBuffer } from "../../../server/report-generator";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
+import { withRateLimit, strictRateLimit } from "../../lib/rate-limit";
 
 /**
  * Normalizes an object's keys from snake_case to camelCase.
@@ -28,8 +29,9 @@ function normalizeKeysToCamelCase(obj: any): any {
 }
 
 export async function POST(request: NextRequest) {
+  return withRateLimit(request, strictRateLimit, async (req) => {
   try {
-    const body = await request.json();
+    const body = await req.json();
     const { analysisIds, dealIds, format, title, includeComparison } = body;
     
     if ((!analysisIds || !Array.isArray(analysisIds) || analysisIds.length === 0) &&
@@ -265,5 +267,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  });
 }
 

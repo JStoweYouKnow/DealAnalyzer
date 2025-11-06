@@ -6,7 +6,7 @@ import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 import { getMortgageRate } from "../../../server/mortgage-rate-service";
 import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
 import { FUNDING_SOURCE_DOWN_PAYMENTS, mortgageValuesSchema } from "../../../shared/schema";
-import { extractTextFromPDF } from "../../lib/pdf-extractor";
+import { getPdfExtractor } from "../../lib/lazy-load";
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +52,8 @@ export async function POST(request: NextRequest) {
     try {
       if (fileExtension === '.pdf') {
         console.log(`Extracting text from PDF file: ${originalName}, size: ${file.size} bytes`);
+        // Lazy load PDF extractor only when needed
+        const { extractTextFromPDF } = await getPdfExtractor();
         fileContent = await extractTextFromPDF(file);
         
         if (!fileContent || fileContent.trim().length === 0) {

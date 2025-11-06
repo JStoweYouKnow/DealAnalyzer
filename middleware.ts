@@ -1,14 +1,33 @@
-// Authentication disabled - to re-enable, uncomment the lines below
-// import { clerkMiddleware } from "@clerk/nextjs/server";
-// export default clerkMiddleware();
-
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// No-op middleware - allows all requests through without authentication
-export function middleware(request: NextRequest) {
+// Define public routes that don't require authentication
+const isPublicRoute = createRouteMatcher([
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/api/health',
+  '/api/gmail-callback', // OAuth callback must be public
+]);
+
+export default clerkMiddleware(async (auth, request: NextRequest) => {
+  // Allow public routes through without authentication
+  if (isPublicRoute(request)) {
+    return NextResponse.next();
+  }
+
+  // Protect all other routes
+  const { userId } = await auth();
+  
+  if (!userId && !isPublicRoute(request)) {
+    // Redirect to sign-in for protected routes
+    const signInUrl = new URL('/sign-in', request.url);
+    signInUrl.searchParams.set('redirect_url', request.url);
+    return NextResponse.redirect(signInUrl);
+  }
+
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [

@@ -1,4 +1,12 @@
-import * as XLSX from 'xlsx';
+// Lazy load ExcelJS - only import when needed
+let ExcelJSModule: any = null;
+
+async function getExcelJS() {
+  if (!ExcelJSModule) {
+    ExcelJSModule = await import('exceljs');
+  }
+  return ExcelJSModule;
+}
 import { parse } from 'csv-parse';
 import fs from 'fs';
 import path from 'path';
@@ -22,7 +30,7 @@ export class ImportExportService {
     
     try {
       if (fileType === 'xlsx') {
-        data = this.parseExcelFile(filePath);
+        data = await this.parseExcelFile(filePath);
       } else {
         data = await this.parseCsvFile(filePath);
       }
@@ -72,11 +80,37 @@ export class ImportExportService {
   }
   
   // Parse Excel file
-  private parseExcelFile(filePath: string): any[] {
-    const workbook = XLSX.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    return XLSX.utils.sheet_to_json(worksheet);
+  private async parseExcelFile(filePath: string): Promise<any[]> {
+    const ExcelJSModule = await getExcelJS();
+    const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+    const Workbook = ExcelJS?.Workbook || ExcelJS;
+    const workbook = new Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.worksheets[0];
+    
+    const data: any[] = [];
+    const headers: string[] = [];
+    
+    // Get headers from first row
+    worksheet.getRow(1).eachCell((cell: any, colNumber: number) => {
+      headers[colNumber - 1] = cell.value?.toString() || '';
+    });
+    
+    // Get data rows
+    worksheet.eachRow((row: any, rowNumber: number) => {
+      if (rowNumber === 1) return; // Skip header row
+      
+      const rowData: any = {};
+      row.eachCell((cell: any, colNumber: number) => {
+        const header = headers[colNumber - 1];
+        if (header) {
+          rowData[header] = cell.value;
+        }
+      });
+      data.push(rowData);
+    });
+    
+    return data;
   }
   
   // Parse CSV file
@@ -180,21 +214,25 @@ export class ImportExportService {
   async exportToExcel(request: ExcelExportRequest): Promise<Buffer> {
     const analyses = await this.getAnalysesForExport(request.propertyIds);
     
-    const workbook = XLSX.utils.book_new();
+    const ExcelJSModule = await getExcelJS();
+    const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+    const Workbook = ExcelJS.Workbook || ExcelJS;
+    const workbook = new Workbook();
     
     if (request.templateType === 'biggerpockets') {
-      this.addBiggerPocketsSheet(workbook, analyses);
+      await this.addBiggerPocketsSheet(workbook, analyses);
     } else if (request.templateType === 'detailed') {
-      this.addDetailedAnalysisSheet(workbook, analyses);
+      await this.addDetailedAnalysisSheet(workbook, analyses);
     } else {
-      this.addSummarySheet(workbook, analyses);
+      await this.addSummarySheet(workbook, analyses);
     }
     
     if (request.includeTemplate) {
-      this.addTemplateSheet(workbook, request.templateType);
+      await this.addTemplateSheet(workbook, request.templateType);
     }
     
-    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
   
   // Export to CSV
@@ -208,8 +246,23 @@ export class ImportExportService {
       data = this.formatForStandard(analyses);
     }
     
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    return XLSX.utils.sheet_to_csv(worksheet);
+    // Convert to CSV format
+    if (data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]);
+    const csvRows = [
+      headers.join(','),
+      ...data.map(row => headers.map(header => {
+        const value = row[header];
+        // Escape commas and quotes in CSV
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value ?? '';
+      }).join(','))
+    ];
+    
+    return csvRows.join('\n');
   }
   
   private async getAnalysesForExport(propertyIds?: string[]): Promise<DealAnalysis[]> {
@@ -224,13 +277,32 @@ export class ImportExportService {
     return allAnalyses;
   }
   
-  private addBiggerPocketsSheet(workbook: XLSX.WorkBook, analyses: DealAnalysis[]) {
+  private async addBiggerPocketsSheet(workbook: any, analyses: DealAnalysis[]) {
     const data = this.formatForBiggerPockets(analyses);
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'BiggerPockets Export');
+    const worksheet = workbook.addWorksheet('BiggerPockets Export');
+    
+    if (data.length > 0) {
+      // Add headers
+      const headers = Object.keys(data[0]);
+      worksheet.addRow(headers);
+      
+      // Style header row
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+      
+      // Add data rows
+      data.forEach((row: any) => {
+        worksheet.addRow(headers.map((header: string) => (row as any)[header]));
+      });
+    }
   }
   
-  private addDetailedAnalysisSheet(workbook: XLSX.WorkBook, analyses: DealAnalysis[]) {
+  private async addDetailedAnalysisSheet(workbook: any, analyses: DealAnalysis[]) {
     const data = analyses.map(analysis => ({
       'Property Address': `${analysis.property?.address}, ${analysis.property?.city}, ${analysis.property?.state}`,
       'Property Type': analysis.property?.propertyType,
@@ -252,11 +324,27 @@ export class ImportExportService {
       'Investment Strategy': analysis.aiAnalysis?.investmentRecommendation?.suggestedStrategy,
     }));
     
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Detailed Analysis');
+    const worksheet = workbook.addWorksheet('Detailed Analysis');
+    
+    if (data.length > 0) {
+      const headers = Object.keys(data[0]);
+      worksheet.addRow(headers);
+      
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+      
+      data.forEach((row: any) => {
+        worksheet.addRow(headers.map((header: string) => (row as any)[header]));
+      });
+    }
   }
   
-  private addSummarySheet(workbook: XLSX.WorkBook, analyses: DealAnalysis[]) {
+  private async addSummarySheet(workbook: any, analyses: DealAnalysis[]) {
     const data = analyses.map(analysis => ({
       'Address': `${analysis.property?.address}, ${analysis.property?.city}, ${analysis.property?.state}`,
       'Price': analysis.property?.purchasePrice,
@@ -267,11 +355,27 @@ export class ImportExportService {
       'Meets Criteria': analysis.meetsCriteria ? 'Yes' : 'No',
     }));
     
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Summary');
+    const worksheet = workbook.addWorksheet('Summary');
+    
+    if (data.length > 0) {
+      const headers = Object.keys(data[0]);
+      worksheet.addRow(headers);
+      
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+      
+      data.forEach((row: any) => {
+        worksheet.addRow(headers.map((header: string) => (row as any)[header]));
+      });
+    }
   }
   
-  private addTemplateSheet(workbook: XLSX.WorkBook, templateType: string) {
+  private async addTemplateSheet(workbook: any, templateType: string) {
     let templateData: any[] = [];
     
     if (templateType === 'biggerpockets') {
@@ -299,8 +403,24 @@ export class ImportExportService {
       }];
     }
     
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Import Template');
+    const worksheet = workbook.addWorksheet('Import Template');
+    
+    if (templateData.length > 0) {
+      const headers = Object.keys(templateData[0]);
+      worksheet.addRow(headers);
+      
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+      
+      templateData.forEach(row => {
+        worksheet.addRow(headers.map(header => row[header]));
+      });
+    }
   }
   
   private formatForBiggerPockets(analyses: DealAnalysis[]): any[] {
@@ -361,7 +481,10 @@ export class ImportExportService {
   }
   
   // Generate BiggerPockets-compatible template
-  generateBiggerPocketsTemplate(): Buffer {
+  async generateBiggerPocketsTemplate(): Promise<Buffer> {
+    const ExcelJSModule = await getExcelJS();
+    const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+    const Workbook = ExcelJS.Workbook || ExcelJS;
     const templateData = [
       {
         'Property Address': '',
@@ -395,11 +518,31 @@ export class ImportExportService {
       }
     ];
     
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'BiggerPockets Template');
+    const ExcelJSMod = await getExcelJS();
+    const ExcelJSClass = ExcelJSMod.default || ExcelJSMod;
+    const WorkbookClass = ExcelJSClass?.Workbook || ExcelJSClass;
+    const workbook = new WorkbookClass();
+    const worksheet = workbook.addWorksheet('BiggerPockets Template');
     
-    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    if (templateData.length > 0) {
+      const headers = Object.keys(templateData[0]);
+      worksheet.addRow(headers);
+      
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+      
+      templateData.forEach((row: any) => {
+        worksheet.addRow(headers.map((header: string) => (row as any)[header]));
+      });
+    }
+    
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 }
 

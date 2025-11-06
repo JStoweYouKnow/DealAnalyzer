@@ -1,6 +1,7 @@
 // TypeScript property analyzer to replace Python backend for Vercel deployment
 import type { Property, FundingSource, MortgageValues } from "../../shared/schema";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../shared/schema";
+import { parseEmailContentOptimized } from './optimizations';
 
 export interface PropertyAnalysis {
   propertyId: string;
@@ -71,60 +72,9 @@ export function loadInvestmentCriteria() {
 }
 
 // Parse email content to extract property details
+// Optimized version using pre-compiled regex patterns
 export function parseEmailContent(emailContent: string): any {
-  const property: any = {
-    address: "",
-    city: "Unknown",
-    state: "Unknown",
-    zipCode: "00000",
-    propertyType: "N/A",
-    purchasePrice: 0,
-    monthlyRent: 0,
-    bedrooms: 0,
-    bathrooms: 0,
-    squareFootage: 0,
-    yearBuilt: 0,
-    description: "",
-    listingUrl: "N/A",
-  };
-
-  // Extract address
-  const addressMatch = emailContent.match(/\b(\d+\s+[A-Z][a-z]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Way|Place|Pl)[,\s]*[A-Z][a-z]+[\s,]*[A-Z][a-z]+)?/);
-  if (addressMatch) {
-    property.address = addressMatch[0].trim();
-  }
-
-  // Extract price
-  const priceMatch = emailContent.match(/\$\s*([0-9,]+)/);
-  if (priceMatch) {
-    property.purchasePrice = parseInt(priceMatch[1].replace(/,/g, ""));
-  }
-
-  // Extract rent
-  const rentMatch = emailContent.match(/rent[:\$]?\s*\$?([0-9,]+)/i);
-  if (rentMatch) {
-    property.monthlyRent = parseInt(rentMatch[1].replace(/,/g, ""));
-  }
-
-  // Extract bedrooms
-  const bedMatch = emailContent.match(/(\d+)\s*(?:bed|bedroom|br|bedrooms)/i);
-  if (bedMatch) {
-    property.bedrooms = parseInt(bedMatch[1]);
-  }
-
-  // Extract bathrooms
-  const bathMatch = emailContent.match(/(\d+(?:\.\d+)?)\s*(?:bath|bathroom|ba|bathrooms)/i);
-  if (bathMatch) {
-    property.bathrooms = parseFloat(bathMatch[1]);
-  }
-
-  // Extract square footage
-  const sqftMatch = emailContent.match(/(\d+)\s*(?:sq\.?\s*ft\.?|square\s*feet)/i);
-  if (sqftMatch) {
-    property.squareFootage = parseInt(sqftMatch[1]);
-  }
-
-  return property;
+  return parseEmailContentOptimized(emailContent);
 }
 
 // Main analysis function
@@ -159,12 +109,7 @@ export function analyzeProperty(
   if (purchasePrice > 0) {
     // PRIMARY LOGIC: Purchase price exists (from file), calculate down payment using funding source percentage
     calculatedDownpayment = purchasePrice * downpaymentPercentage;
-    console.log('Using purchase price from file with funding source percentage:', {
-      purchasePrice,
-      fundingSource: propertyFundingSource,
-      downpaymentPercentage,
-      calculatedDownpayment
-    });
+    // Logging removed for production performance - use logger.debug() if needed
   } else if (mortgageValues && mortgageValues.loanAmount > 0) {
     // BACKUP LOGIC: No purchase price, but mortgage loan amount provided
     // Calculate purchase price = loan amount / (1 - down payment percentage)
