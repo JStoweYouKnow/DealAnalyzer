@@ -38,6 +38,41 @@ export default function DealsPage() {
   // Ref to store the sync mutation function (set after mutation is defined)
   const syncMutateRef = useRef<(() => void) | null>(null);
 
+  // Fetch email deals
+  // Override staleTime to allow refetching after sync
+  const { data: emailDeals = [], isLoading, refetch } = useQuery<EmailDeal[]>({
+    queryKey: ['/api/email-deals'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/email-deals');
+      const data = await response.json();
+      console.log('Email deals response:', data);
+      return Array.isArray(data) ? data : data.data || [];
+    },
+    staleTime: 0, // Allow refetching immediately (overrides global staleTime: Infinity)
+  });
+
+  // Check Gmail connection status
+  const { data: gmailStatus, refetch: refetchGmailStatus } = useQuery({
+    queryKey: ['/api/gmail-status'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/gmail-status');
+      const data = await response.json();
+      console.log('Gmail status check:', {
+        success: data.success,
+        connected: data.connected,
+        fullResponse: data
+      });
+      return data;
+    },
+    staleTime: 0, // Always allow refetching
+    refetchOnWindowFocus: true, // Refetch when user returns to tab (after OAuth)
+    refetchInterval: (query) => {
+      // If not connected, check every 5 seconds to catch recent connections
+      // If connected, don't auto-refetch (user can manually refresh)
+      return query.state.data?.connected ? false : 5000;
+    },
+  });
+
   // Listen for auth success message from popup
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
@@ -109,42 +144,7 @@ export default function DealsPage() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [refetchGmailStatus, queryClient, toast]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fetch email deals
-  // Override staleTime to allow refetching after sync
-  const { data: emailDeals = [], isLoading, refetch } = useQuery<EmailDeal[]>({
-    queryKey: ['/api/email-deals'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/email-deals');
-      const data = await response.json();
-      console.log('Email deals response:', data);
-      return Array.isArray(data) ? data : data.data || [];
-    },
-    staleTime: 0, // Allow refetching immediately (overrides global staleTime: Infinity)
-  });
-
-  // Check Gmail connection status
-  const { data: gmailStatus, refetch: refetchGmailStatus } = useQuery({
-    queryKey: ['/api/gmail-status'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/gmail-status');
-      const data = await response.json();
-      console.log('Gmail status check:', {
-        success: data.success,
-        connected: data.connected,
-        fullResponse: data
-      });
-      return data;
-    },
-    staleTime: 0, // Always allow refetching
-    refetchOnWindowFocus: true, // Refetch when user returns to tab (after OAuth)
-    refetchInterval: (query) => {
-      // If not connected, check every 5 seconds to catch recent connections
-      // If connected, don't auto-refetch (user can manually refresh)
-      return query.state.data?.connected ? false : 5000;
-    },
-  });
+  }, [refetchGmailStatus, queryClient, toast]);
 
   // Connect Gmail mutation
   const connectGmailMutation = useMutation({
