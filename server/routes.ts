@@ -602,6 +602,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Gmail status check endpoint
+  app.get("/api/gmail-status", async (req, res) => {
+    try {
+      const hasTokens = !!(req.session.gmailTokens?.access_token && req.session.gmailTokens?.refresh_token);
+
+      res.json({
+        success: true,
+        connected: hasTokens
+      });
+    } catch (error) {
+      console.error("Error checking Gmail status:", error);
+      res.status(500).json({
+        success: false,
+        connected: false,
+        error: "Failed to check Gmail status"
+      });
+    }
+  });
+
   // Gmail OAuth callback endpoint
   app.get("/api/gmail-callback", async (req, res) => {
     try {
@@ -615,7 +634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const tokens = await emailMonitoringService.getTokens(code);
-      
+
       // Store tokens in session (in production, store securely)
       req.session.gmailTokens = {
         access_token: tokens.access_token || '',
@@ -624,15 +643,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         token_type: tokens.token_type || 'Bearer',
         expiry_date: tokens.expiry_date || undefined
       };
-      
-      // Redirect to deals page
-      res.redirect('/deals');
+
+      // Send success message to popup window and close it
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Gmail Connected</title>
+          </head>
+          <body>
+            <h2>Gmail Connected Successfully!</h2>
+            <p>This window will close automatically...</p>
+            <script>
+              // Send success message to parent window
+              if (window.opener) {
+                window.opener.postMessage({ type: 'GMAIL_AUTH_SUCCESS' }, window.location.origin);
+                // Close popup after a brief delay
+                setTimeout(() => window.close(), 1000);
+              } else {
+                // Fallback: redirect to deals page if not in popup
+                window.location.href = '/deals';
+              }
+            </script>
+          </body>
+        </html>
+      `);
     } catch (error) {
       console.error("Error in Gmail callback:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to complete Gmail authorization"
-      });
+      res.status(500).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Gmail Connection Failed</title>
+          </head>
+          <body>
+            <h2>Failed to Connect Gmail</h2>
+            <p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+            <p><a href="/deals">Return to Deals Page</a></p>
+          </body>
+        </html>
+      `);
     }
   });
 
@@ -652,13 +702,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Set credentials for email service with userId and token metadata
+      // Include callback to update session tokens when they're refreshed
       await emailMonitoringService.setCredentials(
         req.session.gmailTokens.access_token,
         req.session.gmailTokens.refresh_token,
         userId || undefined,
         req.session.gmailTokens.scope,
         req.session.gmailTokens.expiry_date,
-        req.session.gmailTokens.token_type
+        req.session.gmailTokens.token_type,
+        async (tokens) => {
+          // Update session with refreshed tokens
+          req.session.gmailTokens = {
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token || req.session.gmailTokens.refresh_token,
+            scope: tokens.scope || req.session.gmailTokens.scope,
+            token_type: tokens.token_type || req.session.gmailTokens.token_type,
+            expiry_date: tokens.expiry_date
+          };
+          console.log('Session tokens updated after refresh');
+        }
       );
 
       // Search for real estate emails
