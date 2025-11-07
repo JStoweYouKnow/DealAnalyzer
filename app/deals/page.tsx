@@ -50,40 +50,66 @@ export default function DealsPage() {
         try {
           console.log('🎉 Received auth success message from popup!');
 
-          // Wait a brief moment for cookie to propagate
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Wait a bit longer for cookie to propagate and be available
+          await new Promise(resolve => setTimeout(resolve, 1000));
 
-          // Force status check
-          queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
-          const status = await refetchGmailStatus();
-
-          console.log('Auth success - status check result:', status.data);
-
-          if (status.data?.connected) {
-            console.log('✅ Gmail connected! Starting auto-sync...');
-            // Use the helper function via ref to trigger sync with coordination
-            if (syncMutateRef.current) {
-              syncMutateRef.current();
+          // Force multiple status checks with retries
+          let retries = 5;
+          let isConnected = false;
+          
+          while (retries > 0 && !isConnected) {
+            queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
+            const status = await refetchGmailStatus();
+            
+            console.log(`[Retry ${6 - retries}/5] Auth success - status check result:`, status.data);
+            
+            if (status.data?.connected === true) {
+              isConnected = true;
+              console.log('✅ Gmail connected! Starting auto-sync...');
+              // Use the helper function via ref to trigger sync with coordination
+              if (syncMutateRef.current) {
+                syncMutateRef.current();
+              }
+              toast({
+                title: "Gmail Connected",
+                description: "Your Gmail account is now connected. You can sync emails now.",
+              });
+              break;
             }
-          } else {
-            console.log('⚠️ Auth success message received but status still shows disconnected');
+            
+            retries--;
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+
+          if (!isConnected) {
+            console.log('⚠️ Auth success message received but status still shows disconnected after retries');
+            toast({
+              title: "Connection Detected",
+              description: "Gmail connection detected. Please refresh the page or click 'Sync Emails' to verify.",
+            });
+            // Force one more status check
+            queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
+            refetchGmailStatus();
           }
         } catch (error) {
           console.error('❌ Error handling Gmail auth success:', error);
           toast({
             title: "Connection Error",
-            description: "Failed to verify Gmail connection. Please try again.",
+            description: "Failed to verify Gmail connection. Please try clicking 'Sync Emails' manually.",
             variant: "destructive",
           });
           // Ensure queries are still invalidated even on error
           queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
+          refetchGmailStatus();
         }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refetchGmailStatus, queryClient, toast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch email deals
   // Override staleTime to allow refetching after sync
@@ -113,6 +139,11 @@ export default function DealsPage() {
     },
     staleTime: 0, // Always allow refetching
     refetchOnWindowFocus: true, // Refetch when user returns to tab (after OAuth)
+    refetchInterval: (query) => {
+      // If not connected, check every 5 seconds to catch recent connections
+      // If connected, don't auto-refetch (user can manually refresh)
+      return query.state.data?.connected ? false : 5000;
+    },
   });
 
   // Connect Gmail mutation
@@ -746,6 +777,7 @@ export default function DealsPage() {
                 disabled={!gmailStatus?.connected || syncEmailsMutation.isPending || connectGmailMutation.isPending}
                 size="sm"
                 variant={gmailStatus?.connected ? "default" : "outline"}
+                title={!gmailStatus?.connected ? "Connect Gmail first to sync emails" : "Sync emails from Gmail"}
               >
                 {syncEmailsMutation.isPending ? (
                   <>
@@ -760,33 +792,35 @@ export default function DealsPage() {
                 )}
               </Button>
 
-              {/* Show refresh button if connecting */}
-              {connectGmailMutation.isPending && (
-                <Button
-                  onClick={async () => {
-                    console.log('Manual status refresh triggered');
-                    queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
-                    const status = await refetchGmailStatus();
-                    console.log('Manual refresh result:', status.data);
-                    if (status.data?.connected) {
-                      toast({
-                        title: "Gmail Connected",
-                        description: "Connection detected! You can now sync emails.",
-                      });
-                    } else {
-                      toast({
-                        title: "Not Connected Yet",
-                        description: "Complete the authentication in the popup window.",
-                      });
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                >
-                  <i className="fas fa-refresh mr-2"></i>
-                  Check Connection
-                </Button>
-              )}
+              {/* Manual refresh button - always visible to check connection status */}
+              <Button
+                onClick={async () => {
+                  console.log('Manual status refresh triggered');
+                  queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
+                  const status = await refetchGmailStatus();
+                  console.log('Manual refresh result:', status.data);
+                  if (status.data?.connected) {
+                    toast({
+                      title: "Gmail Connected",
+                      description: "Connection verified! You can now sync emails.",
+                    });
+                  } else {
+                    toast({
+                      title: gmailStatus?.connected ? "Connection Lost" : "Not Connected",
+                      description: gmailStatus?.connected 
+                        ? "Gmail connection not detected. Please reconnect."
+                        : "Gmail is not connected. Click 'Connect Gmail' to get started.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                title="Refresh Gmail connection status"
+              >
+                <i className="fas fa-refresh mr-2"></i>
+                Refresh Status
+              </Button>
             </div>
           </div>
           
