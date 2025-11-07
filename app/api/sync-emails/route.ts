@@ -26,10 +26,20 @@ export async function POST() {
     let gmailTokensCookie = cookieStore.get('gmailTokens');
     let gmailTokens: any = null;
     
+    console.log('[Sync Emails] Starting token retrieval', {
+      hasCookie: !!gmailTokensCookie,
+      hasUserId: !!userId,
+      hasConvexUrl: !!process.env.NEXT_PUBLIC_CONVEX_URL
+    });
+    
     // Try to get tokens from cookie first
     if (gmailTokensCookie) {
       try {
         gmailTokens = JSON.parse(gmailTokensCookie.value);
+        console.log('[Sync Emails] Found tokens in cookie', {
+          hasAccessToken: !!gmailTokens.access_token,
+          hasRefreshToken: !!gmailTokens.refresh_token
+        });
       } catch (error) {
         console.error('[Sync Emails] Error parsing cookie tokens:', error);
         gmailTokens = null;
@@ -39,6 +49,7 @@ export async function POST() {
     // If no tokens in cookie and we have userId, try database
     if (!gmailTokens && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
       try {
+        console.log('[Sync Emails] Attempting to retrieve tokens from database for userId:', userId.substring(0, 8) + '...');
         const { ConvexHttpClient } = await import('convex/browser');
         const apiModule = await import('../../../convex/_generated/api');
         const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
@@ -46,7 +57,10 @@ export async function POST() {
         const dbTokens = await convexClient.query(apiModule.api.userOAuthTokens.getTokens, { userId });
         
         if (dbTokens) {
-          console.log('[Sync Emails] Found tokens in database, using them');
+          console.log('[Sync Emails] Found tokens in database', {
+            hasAccessToken: !!dbTokens.accessToken,
+            hasRefreshToken: !!dbTokens.refreshToken
+          });
           gmailTokens = {
             access_token: dbTokens.accessToken,
             refresh_token: dbTokens.refreshToken,
@@ -73,37 +87,78 @@ export async function POST() {
           });
           
           console.log('[Sync Emails] Refreshed cookie with tokens from database');
+        } else {
+          console.log('[Sync Emails] No tokens found in database for userId:', userId.substring(0, 8) + '...');
         }
       } catch (error) {
         console.error('[Sync Emails] Error retrieving tokens from database:', error);
+        if (error instanceof Error) {
+          console.error('[Sync Emails] Error details:', error.message, error.stack);
+        }
       }
     }
     
-    // If still no tokens, return error
-    if (!gmailTokens) {
+    // Validate tokens before proceeding - check for both null/undefined and empty strings
+    const accessToken = typeof gmailTokens?.access_token === 'string' ? gmailTokens.access_token.trim() : '';
+    const refreshToken = typeof gmailTokens?.refresh_token === 'string' ? gmailTokens.refresh_token.trim() : '';
+    
+    if (!gmailTokens || !accessToken || !refreshToken) {
+      console.error('[Sync Emails] Missing or invalid tokens', {
+        hasTokens: !!gmailTokens,
+        hasAccessToken: !!gmailTokens?.access_token,
+        accessTokenLength: accessToken.length,
+        hasRefreshToken: !!gmailTokens?.refresh_token,
+        refreshTokenLength: refreshToken.length
+      });
       return NextResponse.json(
         { success: false, error: "Gmail not connected. Please connect your Gmail account first." },
         { status: 401 }
       );
     }
+    
+    // Update gmailTokens with trimmed values
+    gmailTokens.access_token = accessToken;
+    gmailTokens.refresh_token = refreshToken;
+    
+    console.log('[Sync Emails] Tokens validated, proceeding with email sync');
 
     // Set credentials for email service with userId and token metadata
     // The OAuth2 client will automatically refresh tokens if needed
-    await emailMonitoringService.setCredentials(
-      gmailTokens.access_token,
-      gmailTokens.refresh_token,
-      userId || undefined,
-      gmailTokens.scope,
-      gmailTokens.expiry_date,
-      gmailTokens.token_type
-    );
+    try {
+      console.log('[Sync Emails] Setting credentials for email service');
+      await emailMonitoringService.setCredentials(
+        gmailTokens.access_token,
+        gmailTokens.refresh_token,
+        userId || undefined,
+        gmailTokens.scope,
+        gmailTokens.expiry_date,
+        gmailTokens.token_type
+      );
+      console.log('[Sync Emails] Credentials set successfully');
+    } catch (error) {
+      console.error('[Sync Emails] Error setting credentials:', error);
+      return NextResponse.json(
+        { success: false, error: `Failed to set Gmail credentials: ${error instanceof Error ? error.message : 'Unknown error'}` },
+        { status: 500 }
+      );
+    }
 
     // Search for real estate emails (limit to 10 to avoid timeouts on serverless)
     // Process in smaller batches to stay within timeout limits
     const maxEmails = 10;
-    console.log(`Starting email search for up to ${maxEmails} emails...`);
-    const emailDeals = await emailMonitoringService.searchRealEstateEmails(maxEmails);
-    console.log(`Email search completed. Found ${emailDeals.length} emails after filtering.`);
+    console.log(`[Sync Emails] Starting email search for up to ${maxEmails} emails...`);
+    let emailDeals: any[] = [];
+    try {
+      emailDeals = await emailMonitoringService.searchRealEstateEmails(maxEmails);
+      console.log(`[Sync Emails] Email search completed. Found ${emailDeals.length} emails after filtering.`);
+    } catch (error) {
+      console.error('[Sync Emails] Error searching emails:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return NextResponse.json(
+        { success: false, error: `Failed to search emails: ${errorMessage}` },
+        { status: 500 }
+      );
+    }
     
     // Store new deals in storage, checking for duplicates
     const storedDeals = [];
