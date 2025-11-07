@@ -22,6 +22,7 @@ if (process.env.NODE_ENV === 'production' && ALLOW_PUBLIC_ROUTES_IN_DEV) {
 // - Authentication pages (sign-in/sign-up)
 // - Health check endpoint
 // - OAuth callbacks (required for OAuth flow)
+// - Main application pages (deals, market, search, comparison)
 const safePublicRoutes = [
   '/',
   '/sign-in(.*)',
@@ -29,17 +30,19 @@ const safePublicRoutes = [
   '/api/health',
   '/api/gmail-callback', // OAuth callback must be public
   '/api/gmail-auth-url', // OAuth initiation must be public
+  '/api/gmail-status', // Gmail status check
+  '/api/email-deals(.*)', // Email deals API
+  '/api/sync-emails', // Email sync API
   '/api/cron/weekly-digest', // Cron endpoint (has its own CRON_SECRET auth)
+  '/deals(.*)', // Deals page and sub-routes
+  '/market(.*)', // Market page
+  '/search(.*)', // Search page
+  '/comparison(.*)', // Comparison page
 ];
 
 // Development-only: permissive routes for testing
-// These routes should be protected in production
-const devOnlyPublicRoutes = ALLOW_PUBLIC_ROUTES_IN_DEV ? [
-  '/deals',
-  '/market',
-  '/search',
-  '/comparison',
-] : [];
+// Note: Main app routes are now in safePublicRoutes above
+const devOnlyPublicRoutes: string[] = [];
 
 // Combine safe and dev-only routes
 const publicRoutes = [...safePublicRoutes, ...devOnlyPublicRoutes];
