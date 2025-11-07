@@ -124,7 +124,7 @@ export const getTokensForServerQuery = query({
  * use getTokenMetadata() instead to check connection status without exposing secrets.
  * 
  * This action is intended for use in:
- * - Next.js API routes (app/api/*/route.ts)
+ * - Next.js API routes in the app/api directory
  * - Server-side functions only
  * 
  * DO NOT call this from:
