@@ -736,30 +736,29 @@ export default function DealsPage() {
                 </Button>
               )}
 
-              {/* Sync Emails Button */}
-              {gmailStatus?.connected && (
-                <Button
-                  onClick={() => {
-                    if (!syncEmailsMutation.isPending) {
-                      syncEmailsMutation.mutate();
-                    }
-                  }}
-                  disabled={syncEmailsMutation.isPending || connectGmailMutation.isPending}
-                  size="sm"
-                >
-                  {syncEmailsMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-sync mr-2"></i>
-                      Sync Emails
-                    </>
-                  )}
-                </Button>
-              )}
+              {/* Sync Emails Button - Always visible, disabled when not connected */}
+              <Button
+                onClick={() => {
+                  if (!syncEmailsMutation.isPending && gmailStatus?.connected) {
+                    syncEmailsMutation.mutate();
+                  }
+                }}
+                disabled={!gmailStatus?.connected || syncEmailsMutation.isPending || connectGmailMutation.isPending}
+                size="sm"
+                variant={gmailStatus?.connected ? "default" : "outline"}
+              >
+                {syncEmailsMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-sync mr-2"></i>
+                    Sync Emails
+                  </>
+                )}
+              </Button>
 
               {/* Show refresh button if connecting */}
               {connectGmailMutation.isPending && (
