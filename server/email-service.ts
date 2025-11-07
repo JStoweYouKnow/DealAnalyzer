@@ -127,7 +127,17 @@ export class EmailMonitoringService {
   }
 
   // Set up OAuth credentials
-  async setCredentials(accessToken: string, refreshToken: string, userId?: string, scope?: string, expiryDate?: number, tokenType?: string) {
+  // onTokenRefresh: Optional callback that receives refreshed tokens and returns a Promise
+  // This allows the caller to update cookies or other storage without race conditions
+  async setCredentials(
+    accessToken: string, 
+    refreshToken: string, 
+    userId?: string, 
+    scope?: string, 
+    expiryDate?: number, 
+    tokenType?: string,
+    onTokenRefresh?: (tokens: { access_token: string; refresh_token?: string; scope?: string; expiry_date?: number; token_type?: string }) => Promise<void>
+  ) {
     const auth = new google.auth.OAuth2(
       process.env.GMAIL_CLIENT_ID,
       process.env.GMAIL_CLIENT_SECRET,
@@ -190,6 +200,7 @@ export class EmailMonitoringService {
           // Always persist when access token is refreshed
           // Use the current refresh token (which may have been updated above)
           if (tokens.access_token && currentRefreshToken) {
+            // Persist to database
             await persistTokens(
               userId,
               tokens.access_token,
@@ -199,6 +210,23 @@ export class EmailMonitoringService {
               currentTokenType
             );
             console.log('Access token refreshed and persisted for user');
+            
+            // Call the onTokenRefresh callback if provided (e.g., to update cookies)
+            // This allows the caller to update cookies or other storage
+            if (onTokenRefresh) {
+              try {
+                await onTokenRefresh({
+                  access_token: tokens.access_token,
+                  refresh_token: currentRefreshToken,
+                  scope: currentScope,
+                  expiry_date: currentExpiryDate,
+                  token_type: currentTokenType
+                });
+              } catch (error) {
+                console.error('Error in onTokenRefresh callback:', error);
+                // Don't throw - token refresh should continue even if callback fails
+              }
+            }
           }
         } catch (error) {
           console.error('Error handling token refresh event:', error);

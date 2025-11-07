@@ -1,8 +1,15 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-async function throwIfResNotOk(res: Response) {
+async function throwIfResNotOk(res: Response, url?: string) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+    const urlInfo = url ? ` (${url})` : '';
+    console.error(`API request failed${urlInfo}:`, {
+      status: res.status,
+      statusText: res.statusText,
+      url: url || res.url,
+      error: text
+    });
     throw new Error(`${res.status}: ${text}`);
   }
 }
@@ -22,7 +29,7 @@ export async function apiRequest(
     credentials: "include",
   });
 
-  await throwIfResNotOk(res);
+  await throwIfResNotOk(res, apiUrl);
   return res;
 }
 
@@ -51,7 +58,7 @@ export const getQueryFn: <T>(options: {
       return null;
     }
 
-    await throwIfResNotOk(res);
+    await throwIfResNotOk(res, url);
     return await res.json();
   };
 

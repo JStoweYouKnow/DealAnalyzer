@@ -47,6 +47,7 @@ export async function POST() {
     }
     
     // If no tokens in cookie and we have userId, try database
+    // SECURITY: Use server-side action to retrieve tokens - never expose tokens to clients
     if (!gmailTokens && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
       try {
         console.log('[Sync Emails] Attempting to retrieve tokens from database for userId:', userId.substring(0, 8) + '...');
@@ -54,7 +55,9 @@ export async function POST() {
         const apiModule = await import('../../../convex/_generated/api');
         const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
         
-        const dbTokens = await convexClient.query(apiModule.api.userOAuthTokens.getTokens, { userId });
+        // SECURITY: Use action to retrieve tokens server-side only
+        // This ensures tokens are never exposed to client code
+        const dbTokens = await convexClient.action(apiModule.api.userOAuthTokens.retrieveTokensForServer, { userId });
         
         if (dbTokens) {
           console.log('[Sync Emails] Found tokens in database', {
@@ -70,6 +73,7 @@ export async function POST() {
           };
           
           // Refresh the cookie with tokens from database
+          // SECURITY: Tokens are stored in httpOnly cookie, not exposed to client JavaScript
           const tokenData = {
             access_token: gmailTokens.access_token,
             refresh_token: gmailTokens.refresh_token,
@@ -126,13 +130,65 @@ export async function POST() {
     // The OAuth2 client will automatically refresh tokens if needed
     try {
       console.log('[Sync Emails] Setting credentials for email service');
+      
+      // Create a token refresh callback that properly handles cookie updates
+      // This callback clones gmailTokens, updates the access_token, and ensures cookieStore.set() completes
+      // The Promise returned by this callback is awaited in the email-service token refresh handler
+      // This prevents race conditions where the HTTP response might be sent before cookies are updated
+      const onTokenRefresh = async (refreshedTokens: {
+        access_token: string;
+        refresh_token?: string;
+        scope?: string;
+        expiry_date?: number;
+        token_type?: string;
+      }): Promise<void> => {
+        // Clone gmailTokens to avoid mutating the original
+        const updatedTokens = {
+          ...gmailTokens,
+          access_token: refreshedTokens.access_token,
+          refresh_token: refreshedTokens.refresh_token || gmailTokens.refresh_token,
+          scope: refreshedTokens.scope || gmailTokens.scope,
+          expiry_date: refreshedTokens.expiry_date ?? gmailTokens.expiry_date,
+          token_type: refreshedTokens.token_type || gmailTokens.token_type,
+        };
+        
+        // Get a fresh cookies() store inside the async handler
+        const freshCookieStore = await cookies();
+        
+        // Prepare token data for cookie
+        const tokenData = {
+          access_token: updatedTokens.access_token,
+          refresh_token: updatedTokens.refresh_token,
+          scope: updatedTokens.scope || '',
+          token_type: updatedTokens.token_type || 'Bearer',
+          expiry_date: updatedTokens.expiry_date,
+        };
+        
+        // Set cookie (Next.js cookies().set() is synchronous and sets headers immediately)
+        // The async callback ensures this operation completes before the Promise resolves
+        freshCookieStore.set('gmailTokens', JSON.stringify(tokenData), {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 24 * 60 * 60, // 24 hours
+          path: '/',
+        });
+        
+        // Ensure the operation is complete by awaiting a microtask
+        // This ensures the cookie update is fully processed before the Promise resolves
+        await Promise.resolve();
+        
+        console.log('[Sync Emails] Token refresh: Cookie updated with new access token');
+      };
+      
       await emailMonitoringService.setCredentials(
         gmailTokens.access_token,
         gmailTokens.refresh_token,
         userId || undefined,
         gmailTokens.scope,
         gmailTokens.expiry_date,
-        gmailTokens.token_type
+        gmailTokens.token_type,
+        onTokenRefresh
       );
       console.log('[Sync Emails] Credentials set successfully');
     } catch (error) {

@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       refresh_token: tokens.refresh_token || '',
       scope: tokens.scope || '',
       token_type: tokens.token_type || 'Bearer',
-      expiry_date: tokens.expiry_date || undefined
+      expiry_date: tokens.expiry_date ?? undefined
     };
 
     cookieStore.set('gmailTokens', JSON.stringify(tokenData), {

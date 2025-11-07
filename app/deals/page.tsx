@@ -104,7 +104,11 @@ export default function DealsPage() {
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/gmail-status');
       const data = await response.json();
-      console.log('Gmail status check:', data);
+      console.log('Gmail status check:', {
+        success: data.success,
+        connected: data.connected,
+        fullResponse: data
+      });
       return data;
     },
     staleTime: 0, // Always allow refetching
@@ -141,18 +145,26 @@ export default function DealsPage() {
           queryClient.invalidateQueries({ queryKey: ['/api/gmail-status'] });
           const status = await refetchGmailStatus();
 
+          const statusData = status.data;
           console.log(`[Poll ${pollCount}/${maxPolls}] Gmail status:`, {
-            success: status.data?.success,
-            connected: status.data?.connected
+            success: statusData?.success,
+            connected: statusData?.connected,
+            connectedType: typeof statusData?.connected,
+            fullStatusData: statusData
           });
 
-          if (status.data?.connected === true) {
+          // Check if connected is true (handle both boolean true and string "true")
+          const isConnected = statusData?.connected === true || statusData?.connected === 'true';
+          
+          if (isConnected) {
             console.log('✅ Gmail connected! Starting auto-sync...');
             clearInterval(pollInterval);
             // Use the helper function via ref to trigger sync with coordination
             if (syncMutateRef.current) {
               syncMutateRef.current();
             }
+          } else {
+            console.log(`⏳ Gmail not connected yet (connected=${statusData?.connected})`);
           }
         } catch (error) {
           console.error('❌ Error polling Gmail status:', error);
@@ -190,20 +202,19 @@ export default function DealsPage() {
       console.log('Sync response:', data);
       if (data.success) {
         // Invalidate the query to mark it as stale
-        queryClient.invalidateQueries({
-          queryKey: ['/api/email-deals']
-        });
-
-        // Force immediate refetch using the refetch function from useQuery
-        // This is more reliable than refetchQueries when staleTime is overridden
-        const refetchResult = await refetch();
-        console.log('Refetch after sync:', refetchResult);
-
-        // Also use refetchQueries as backup
-        await queryClient.refetchQueries({
-          queryKey: ['/api/email-deals'],
-          type: 'active'
-        });
+        // React Query will automatically refetch active queries
+        try {
+          await queryClient.invalidateQueries({
+            queryKey: ['/api/email-deals']
+          });
+        } catch (error) {
+          console.error('Error invalidating email deals query:', error);
+          toast({
+            title: "Refresh Error",
+            description: "Failed to refresh email deals. Please reload the page.",
+            variant: "destructive",
+          });
+        }
 
         toast({
           title: "Emails Synced",

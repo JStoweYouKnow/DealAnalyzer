@@ -2,20 +2,49 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Define public routes that don't require authentication
-// Authentication is currently disabled - all routes are public
-const isPublicRoute = createRouteMatcher([
+// Development-only flag: allows permissive route matching in development
+// In production, this should be false to enforce authentication
+const ALLOW_PUBLIC_ROUTES_IN_DEV = process.env.NODE_ENV !== 'production' || 
+  process.env.FEATURE_ALLOW_PUBLIC_ROUTES === 'true';
+
+// Runtime assertion to prevent accidental deployment with permissive matcher
+if (process.env.NODE_ENV === 'production' && ALLOW_PUBLIC_ROUTES_IN_DEV) {
+  const errorMsg = 'SECURITY ERROR: Public routes cannot be enabled in production! ' +
+    'Set FEATURE_ALLOW_PUBLIC_ROUTES=false or remove it to enforce authentication.';
+  console.error('⚠️  ', errorMsg);
+  // Fail hard in production to prevent accidental deployment with insecure configuration
+  throw new Error(errorMsg);
+}
+
+// Define safe public routes that don't require authentication
+// These are endpoints that must be accessible without auth:
+// - Root and static pages
+// - Authentication pages (sign-in/sign-up)
+// - Health check endpoint
+// - OAuth callbacks (required for OAuth flow)
+const safePublicRoutes = [
   '/',
-  '/deals',
-  '/market',
-  '/search',
-  '/comparison',
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/health',
   '/api/gmail-callback', // OAuth callback must be public
-  '/api/(.*)', // All API routes are public
-]);
+  '/api/gmail-auth-url', // OAuth initiation must be public
+  '/api/cron/weekly-digest', // Cron endpoint (has its own CRON_SECRET auth)
+];
+
+// Development-only: permissive routes for testing
+// These routes should be protected in production
+const devOnlyPublicRoutes = ALLOW_PUBLIC_ROUTES_IN_DEV ? [
+  '/deals',
+  '/market',
+  '/search',
+  '/comparison',
+] : [];
+
+// Combine safe and dev-only routes
+const publicRoutes = [...safePublicRoutes, ...devOnlyPublicRoutes];
+
+const isPublicRoute = createRouteMatcher(publicRoutes);
 
 export default clerkMiddleware(async (auth, request: NextRequest) => {
   // Allow public routes through without authentication
@@ -23,10 +52,14 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
     return NextResponse.next();
   }
 
-  // Authentication is currently disabled - allow all routes through
-  // If you want to re-enable authentication, uncomment the code below:
-  /*
-  // Protect all other routes
+  // In production, enforce authentication for all protected routes
+  // In development with ALLOW_PUBLIC_ROUTES_IN_DEV=true, allow all routes through
+  if (ALLOW_PUBLIC_ROUTES_IN_DEV) {
+    // Development mode: allow all routes through
+    return NextResponse.next();
+  }
+
+  // Production mode: protect all other routes
   const { userId } = await auth();
   
   if (!userId) {
@@ -35,7 +68,6 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
     signInUrl.searchParams.set('redirect_url', request.url);
     return NextResponse.redirect(signInUrl);
   }
-  */
 
   return NextResponse.next();
 });

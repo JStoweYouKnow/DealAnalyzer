@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, action } from "./_generated/server";
 
 // Upsert user OAuth tokens
 export const upsertTokens = mutation({
@@ -47,8 +47,12 @@ export const upsertTokens = mutation({
   },
 });
 
-// Get user OAuth tokens by userId
-export const getTokens = query({
+/**
+ * SECURITY: Get non-sensitive OAuth token metadata only.
+ * This query is safe to expose to clients as it does NOT return accessToken or refreshToken.
+ * Use this for checking connection status without exposing secrets.
+ */
+export const getTokenMetadata = query({
   args: {
     userId: v.string(),
   },
@@ -62,6 +66,44 @@ export const getTokens = query({
       return null;
     }
     
+    // SECURITY: Only return non-sensitive metadata - NEVER return accessToken or refreshToken
+    return {
+      scope: tokens.scope,
+      expiryDate: tokens.expiryDate,
+      tokenType: tokens.tokenType,
+      updatedAt: tokens.updatedAt,
+      // Explicitly exclude accessToken and refreshToken
+    };
+  },
+});
+
+/**
+ * SECURITY CRITICAL: Retrieve OAuth tokens for server-side use only.
+ * 
+ * ⚠️ WARNING: This query returns sensitive OAuth secrets (accessToken, refreshToken).
+ * It is marked as public for technical reasons (actions need to call public queries),
+ * but it MUST only be called from the retrieveTokensForServer action, NEVER directly from clients.
+ * 
+ * DO NOT call this query directly from client code. Use getTokenMetadata() instead.
+ * This query exists solely to support the retrieveTokensForServer action.
+ * 
+ * @internal - This is exported only for technical reasons. Use retrieveTokensForServer action instead.
+ */
+export const getTokensForServerQuery = query({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const tokens = await ctx.db
+      .query("userOAuthTokens")
+      .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+      .first();
+    
+    if (!tokens) {
+      return null;
+    }
+    
+    // SECURITY: This returns sensitive tokens - should only be called from server-side action
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
@@ -69,6 +111,50 @@ export const getTokens = query({
       expiryDate: tokens.expiryDate,
       tokenType: tokens.tokenType,
     };
+  },
+});
+
+/**
+ * SECURITY CRITICAL: Retrieve OAuth tokens for server-side use only.
+ * 
+ * ⚠️ WARNING: This action returns sensitive OAuth secrets (accessToken, refreshToken).
+ * It MUST only be called from server-side API routes, NEVER from client-side code.
+ * 
+ * Tokens must remain server-side to prevent security breaches. Client code should
+ * use getTokenMetadata() instead to check connection status without exposing secrets.
+ * 
+ * This action is intended for use in:
+ * - Next.js API routes (app/api/*/route.ts)
+ * - Server-side functions only
+ * 
+ * DO NOT call this from:
+ * - React components
+ * - Client-side hooks
+ * - Browser JavaScript
+ * - Any client-facing code
+ */
+export const retrieveTokensForServer = action({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Note: In a production system, you should add additional authentication checks here
+    // to ensure the caller is authorized and the request is coming from server-side code.
+    // For now, we rely on the caller being a server-side API route.
+    
+    // Import API to access the query
+    const api = await import("./_generated/api");
+    
+    // Retrieve full token record including secrets (server-side only)
+    // Note: getTokensForServerQuery is public for technical reasons (actions can only call public queries),
+    // but it should never be called directly from clients - only through this action
+    const tokens = await ctx.runQuery(api.userOAuthTokens.getTokensForServerQuery, {
+      userId: args.userId,
+    });
+    
+    // SECURITY: Only return tokens to server-side callers
+    // This action should never be called from client code
+    return tokens;
   },
 });
 

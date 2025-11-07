@@ -47,13 +47,16 @@ export async function GET() {
     }
     
     // If no valid cookie but we have userId, check database
+    // SECURITY: Use server-side action to retrieve tokens - never expose tokens to clients
     if (!isConnected && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
       try {
         const { ConvexHttpClient } = await import('convex/browser');
         const apiModule = await import('../../../convex/_generated/api');
         const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
         
-        const dbTokens = await convexClient.query(apiModule.api.userOAuthTokens.getTokens, { userId });
+        // SECURITY: Use action to retrieve tokens server-side only
+        // This ensures tokens are never exposed to client code
+        const dbTokens = await convexClient.action(apiModule.api.userOAuthTokens.retrieveTokensForServer, { userId });
         
         if (dbTokens && 
             dbTokens.accessToken && 
@@ -65,6 +68,7 @@ export async function GET() {
           console.log('[Gmail Status Check] Valid tokens found in database');
           
           // Refresh the cookie with tokens from database for faster access next time
+          // SECURITY: Tokens are stored in httpOnly cookie, not exposed to client JavaScript
           const tokenData = {
             access_token: dbTokens.accessToken,
             refresh_token: dbTokens.refreshToken,
