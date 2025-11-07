@@ -715,6 +715,52 @@ export default function DealsPage() {
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Connect Gmail Button */}
+              {!gmailStatus?.connected && (
+                <Button
+                  onClick={() => connectGmailMutation.mutate()}
+                  disabled={connectGmailMutation.isPending || syncEmailsMutation.isPending}
+                  size="sm"
+                >
+                  {connectGmailMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-envelope mr-2"></i>
+                      Connect Gmail
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* Sync Emails Button */}
+              {gmailStatus?.connected && (
+                <Button
+                  onClick={() => {
+                    if (!syncEmailsMutation.isPending) {
+                      syncEmailsMutation.mutate();
+                    }
+                  }}
+                  disabled={syncEmailsMutation.isPending || connectGmailMutation.isPending}
+                  size="sm"
+                >
+                  {syncEmailsMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-sync mr-2"></i>
+                      Sync Emails
+                    </>
+                  )}
+                </Button>
+              )}
+
               {/* Show refresh button if connecting */}
               {connectGmailMutation.isPending && (
                 <Button
@@ -726,9 +772,8 @@ export default function DealsPage() {
                     if (status.data?.connected) {
                       toast({
                         title: "Gmail Connected",
-                        description: "Connection detected! Starting sync...",
+                        description: "Connection detected! You can now sync emails.",
                       });
-                      syncEmailsMutation.mutate();
                     } else {
                       toast({
                         title: "Not Connected Yet",
@@ -743,41 +788,6 @@ export default function DealsPage() {
                   Check Connection
                 </Button>
               )}
-
-              <Button
-                onClick={() => {
-                  // If not connected, connect first. Otherwise, sync.
-                  if (!gmailStatus?.connected) {
-                    connectGmailMutation.mutate();
-                  } else if (!syncEmailsMutation.isPending) {
-                    syncEmailsMutation.mutate();
-                  }
-                }}
-                disabled={syncEmailsMutation.isPending || connectGmailMutation.isPending}
-                size="sm"
-              >
-                {syncEmailsMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Syncing...
-                  </>
-                ) : connectGmailMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Connecting...
-                  </>
-                ) : !gmailStatus?.connected ? (
-                  <>
-                    <i className="fas fa-envelope mr-2"></i>
-                    Connect & Sync Gmail
-                  </>
-                ) : (
-                  <>
-                    <i className="fas fa-sync mr-2"></i>
-                    Sync Emails
-                  </>
-                )}
-              </Button>
             </div>
           </div>
           
