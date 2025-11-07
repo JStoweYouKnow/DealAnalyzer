@@ -137,20 +137,30 @@ export const retrieveTokensForServer = action({
   args: {
     userId: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    scope?: string;
+    expiryDate?: number;
+    tokenType?: string;
+  } | null> => {
     // Note: In a production system, you should add additional authentication checks here
     // to ensure the caller is authorized and the request is coming from server-side code.
     // For now, we rely on the caller being a server-side API route.
     
     // Import API to access the query
+    // Use dynamic import to avoid circular type reference during type checking
     const api = await import("./_generated/api");
     
     // Retrieve full token record including secrets (server-side only)
     // Note: getTokensForServerQuery is public for technical reasons (actions can only call public queries),
     // but it should never be called directly from clients - only through this action
-    const tokens = await ctx.runQuery(api.userOAuthTokens.getTokensForServerQuery, {
-      userId: args.userId,
-    });
+    const tokens = await ctx.runQuery(
+      (api as any).userOAuthTokens.getTokensForServerQuery,
+      {
+        userId: args.userId,
+      }
+    );
     
     // SECURITY: Only return tokens to server-side callers
     // This action should never be called from client code
