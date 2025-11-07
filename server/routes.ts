@@ -701,22 +701,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
+      // Store current tokens in a variable for use in callback
+      const currentTokens = req.session.gmailTokens;
+
       // Set credentials for email service with userId and token metadata
       // Include callback to update session tokens when they're refreshed
       await emailMonitoringService.setCredentials(
-        req.session.gmailTokens.access_token,
-        req.session.gmailTokens.refresh_token,
+        currentTokens.access_token,
+        currentTokens.refresh_token,
         userId || undefined,
-        req.session.gmailTokens.scope,
-        req.session.gmailTokens.expiry_date,
-        req.session.gmailTokens.token_type,
+        currentTokens.scope,
+        currentTokens.expiry_date,
+        currentTokens.token_type,
         async (tokens) => {
           // Update session with refreshed tokens
           req.session.gmailTokens = {
             access_token: tokens.access_token,
-            refresh_token: tokens.refresh_token || req.session.gmailTokens.refresh_token,
-            scope: tokens.scope || req.session.gmailTokens.scope,
-            token_type: tokens.token_type || req.session.gmailTokens.token_type,
+            refresh_token: tokens.refresh_token || currentTokens.refresh_token,
+            scope: tokens.scope || currentTokens.scope,
+            token_type: tokens.token_type || currentTokens.token_type,
             expiry_date: tokens.expiry_date
           };
           console.log('Session tokens updated after refresh');
