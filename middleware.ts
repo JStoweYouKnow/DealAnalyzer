@@ -33,6 +33,10 @@ const safePublicRoutes = [
   '/api/gmail-status', // Gmail status check
   '/api/email-deals(.*)', // Email deals API
   '/api/sync-emails', // Email sync API
+  '/api/analyze-email-deal', // Email deal analysis API
+  '/api/criteria', // Investment criteria API
+  '/api/analyze', // Property analysis API
+  '/api/analyze-file', // File analysis API
   '/api/cron/weekly-digest', // Cron endpoint (has its own CRON_SECRET auth)
   '/deals(.*)', // Deals page and sub-routes
   '/market(.*)', // Market page
