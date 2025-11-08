@@ -49,11 +49,13 @@ export async function GET(request: Request) {
     const authUrlConfig: any = {
       access_type: 'offline',
       scope: scopes,
+      include_granted_scopes: true,
+      prompt: 'select_account', // default to account chooser for first-time auth
     };
     
-    // Force account selection if clear parameter is present
+    // Force account selection and consent if requested via `clear=true`
     if (clearSession) {
-      authUrlConfig.prompt = 'select_account';
+      authUrlConfig.prompt = 'select_account consent';
     }
 
     const authUrl = auth.generateAuthUrl(authUrlConfig);
