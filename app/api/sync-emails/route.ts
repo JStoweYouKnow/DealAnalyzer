@@ -23,7 +23,7 @@ export async function POST() {
 
     // Check if user has Gmail tokens - first check cookies, then database
     const cookieStore = await cookies();
-    const headersList = headers();
+    const headersList = await headers();
     const forwardedProto = headersList.get('x-forwarded-proto');
     const origin = headersList.get('origin');
     let isHttps = forwardedProto === 'https';
