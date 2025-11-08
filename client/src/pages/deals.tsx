@@ -32,7 +32,7 @@ export default function DealsPage() {
   // Connect Gmail mutation
   const connectGmailMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('GET', '/api/gmail-auth-url');
+      const response = await apiRequest('GET', '/api/gmail-auth-url?clear=true');
       const data = await response.json();
       if (data.success) {
         // Open in new tab to avoid iframe restrictions
