@@ -30,6 +30,13 @@ export async function GET(request: NextRequest) {
 
     // Store tokens in cookie
     const cookieStore = await cookies();
+    const forwardedProto = request.headers.get('x-forwarded-proto');
+    const callbackUrl = new URL(request.url);
+    const isHttps = forwardedProto
+      ? forwardedProto === 'https'
+      : callbackUrl.protocol === 'https:';
+    const isDevelopment = process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1';
+    const useSecureCookies = !isDevelopment && isHttps;
     const tokenData = {
       access_token: tokens.access_token || '',
       refresh_token: tokens.refresh_token || '',
@@ -40,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     cookieStore.set('gmailTokens', JSON.stringify(tokenData), {
       httpOnly: true,
-      secure: true, // Always use secure in Vercel (all URLs are HTTPS)
+      secure: useSecureCookies,
       sameSite: 'lax',
       maxAge: 24 * 60 * 60, // 24 hours
       path: '/', // Ensure cookie is available across the entire domain

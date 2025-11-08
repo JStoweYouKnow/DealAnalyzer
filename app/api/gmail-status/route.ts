@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 export async function GET() {
   try {
@@ -14,6 +14,21 @@ export async function GET() {
     }
 
     const cookieStore = await cookies();
+    const headersList = await headers();
+    const forwardedProto = headersList.get('x-forwarded-proto');
+    const origin = headersList.get('origin');
+    let isHttps = forwardedProto === 'https';
+
+    if (!isHttps && origin) {
+      try {
+        isHttps = new URL(origin).protocol === 'https:';
+      } catch {
+        // Ignore invalid origin values
+      }
+    }
+
+    const isDevelopment = process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1';
+    const useSecureCookies = !isDevelopment && isHttps;
 
     // Debug: Log all cookies (only in development)
     if (process.env.NODE_ENV === 'development') {
@@ -79,7 +94,7 @@ export async function GET() {
           
           cookieStore.set('gmailTokens', JSON.stringify(tokenData), {
             httpOnly: true,
-            secure: true, // Always use secure in Vercel (all URLs are HTTPS)
+            secure: useSecureCookies,
             sameSite: 'lax',
             maxAge: 24 * 60 * 60, // 24 hours
             path: '/',

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { emailMonitoringService } from "../../../server/email-service";
 import { storage } from "../../../server/storage";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { google } from "googleapis";
 import type { EmailMonitoringResponse } from "../../../shared/schema";
 
@@ -23,6 +23,21 @@ export async function POST() {
 
     // Check if user has Gmail tokens - first check cookies, then database
     const cookieStore = await cookies();
+    const headersList = headers();
+    const forwardedProto = headersList.get('x-forwarded-proto');
+    const origin = headersList.get('origin');
+    let isHttps = forwardedProto === 'https';
+
+    if (!isHttps && origin) {
+      try {
+        isHttps = new URL(origin).protocol === 'https:';
+      } catch {
+        // Ignore invalid origin values
+      }
+    }
+
+    const isDevelopment = process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1';
+    const useSecureCookies = !isDevelopment && isHttps;
     let gmailTokensCookie = cookieStore.get('gmailTokens');
     let gmailTokens: any = null;
     
@@ -84,7 +99,7 @@ export async function POST() {
           
           cookieStore.set('gmailTokens', JSON.stringify(tokenData), {
             httpOnly: true,
-            secure: true, // Always use secure in Vercel (all URLs are HTTPS)
+            secure: useSecureCookies,
             sameSite: 'lax',
             maxAge: 24 * 60 * 60, // 24 hours
             path: '/',
@@ -168,7 +183,7 @@ export async function POST() {
         // The async callback ensures this operation completes before the Promise resolves
         freshCookieStore.set('gmailTokens', JSON.stringify(tokenData), {
           httpOnly: true,
-          secure: true, // Always use secure in Vercel (all URLs are HTTPS)
+          secure: useSecureCookies,
           sameSite: 'lax',
           maxAge: 24 * 60 * 60, // 24 hours
           path: '/',
