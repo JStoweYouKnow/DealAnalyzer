@@ -84,7 +84,7 @@ export async function POST() {
           
           cookieStore.set('gmailTokens', JSON.stringify(tokenData), {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true, // Always use secure in Vercel (all URLs are HTTPS)
             sameSite: 'lax',
             maxAge: 24 * 60 * 60, // 24 hours
             path: '/',
@@ -168,7 +168,7 @@ export async function POST() {
         // The async callback ensures this operation completes before the Promise resolves
         freshCookieStore.set('gmailTokens', JSON.stringify(tokenData), {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
+          secure: true, // Always use secure in Vercel (all URLs are HTTPS)
           sameSite: 'lax',
           maxAge: 24 * 60 * 60, // 24 hours
           path: '/',

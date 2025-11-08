@@ -79,7 +79,7 @@ export async function GET() {
           
           cookieStore.set('gmailTokens', JSON.stringify(tokenData), {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true, // Always use secure in Vercel (all URLs are HTTPS)
             sameSite: 'lax',
             maxAge: 24 * 60 * 60, // 24 hours
             path: '/',
