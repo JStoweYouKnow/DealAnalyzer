@@ -28,10 +28,13 @@ export function MortgageCalculator({ onMortgageCalculated }: MortgageCalculatorP
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<MortgageCalculatorResult | null>(null);
-  
+
+  const [purchasePrice, setPurchasePrice] = useState("");
+  const [downPaymentPercent, setDownPaymentPercent] = useState("20");
   const [loanAmount, setLoanAmount] = useState("");
   const [interestRate, setInterestRate] = useState("");
   const [durationYears, setDurationYears] = useState("30");
+  const [manualLoanAmount, setManualLoanAmount] = useState(false);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -40,6 +43,38 @@ export function MortgageCalculator({ onMortgageCalculated }: MortgageCalculatorP
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+  };
+
+  // Auto-calculate loan amount when purchase price or down payment changes
+  const handlePurchasePriceChange = (value: string) => {
+    setPurchasePrice(value);
+    if (!manualLoanAmount && value && downPaymentPercent) {
+      const price = parseFloat(value);
+      const downPercent = parseFloat(downPaymentPercent);
+      if (!isNaN(price) && !isNaN(downPercent) && price > 0) {
+        const downPaymentAmount = price * (downPercent / 100);
+        const calculatedLoanAmount = price - downPaymentAmount;
+        setLoanAmount(calculatedLoanAmount.toFixed(2));
+      }
+    }
+  };
+
+  const handleDownPaymentChange = (value: string) => {
+    setDownPaymentPercent(value);
+    if (!manualLoanAmount && purchasePrice && value) {
+      const price = parseFloat(purchasePrice);
+      const downPercent = parseFloat(value);
+      if (!isNaN(price) && !isNaN(downPercent) && price > 0) {
+        const downPaymentAmount = price * (downPercent / 100);
+        const calculatedLoanAmount = price - downPaymentAmount;
+        setLoanAmount(calculatedLoanAmount.toFixed(2));
+      }
+    }
+  };
+
+  const handleLoanAmountChange = (value: string) => {
+    setLoanAmount(value);
+    setManualLoanAmount(true); // User is manually entering loan amount
   };
 
   const handleCalculate = async () => {
@@ -153,11 +188,14 @@ export function MortgageCalculator({ onMortgageCalculated }: MortgageCalculatorP
   };
 
   const handleReset = () => {
+    setPurchasePrice("");
+    setDownPaymentPercent("20");
     setLoanAmount("");
     setInterestRate("");
     setDurationYears("30");
+    setManualLoanAmount(false);
     setResult(null);
-    
+
     // Notify parent that mortgage calculator was reset
     if (onMortgageCalculated) {
       onMortgageCalculated(null);
@@ -173,15 +211,60 @@ export function MortgageCalculator({ onMortgageCalculated }: MortgageCalculatorP
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Purchase Price and Down Payment Section */}
+        <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+          <h4 className="font-semibold text-sm text-muted-foreground">Property Details</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="purchase-price">Purchase Price ($)</Label>
+              <Input
+                id="purchase-price"
+                type="number"
+                placeholder="e.g., 250000"
+                value={purchasePrice}
+                onChange={(e) => handlePurchasePriceChange(e.target.value)}
+                min="0"
+                step="1000"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="down-payment">Down Payment (%)</Label>
+              <Input
+                id="down-payment"
+                type="number"
+                placeholder="e.g., 20"
+                value={downPaymentPercent}
+                onChange={(e) => handleDownPaymentChange(e.target.value)}
+                min="0"
+                max="100"
+                step="1"
+              />
+            </div>
+          </div>
+
+          {purchasePrice && downPaymentPercent && (
+            <div className="text-sm text-muted-foreground">
+              Down Payment Amount: {formatCurrency(parseFloat(purchasePrice) * (parseFloat(downPaymentPercent) / 100))}
+            </div>
+          )}
+        </div>
+
+        {/* Loan Details Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="loan-amount">Loan Amount ($)</Label>
+            <Label htmlFor="loan-amount">
+              Loan Amount ($)
+              {!manualLoanAmount && purchasePrice && (
+                <span className="ml-2 text-xs text-muted-foreground">(Auto-calculated)</span>
+              )}
+            </Label>
             <Input
               id="loan-amount"
               type="number"
               placeholder="e.g., 200000"
               value={loanAmount}
-              onChange={(e) => setLoanAmount(e.target.value)}
+              onChange={(e) => handleLoanAmountChange(e.target.value)}
               min="0"
               step="1000"
             />
