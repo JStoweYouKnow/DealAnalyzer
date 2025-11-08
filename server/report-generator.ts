@@ -275,7 +275,7 @@ async function makePDF(html: string): Promise<Buffer | null> {
       
       await browser.close();
 
-      return pdfBuffer as Buffer;
+      return buffer;
     }
 
     // If browser wasn't launched, this is an error condition

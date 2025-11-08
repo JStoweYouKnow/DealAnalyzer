@@ -21,16 +21,107 @@ interface MortgageValues {
   monthlyPayment: number;
 }
 
+interface DealMortgageInputs {
+  purchasePrice: string;
+  downPaymentPercent: string;
+  loanAmount: string;
+  interestRate: string;
+  durationYears: string;
+  manualLoanAmount: boolean;
+}
+
+const DEFAULT_MORTGAGE_INPUTS: DealMortgageInputs = {
+  purchasePrice: "",
+  downPaymentPercent: "20",
+  loanAmount: "",
+  interestRate: "",
+  durationYears: "30",
+  manualLoanAmount: false,
+};
+
+const createDefaultMortgageInputs = (): DealMortgageInputs => ({
+  ...DEFAULT_MORTGAGE_INPUTS,
+});
+
 export default function DealsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'reviewed' | 'analyzed' | 'archived'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingDeal, setEditingDeal] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{[key: string]: {price?: number, rent?: number, adr?: number, occupancyRate?: number, bedrooms?: number, bathrooms?: number, fundingSource?: FundingSource, mortgageValues?: MortgageValues | null}}>({});
-  const [mortgageInputs, setMortgageInputs] = useState<{[key: string]: {loanAmount: string, interestRate: string, durationYears: string}}>({});
+  const [mortgageInputs, setMortgageInputs] = useState<Record<string, DealMortgageInputs>>({});
   const [mortgageLoading, setMortgageLoading] = useState<{[key: string]: boolean}>({});
   const [mortgageResults, setMortgageResults] = useState<{[key: string]: {monthly_payment: number, total_interest_paid: number, total_paid: number}}>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  const getMortgageInputsForDeal = (dealId: string): DealMortgageInputs =>
+    mortgageInputs[dealId] ?? DEFAULT_MORTGAGE_INPUTS;
+
+  const updateMortgageInputs = (
+    dealId: string,
+    updater: (inputs: DealMortgageInputs) => DealMortgageInputs
+  ) => {
+    setMortgageInputs(prev => {
+      const existing = prev[dealId] ? { ...prev[dealId] } : createDefaultMortgageInputs();
+      const updated = updater(existing);
+      return { ...prev, [dealId]: updated };
+    });
+  };
+
+  const calculateDownPaymentAmount = (purchasePrice: string, downPaymentPercent: string): number | null => {
+    const price = parseFloat(purchasePrice);
+    const percent = parseFloat(downPaymentPercent);
+    if (isNaN(price) || isNaN(percent) || price <= 0 || percent < 0) {
+      return null;
+    }
+    return price * (percent / 100);
+  };
+
+  const handleMortgagePurchasePriceChange = (dealId: string, value: string) => {
+    updateMortgageInputs(dealId, current => {
+      const updated = { ...current, purchasePrice: value };
+
+      if (!current.manualLoanAmount) {
+        const price = parseFloat(value);
+        const percent = parseFloat(current.downPaymentPercent);
+        if (!isNaN(price) && price > 0 && !isNaN(percent)) {
+          const downPaymentAmount = price * (percent / 100);
+          const calculatedLoanAmount = price - downPaymentAmount;
+          updated.loanAmount = calculatedLoanAmount > 0 ? calculatedLoanAmount.toFixed(2) : "";
+        } else if (!value) {
+          updated.loanAmount = "";
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  const handleMortgageDownPaymentChange = (dealId: string, value: string) => {
+    updateMortgageInputs(dealId, current => {
+      const updated = { ...current, downPaymentPercent: value };
+
+      if (!current.manualLoanAmount) {
+        const price = parseFloat(current.purchasePrice);
+        const percent = parseFloat(value);
+        if (!isNaN(price) && price > 0 && !isNaN(percent)) {
+          const downPaymentAmount = price * (percent / 100);
+          const calculatedLoanAmount = price - downPaymentAmount;
+          updated.loanAmount = calculatedLoanAmount > 0 ? calculatedLoanAmount.toFixed(2) : "";
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  const handleMortgageLoanAmountChange = (dealId: string, value: string) => {
+    updateMortgageInputs(dealId, current => ({
+      ...current,
+      loanAmount: value,
+      manualLoanAmount: true,
+    }));
+  };
   
   // Coordination flag to prevent race conditions between postMessage handler and polling
   const isSyncingRef = useRef<boolean>(false);
@@ -470,8 +561,12 @@ export default function DealsPage() {
 
   // Mortgage calculator handler
   const handleMortgageCalculate = async (dealId: string) => {
-    const inputs = mortgageInputs[dealId];
-    if (!inputs || !inputs.loanAmount || !inputs.interestRate || !inputs.durationYears) {
+    const inputs = getMortgageInputsForDeal(dealId);
+    const loanAmountValue = inputs.loanAmount?.trim();
+    const interestRateValue = inputs.interestRate?.trim();
+    const durationValue = inputs.durationYears?.trim();
+
+    if (!loanAmountValue || !interestRateValue || !durationValue) {
       toast({
         title: "Missing Information",
         description: "Please fill in all mortgage calculator fields",
@@ -480,9 +575,9 @@ export default function DealsPage() {
       return;
     }
 
-    const loan = parseFloat(inputs.loanAmount);
-    const rate = parseFloat(inputs.interestRate);
-    const years = parseFloat(inputs.durationYears);
+    const loan = parseFloat(loanAmountValue);
+    const rate = parseFloat(interestRateValue);
+    const years = parseFloat(durationValue);
 
     if (isNaN(loan) || loan <= 0) {
       toast({
@@ -720,6 +815,15 @@ export default function DealsPage() {
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatCurrencyDetailed = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -1115,8 +1219,15 @@ export default function DealsPage() {
                           </div>
                           
                           {/* Funding Source and Mortgage Calculator Section */}
-                          {editingDeal === deal.id && (
-                            <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border-t border-gray-200 dark:border-gray-700 mt-4">
+                          {editingDeal === deal.id && (() => {
+                            const inputs = getMortgageInputsForDeal(deal.id);
+                            const downPaymentAmount = calculateDownPaymentAmount(
+                              inputs.purchasePrice,
+                              inputs.downPaymentPercent
+                            );
+
+                            return (
+                              <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border-t border-gray-200 dark:border-gray-700 mt-4">
                               {/* Funding Source */}
                               <div>
                                 <Label className="text-sm font-medium mb-2 block">Funding Source</Label>
@@ -1151,23 +1262,59 @@ export default function DealsPage() {
                                 <Label className="text-sm font-semibold mb-3 block">Mortgage Calculator (Optional)</Label>
                                 <p className="text-xs text-muted-foreground mb-4">Calculate mortgage payment to use in analysis</p>
                                 
+                                <div className="p-4 bg-muted/40 rounded-lg space-y-4 mb-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <Label htmlFor={`purchase-price-${deal.id}`} className="text-sm font-medium">Purchase Price ($)</Label>
+                                      <Input
+                                        id={`purchase-price-${deal.id}`}
+                                        type="number"
+                                        placeholder="e.g., 250000"
+                                        value={inputs.purchasePrice}
+                                        onChange={(e) => handleMortgagePurchasePriceChange(deal.id, e.target.value)}
+                                        min="0"
+                                        step="1000"
+                                        className="h-10"
+                                      />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <Label htmlFor={`down-payment-${deal.id}`} className="text-sm font-medium">Down Payment (%)</Label>
+                                      <Input
+                                        id={`down-payment-${deal.id}`}
+                                        type="number"
+                                        placeholder="e.g., 20"
+                                        value={inputs.downPaymentPercent}
+                                        onChange={(e) => handleMortgageDownPaymentChange(deal.id, e.target.value)}
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        className="h-10"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {downPaymentAmount !== null && (
+                                    <div className="text-xs text-muted-foreground">
+                                      Down Payment Amount: {formatCurrencyDetailed(downPaymentAmount)}
+                                    </div>
+                                  )}
+                                </div>
+
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                                   <div className="space-y-2">
-                                    <Label htmlFor={`loan-amount-${deal.id}`} className="text-sm font-medium">Loan Amount ($)</Label>
+                                    <Label htmlFor={`loan-amount-${deal.id}`} className="text-sm font-medium">
+                                      Loan Amount ($)
+                                      {!inputs.manualLoanAmount && inputs.purchasePrice && (
+                                        <span className="ml-2 text-xs text-muted-foreground">(Auto-calculated)</span>
+                                      )}
+                                    </Label>
                                     <Input
                                       id={`loan-amount-${deal.id}`}
                                       type="number"
                                       placeholder="e.g., 200000"
-                                      value={mortgageInputs[deal.id]?.loanAmount || ""}
-                                      onChange={(e) => setMortgageInputs(prev => ({
-                                        ...prev,
-                                        [deal.id]: {
-                                          ...prev[deal.id],
-                                          loanAmount: e.target.value,
-                                          interestRate: prev[deal.id]?.interestRate || "",
-                                          durationYears: prev[deal.id]?.durationYears || "30"
-                                        }
-                                      }))}
+                                      value={inputs.loanAmount}
+                                      onChange={(e) => handleMortgageLoanAmountChange(deal.id, e.target.value)}
                                       min="0"
                                       step="1000"
                                       className="h-10"
@@ -1179,16 +1326,11 @@ export default function DealsPage() {
                                     <Input
                                       id={`interest-rate-${deal.id}`}
                                       type="number"
-                                      placeholder="e.g., 3.5"
-                                      value={mortgageInputs[deal.id]?.interestRate || ""}
-                                      onChange={(e) => setMortgageInputs(prev => ({
-                                        ...prev,
-                                        [deal.id]: {
-                                          ...prev[deal.id],
-                                          loanAmount: prev[deal.id]?.loanAmount || "",
-                                          interestRate: e.target.value,
-                                          durationYears: prev[deal.id]?.durationYears || "30"
-                                        }
+                                      placeholder="e.g., 6.5"
+                                      value={inputs.interestRate}
+                                      onChange={(e) => updateMortgageInputs(deal.id, current => ({
+                                        ...current,
+                                        interestRate: e.target.value,
                                       }))}
                                       min="0"
                                       step="0.1"
@@ -1202,15 +1344,10 @@ export default function DealsPage() {
                                       id={`duration-${deal.id}`}
                                       type="number"
                                       placeholder="e.g., 30"
-                                      value={mortgageInputs[deal.id]?.durationYears || "30"}
-                                      onChange={(e) => setMortgageInputs(prev => ({
-                                        ...prev,
-                                        [deal.id]: {
-                                          ...prev[deal.id],
-                                          loanAmount: prev[deal.id]?.loanAmount || "",
-                                          interestRate: prev[deal.id]?.interestRate || "",
-                                          durationYears: e.target.value
-                                        }
+                                      value={inputs.durationYears}
+                                      onChange={(e) => updateMortgageInputs(deal.id, current => ({
+                                        ...current,
+                                        durationYears: e.target.value,
                                       }))}
                                       min="1"
                                       step="1"
@@ -1279,14 +1416,62 @@ export default function DealsPage() {
                                           {formatCurrency(mortgageResults[deal.id].monthly_payment)}
                                         </p>
                                       </div>
-                                      
+
                                       <div className="space-y-1">
                                         <p className="text-sm text-blue-700 dark:text-blue-300">Total Interest Paid</p>
-                                        <p className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                                        <p className="text-xl font-semibold">
                                           {formatCurrency(mortgageResults[deal.id].total_interest_paid)}
                                         </p>
                                       </div>
+
+                                      <div className="space-y-1">
+                                        <p className="text-sm text-blue-700 dark:text-blue-300">Total Amount Paid</p>
+                                        <p className="text-xl font-semibold">
+                                          {formatCurrency(mortgageResults[deal.id].total_paid)}
+                                        </p>
+                                      </div>
+
+                                      {mortgageResults[deal.id].payback_period_years && (
+                                        <div className="space-y-1">
+                                          <p className="text-sm text-blue-700 dark:text-blue-300">Loan Term</p>
+                                          <p className="text-xl font-semibold">
+                                            {mortgageResults[deal.id].payback_period_years} years
+                                            {mortgageResults[deal.id].payback_period_months && (
+                                              <span className="text-sm text-muted-foreground ml-1">
+                                                ({mortgageResults[deal.id].payback_period_months} months)
+                                              </span>
+                                            )}
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
+
+                                    <div className="mt-4 pt-4 border-t border-blue-100 dark:border-blue-900">
+                                      <p className="text-sm text-muted-foreground mb-2">Payment Breakdown</p>
+                                      <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-sm">Principal</span>
+                                          <span className="font-semibold">{formatCurrency(mortgageResults[deal.id].total_paid - mortgageResults[deal.id].total_interest_paid)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-sm">Interest</span>
+                                          <span className="font-semibold">{formatCurrency(mortgageResults[deal.id].total_interest_paid)}</span>
+                                        </div>
+                                        <div className="w-full bg-blue-100 dark:bg-blue-900/40 h-2 rounded-full overflow-hidden">
+                                          <div
+                                            className="bg-blue-500 dark:bg-blue-400 h-full transition-all"
+                                            style={{
+                                              width: `${((mortgageResults[deal.id].total_paid - mortgageResults[deal.id].total_interest_paid) / mortgageResults[deal.id].total_paid) * 100}%`
+                                            }}
+                                          />
+                                        </div>
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                          <span>Principal: {(((mortgageResults[deal.id].total_paid - mortgageResults[deal.id].total_interest_paid) / mortgageResults[deal.id].total_paid) * 100).toFixed(1)}%</span>
+                                          <span>Interest: {((mortgageResults[deal.id].total_interest_paid / mortgageResults[deal.id].total_paid) * 100).toFixed(1)}%</span>
+                                        </div>
+                                      </div>
+                                    </div>
+
                                     <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
                                       <p className="text-xs text-blue-600 dark:text-blue-400">
                                         <i className="fas fa-check-circle mr-1"></i>
@@ -1296,8 +1481,9 @@ export default function DealsPage() {
                                   </div>
                                 )}
                               </div>
-                            </div>
-                          )}
+                              </div>
+                            );
+                          })()}
                           
                           {/* Editable Bedroom and Bathroom Section */}
                           {editingDeal === deal.id && (
@@ -1424,12 +1610,20 @@ export default function DealsPage() {
                                     fundingSource: 'conventional'
                                   }
                                 }));
+                                const initialPrice = deal.analysis?.property?.purchasePrice || deal.extractedProperty?.price;
+                                const purchasePriceString = initialPrice ? initialPrice.toString() : "";
+                                const initialLoanAmount = initialPrice
+                                  ? (initialPrice - initialPrice * 0.2).toFixed(2)
+                                  : "";
                                 setMortgageInputs(prev => ({
                                   ...prev,
                                   [deal.id]: {
-                                    loanAmount: "",
+                                    purchasePrice: purchasePriceString,
+                                    downPaymentPercent: "20",
+                                    loanAmount: initialLoanAmount,
                                     interestRate: "",
-                                    durationYears: "30"
+                                    durationYears: "30",
+                                    manualLoanAmount: false,
                                   }
                                 }));
                               }}

@@ -165,6 +165,7 @@ export default function HomePage() {
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
         {/* Left Panel - File Upload & Tools */}
         <div className="xl:col-span-2 space-y-6">
+          <MortgageCalculator onMortgageCalculated={setMortgageValues} />
           <AnalyzerForm 
             onAnalyze={handleAnalyze}
             isLoading={analysisMutation.isPending}

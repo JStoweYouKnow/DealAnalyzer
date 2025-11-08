@@ -28,6 +28,53 @@ export async function GET(request: NextRequest) {
 
     console.log('[Gmail Callback] Received tokens, setting cookie...');
 
+    // Preserve existing refresh token if Google doesn't return one (common on re-auth)
+    let refreshToken = tokens.refresh_token || '';
+    let existingTokens: {
+      access_token?: string;
+      refresh_token?: string;
+      scope?: string;
+      token_type?: string;
+      expiry_date?: number;
+    } | null = null;
+
+    const existingCookie = request.cookies.get('gmailTokens');
+    if (!refreshToken && existingCookie?.value) {
+      try {
+        existingTokens = JSON.parse(existingCookie.value);
+        refreshToken = existingTokens?.refresh_token || refreshToken;
+      } catch (error) {
+        console.error('[Gmail Callback] Error parsing existing cookie tokens:', error);
+      }
+    }
+
+    if (!refreshToken && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
+      try {
+        const { ConvexHttpClient } = await import('convex/browser');
+        const apiModule = await import('../../../convex/_generated/api');
+        const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+
+        const dbTokens = await convexClient.action(
+          apiModule.api.userOAuthTokens.retrieveTokensForServer,
+          { userId }
+        );
+
+        if (dbTokens?.refreshToken) {
+          refreshToken = dbTokens.refreshToken;
+          existingTokens = {
+            refresh_token: dbTokens.refreshToken,
+            access_token: dbTokens.accessToken,
+            scope: dbTokens.scope,
+            token_type: dbTokens.tokenType,
+            expiry_date: dbTokens.expiryDate,
+          };
+          console.log('[Gmail Callback] Retrieved refresh token from database');
+        }
+      } catch (error) {
+        console.error('[Gmail Callback] Error retrieving refresh token from database:', error);
+      }
+    }
+
     // Store tokens in cookie
     const cookieStore = await cookies();
     const forwardedProto = request.headers.get('x-forwarded-proto');
@@ -39,10 +86,10 @@ export async function GET(request: NextRequest) {
     const useSecureCookies = !isDevelopment && isHttps;
     const tokenData = {
       access_token: tokens.access_token || '',
-      refresh_token: tokens.refresh_token || '',
-      scope: tokens.scope || '',
-      token_type: tokens.token_type || 'Bearer',
-      expiry_date: tokens.expiry_date ?? undefined
+      refresh_token: refreshToken,
+      scope: tokens.scope || existingTokens?.scope || '',
+      token_type: tokens.token_type || existingTokens?.token_type || 'Bearer',
+      expiry_date: tokens.expiry_date ?? existingTokens?.expiry_date ?? undefined
     };
 
     cookieStore.set('gmailTokens', JSON.stringify(tokenData), {
@@ -56,7 +103,8 @@ export async function GET(request: NextRequest) {
     console.log('[Gmail Callback] Cookie set successfully');
 
     // Persist tokens to database if userId is available and we have both tokens
-    if (userId && tokens.access_token && tokens.refresh_token) {
+    const hasRefreshToken = !!refreshToken;
+    if (userId && tokens.access_token && hasRefreshToken) {
       try {
         // Initialize Convex client for token persistence
         if (process.env.NEXT_PUBLIC_CONVEX_URL) {
@@ -67,10 +115,10 @@ export async function GET(request: NextRequest) {
           await convexClient.mutation(apiModule.api.userOAuthTokens.upsertTokens, {
             userId,
             accessToken: tokens.access_token,
-            refreshToken: tokens.refresh_token,
-            scope: tokens.scope,
-            expiryDate: tokens.expiry_date ?? undefined,
-            tokenType: tokens.token_type || 'Bearer',
+            refreshToken,
+            scope: tokens.scope || existingTokens?.scope,
+            expiryDate: tokens.expiry_date ?? existingTokens?.expiry_date ?? undefined,
+            tokenType: tokens.token_type || existingTokens?.token_type || 'Bearer',
           });
           
           console.log('[Gmail Callback] Tokens persisted to database');
