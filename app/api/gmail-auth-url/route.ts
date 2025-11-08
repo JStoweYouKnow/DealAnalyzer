@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
 
+const DEFAULT_PROJECT_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN;
+
 export async function GET(request: Request) {
   try {
     // Check for a "clear" parameter to force account selection
@@ -8,25 +10,31 @@ export async function GET(request: Request) {
     const clearSession = url.searchParams.get('clear') === 'true';
     
     // Dynamically construct the redirect URI based on the request
-    // Use the main production domain for consistency
-    const protocol = request.headers.get('x-forwarded-proto') || 'http';
+    // Allow overriding with NEXT_PUBLIC_APP_DOMAIN for production if needed
+    const forwardedProto = request.headers.get('x-forwarded-proto');
+    let protocol = forwardedProto || url.protocol.replace(':', '') || 'https';
     let host = request.headers.get('host') || url.hostname;
-    
-    // Extract just the main domain (remove preview deployment suffixes)
-    // e.g., "comfort-finder-analyzer-9vh7byfjs-james-stowes-projects.vercel.app" -> "comfort-finder-analyzer.vercel.app"
-    if (host.includes('vercel.app')) {
-      // Match any Vercel subdomain pattern and extract just the base project name
-      const mainDomainMatch = host.match(/(comfort-finder-analyzer)[^.]*\.(vercel\.app)$/);
-      if (mainDomainMatch) {
-        host = `${mainDomainMatch[1]}.${mainDomainMatch[2]}`;
+
+    if (DEFAULT_PROJECT_DOMAIN) {
+      try {
+        const parsed = new URL(
+          DEFAULT_PROJECT_DOMAIN.startsWith('http')
+            ? DEFAULT_PROJECT_DOMAIN
+            : `https://${DEFAULT_PROJECT_DOMAIN}`
+        );
+        protocol = parsed.protocol.replace(':', '') || protocol;
+        host = parsed.host || host;
+      } catch (error) {
+        console.warn('Invalid NEXT_PUBLIC_APP_DOMAIN, falling back to request host:', error);
+        host = DEFAULT_PROJECT_DOMAIN;
+        protocol = protocol || 'https';
       }
     }
-    
-    // Fallback to main production domain if we're on Vercel
-    if (host.includes('vercel.app') && !host.match(/^comfort-finder-analyzer\.vercel\.app$/)) {
-      host = 'comfort-finder-analyzer.vercel.app';
+
+    if (!host) {
+      throw new Error('Unable to determine host for Gmail redirect');
     }
-    
+
     const redirectUri = `${protocol}://${host}/api/gmail-callback`;
     
     // Create auth URL with dynamic redirect URI
