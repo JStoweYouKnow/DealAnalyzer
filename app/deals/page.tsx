@@ -21,6 +21,14 @@ interface MortgageValues {
   monthlyPayment: number;
 }
 
+interface DealMortgageResult {
+  monthly_payment: number;
+  total_interest_paid: number;
+  total_paid: number;
+  payback_period_years?: number;
+  payback_period_months?: number;
+}
+
 interface DealMortgageInputs {
   purchasePrice: string;
   downPaymentPercent: string;
@@ -50,7 +58,7 @@ export default function DealsPage() {
   const [editValues, setEditValues] = useState<{[key: string]: {price?: number, rent?: number, adr?: number, occupancyRate?: number, bedrooms?: number, bathrooms?: number, fundingSource?: FundingSource, mortgageValues?: MortgageValues | null}}>({});
   const [mortgageInputs, setMortgageInputs] = useState<Record<string, DealMortgageInputs>>({});
   const [mortgageLoading, setMortgageLoading] = useState<{[key: string]: boolean}>({});
-  const [mortgageResults, setMortgageResults] = useState<{[key: string]: {monthly_payment: number, total_interest_paid: number, total_paid: number}}>({});
+  const [mortgageResults, setMortgageResults] = useState<Record<string, DealMortgageResult>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -1431,12 +1439,12 @@ export default function DealsPage() {
                                         </p>
                                       </div>
 
-                                      {mortgageResults[deal.id].payback_period_years && (
+                                    {mortgageResults[deal.id].payback_period_years !== undefined && (
                                         <div className="space-y-1">
                                           <p className="text-sm text-blue-700 dark:text-blue-300">Loan Term</p>
                                           <p className="text-xl font-semibold">
                                             {mortgageResults[deal.id].payback_period_years} years
-                                            {mortgageResults[deal.id].payback_period_months && (
+                                            {mortgageResults[deal.id].payback_period_months !== undefined && (
                                               <span className="text-sm text-muted-foreground ml-1">
                                                 ({mortgageResults[deal.id].payback_period_months} months)
                                               </span>
