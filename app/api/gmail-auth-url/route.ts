@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
+import type { GenerateAuthUrlOpts } from "google-auth-library";
 
 const DEFAULT_PROJECT_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN;
 
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
 
     const scopes = ['https://www.googleapis.com/auth/gmail.readonly'];
 
-    const authUrlConfig: any = {
+    const authUrlConfig: GenerateAuthUrlOpts = {
       access_type: 'offline',
       scope: scopes,
       include_granted_scopes: true,
