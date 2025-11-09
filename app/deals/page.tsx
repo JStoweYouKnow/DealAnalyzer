@@ -51,6 +51,14 @@ const createDefaultMortgageInputs = (): DealMortgageInputs => ({
   ...DEFAULT_MORTGAGE_INPUTS,
 });
 
+const FUNDING_SOURCE_DOWN_PAYMENT_DEFAULTS: Record<FundingSource, number> = {
+  conventional: 5,
+  fha: 3.5,
+  va: 0,
+  dscr: 20,
+  cash: 100,
+};
+
 export default function DealsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'reviewed' | 'analyzed' | 'archived'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -1241,13 +1249,42 @@ export default function DealsPage() {
                                 <Label className="text-sm font-medium mb-2 block">Funding Source</Label>
                                 <Select
                                   value={editValues[deal.id]?.fundingSource || 'conventional'}
-                                  onValueChange={(value) => setEditValues(prev => ({
-                                    ...prev,
-                                    [deal.id]: {
-                                      ...prev[deal.id],
-                                      fundingSource: value as FundingSource
+                                  onValueChange={(value) => {
+                                    const fundingSource = value as FundingSource;
+                                    setEditValues(prev => ({
+                                      ...prev,
+                                      [deal.id]: {
+                                        ...prev[deal.id],
+                                        fundingSource,
+                                      }
+                                    }));
+                                    
+                                    const defaultDownPayment = FUNDING_SOURCE_DOWN_PAYMENT_DEFAULTS[fundingSource];
+                                    
+                                    if (typeof defaultDownPayment === 'number') {
+                                      updateMortgageInputs(deal.id, current => {
+                                        const downPaymentPercent = defaultDownPayment.toString();
+                                        const updated: DealMortgageInputs = {
+                                          ...current,
+                                          downPaymentPercent,
+                                          manualLoanAmount: false,
+                                        };
+                                        
+                                        const price = parseFloat(updated.purchasePrice);
+                                        const percent = parseFloat(downPaymentPercent);
+                                        
+                                        if (!isNaN(price) && price > 0 && !isNaN(percent)) {
+                                          const downPaymentAmount = price * (percent / 100);
+                                          const calculatedLoanAmount = price - downPaymentAmount;
+                                          updated.loanAmount = calculatedLoanAmount > 0 ? calculatedLoanAmount.toFixed(2) : "";
+                                        } else if (!updated.purchasePrice) {
+                                          updated.loanAmount = "";
+                                        }
+                                        
+                                        return updated;
+                                      });
                                     }
-                                  }))}
+                                  }}
                                 >
                                   <SelectTrigger className="h-10">
                                     <SelectValue placeholder="Select funding source" />
