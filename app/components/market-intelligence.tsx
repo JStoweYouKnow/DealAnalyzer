@@ -73,6 +73,7 @@ type MarketTrend = {
 export function MarketIntelligence() {
   const [zipInput, setZipInput] = useState<string>("");
   const [zipCode, setZipCode] = useState<string>("");
+  const [addressInput, setAddressInput] = useState<string>("");
   const [searchAddress, setSearchAddress] = useState<string>("");
   const [useLiveData, setUseLiveData] = useState<boolean>(false);
 
@@ -90,6 +91,19 @@ export function MarketIntelligence() {
   const handleZipClear = () => {
     setZipInput("");
     setZipCode("");
+  };
+
+  const handleAddressSearch = () => {
+    const trimmed = addressInput.trim();
+    if (!trimmed || trimmed.length < 5) {
+      return;
+    }
+    setSearchAddress(trimmed);
+  };
+
+  const handleAddressClear = () => {
+    setAddressInput("");
+    setSearchAddress("");
   };
 
   // Fetch neighborhood trends
@@ -730,21 +744,37 @@ export function MarketIntelligence() {
         </TabsContent>
 
         <TabsContent value="sales" className="space-y-4">
-          <div className="flex space-x-4">
+          <div className="flex flex-col md:flex-row md:items-end gap-3">
             <Input 
               placeholder="Enter property address to find comparable sales..."
-              value={searchAddress}
-              onChange={(e) => setSearchAddress(e.target.value)}
+              value={addressInput}
+              onChange={(e) => setAddressInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddressSearch();
+                }
+              }}
               className="flex-1"
               data-testid="input-address-search"
             />
-            <Button 
-              onClick={() => setSearchAddress("")}
-              variant="outline"
-              data-testid="button-clear-search"
-            >
-              Clear
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleAddressSearch}
+                data-testid="button-search-address"
+                disabled={addressInput.trim().length < 5}
+              >
+                Search
+              </Button>
+              <Button 
+                onClick={handleAddressClear}
+                variant="outline"
+                data-testid="button-clear-search"
+                disabled={!addressInput && !searchAddress}
+              >
+                Clear
+              </Button>
+            </div>
           </div>
 
           {salesLoading ? (

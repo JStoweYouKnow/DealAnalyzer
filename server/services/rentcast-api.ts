@@ -72,13 +72,15 @@ export class RentCastAPIService {
           });
 
           if (!response.ok) {
-            throw new Error(`RentCast API error: ${response.status} ${response.statusText}`);
+            const errorBody = await response.text();
+            console.warn(`[RentCast] ${endpoint} responded ${response.status} ${response.statusText}: ${errorBody}`);
+            return null;
           }
 
           return await response.json();
         } catch (error) {
           console.error('RentCast API request failed:', error);
-          throw error;
+          return null;
         }
       }
     );
