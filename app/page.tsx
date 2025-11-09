@@ -10,7 +10,6 @@ import { QuickCompare } from "@/components/quick-compare";
 import { RecentAnalyses } from "@/components/recent-analyses";
 import { Reports } from "@/components/reports";
 import { LoadingState } from "@/components/loading-state";
-import { MortgageCalculator } from "@/components/mortgage-calculator";
 import { useToast } from "@/hooks/use-toast";
 import { useComparison } from "@/hooks/use-comparison";
 import type { AnalyzePropertyResponse, DealAnalysis, CriteriaResponse } from "@shared/schema";
@@ -24,7 +23,6 @@ interface MortgageValues {
 export default function HomePage() {
   const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(null);
   const [recentAnalyses, setRecentAnalyses] = useState<DealAnalysis[]>([]);
-  const [mortgageValues, setMortgageValues] = useState<MortgageValues | null>(null);
   const { toast } = useToast();
 
   const { 
@@ -165,12 +163,9 @@ export default function HomePage() {
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
         {/* Left Panel - File Upload & Tools */}
         <div className="xl:col-span-2 space-y-6">
-          <MortgageCalculator onMortgageCalculated={setMortgageValues} />
           <AnalyzerForm 
             onAnalyze={handleAnalyze}
             isLoading={analysisMutation.isPending}
-            mortgageValues={mortgageValues}
-            onMortgageCalculated={setMortgageValues}
             data-testid="analyzer-form"
           />
         </div>
