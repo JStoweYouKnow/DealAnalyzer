@@ -247,6 +247,7 @@ export const emailDealSchema = z.object({
   sender: z.string(),
   receivedDate: z.date(),
   emailContent: z.string(),
+  userId: z.string().optional(), // User ID for email forwarding
   extractedProperty: z.object({
     address: z.string().optional(),
     city: z.string().optional(),

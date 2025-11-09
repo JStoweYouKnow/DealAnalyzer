@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
 import type { EmailDeal, EmailMonitoringResponse, AnalyzePropertyResponse, FundingSource } from "@shared/schema";
+import { EmailForwardingSetup } from "@/components/email-forwarding-setup";
 
 interface MortgageValues {
   loanAmount: number;
@@ -997,23 +998,42 @@ export default function DealsPage() {
           {isLoading ? (
             <div className="text-center py-8">Loading deals...</div>
           ) : filteredDeals.length === 0 ? (
-            <Card className="analysis-card">
-              <CardContent className="p-8 text-center">
-                <i className="fas fa-inbox text-4xl text-muted-foreground mb-4"></i>
-                <h3 className="text-lg font-semibold mb-2">No Deals Found</h3>
-                <p className="text-muted-foreground mb-4">
-                  {!gmailStatus?.connected
-                    ? "Connect your Gmail account to start finding real estate deals"
-                    : "Click the button above to sync your emails and find real estate deals"}
-                </p>
-                {!gmailStatus?.connected && (
-                  <Button onClick={() => connectGmailMutation.mutate()}>
-                    <i className="fas fa-envelope mr-2"></i>
-                    Connect Gmail
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              <Card className="analysis-card">
+                <CardContent className="p-8 text-center">
+                  <i className="fas fa-inbox text-4xl text-muted-foreground mb-4"></i>
+                  <h3 className="text-lg font-semibold mb-2">No Deals Found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Get started by setting up automatic email forwarding or connecting your Gmail account
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Email Forwarding Setup - The recommended approach */}
+              <EmailForwardingSetup userId={undefined} />
+
+              {/* Or use Gmail OAuth (legacy) */}
+              <Card className="border-2 border-dashed">
+                <CardContent className="p-6 text-center">
+                  <h4 className="font-medium mb-2">Or Use Gmail OAuth (Alternative)</h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Connect your Gmail account directly to sync emails. Note: Requires OAuth setup.
+                  </p>
+                  {!gmailStatus?.connected && (
+                    <Button onClick={() => connectGmailMutation.mutate()} variant="outline">
+                      <i className="fas fa-envelope mr-2"></i>
+                      Connect Gmail
+                    </Button>
+                  )}
+                  {gmailStatus?.connected && (
+                    <Button onClick={() => syncEmailsMutation.mutate()}>
+                      <i className="fas fa-sync mr-2"></i>
+                      Sync Emails Now
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           ) : (
             filteredDeals.map((deal) => (
               <Card key={deal.id} className="analysis-card">
