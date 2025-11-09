@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../../server/storage";
 import { rentCastAPI } from "../../../../server/services/rentcast-api";
-import { attomAPI } from "../../../../server/services/attom-api";
 import { censusAPI } from "../../../../server/services/census-api";
+import { attomAPI } from "../../../../server/services/attom-api";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,38 +18,110 @@ export async function GET(request: NextRequest) {
     if (live === 'true') {
       try {
         // Combine data from multiple sources for richer insights
-        const [rentCastData, censusData, attomData] = await Promise.all([
+        const [rentCastData, censusData, attomProperties] = await Promise.all([
           city && state ? rentCastAPI.getNeighborhoodTrends(city, state).catch(() => null) : null,
           zipCode ? censusAPI.getZipCodeData(zipCode).catch(() => null) : null,
-          zipCode ? attomAPI.getSalesTrends(zipCode).catch(() => null) : null,
+          zipCode ? attomAPI.getPropertiesByZipCode(zipCode, 100).catch(() => []) : [],
         ]);
+
+        // Calculate market stats from Attom property data
+        const attomMarketStats = attomProperties.length > 0
+          ? attomAPI.calculateMarketStats(attomProperties)
+          : null;
+
+        console.log(`[Market Trends] Fetched ${attomProperties.length} properties from Attom API`);
+        if (attomMarketStats) {
+          console.log('[Market Trends] Calculated market stats:', attomMarketStats);
+        }
 
         // Merge data from different sources
         const enrichedTrends = [];
 
-        if (attomData && attomData.length > 0) {
-          // Use Attom data as primary source for market trends
-          enrichedTrends.push(...attomData.map((trend: any) => ({
-            zipCode: trend.zipcode || zipCode,
-            neighborhood: `${city || ''} ${state || ''}`.trim() || undefined,
-            month: trend.month,
-            medianPrice: trend.medianPrice,
-            priceChange: trend.medianPriceChange,
-            averageDaysOnMarket: trend.averageDaysOnMarket,
-            salesVolume: trend.salesVolume,
+        // Use Attom data as primary source if available
+        if (attomMarketStats) {
+          enrichedTrends.push({
+            zipCode,
+            neighborhood: `${city || ''} ${state || ''}`.trim() || `Zip Code ${zipCode}`,
+            // Market statistics from Attom property data
+            marketStats: {
+              totalProperties: attomMarketStats.totalProperties,
+              medianSalePrice: attomMarketStats.medianSalePrice,
+              avgPricePerSqft: attomMarketStats.avgPricePerSqft,
+              medianBuildingSize: attomMarketStats.medianBuildingSize,
+              avgYearBuilt: attomMarketStats.avgYearBuilt,
+              propertyTypes: attomMarketStats.propertyTypes,
+              ownerOccupancyRate: attomMarketStats.ownerOccupancyRate,
+            },
+            // Sample properties (top 10)
+            sampleProperties: attomProperties.slice(0, 10).map(p => ({
+              address: p.address,
+              propertyType: p.propertyType,
+              yearBuilt: p.yearBuilt,
+              beds: p.beds,
+              baths: p.baths,
+              buildingSize: p.buildingSize,
+              lotSize: p.lotSize,
+              lastSalePrice: p.lastSalePrice,
+              lastSaleDate: p.lastSaleDate,
+              assessedValue: p.assessedValue,
+              ownerOccupied: p.ownerOccupied,
+            })),
+            // Census demographics if available
+            demographics: censusData ? {
+              population: censusData.data.population,
+              medianIncome: censusData.data.medianHouseholdIncome,
+              medianAge: censusData.data.medianAge,
+              medianHomeValue: censusData.data.medianHomeValue,
+              perCapitaIncome: censusData.data.perCapitaIncome,
+              medianGrossRent: censusData.data.medianGrossRent,
+              totalHousingUnits: censusData.data.totalHousingUnits,
+              ownerOccupied: censusData.data.ownerOccupied,
+              renterOccupied: censusData.data.renterOccupied,
+              unemploymentRate: censusData.data.unemploymentRate,
+              educationLevel: censusData.data.educationLevel,
+            } : undefined,
+          });
+        }
+        // Fall back to RentCast + Census if no Attom data
+        else if (rentCastData && rentCastData.length > 0) {
+          enrichedTrends.push(...rentCastData.map((trend: any) => ({
+            ...trend,
+            zipCode: zipCode || trend.zipCode,
             // Add census demographics if available
             demographics: censusData ? {
               population: censusData.data.population,
               medianIncome: censusData.data.medianHouseholdIncome,
               medianAge: censusData.data.medianAge,
               medianHomeValue: censusData.data.medianHomeValue,
+              perCapitaIncome: censusData.data.perCapitaIncome,
+              medianGrossRent: censusData.data.medianGrossRent,
+              totalHousingUnits: censusData.data.totalHousingUnits,
+              ownerOccupied: censusData.data.ownerOccupied,
+              renterOccupied: censusData.data.renterOccupied,
+              unemploymentRate: censusData.data.unemploymentRate,
+              educationLevel: censusData.data.educationLevel,
             } : undefined,
           })));
         }
-
-        // Fall back to RentCast if Attom didn't return data
-        if (enrichedTrends.length === 0 && rentCastData) {
-          enrichedTrends.push(...rentCastData);
+        // Fall back to Census only if no other data
+        else if (censusData) {
+          enrichedTrends.push({
+            zipCode,
+            neighborhood: `${city || ''} ${state || ''}`.trim() || `Zip Code ${zipCode}`,
+            demographics: {
+              population: censusData.data.population,
+              medianIncome: censusData.data.medianHouseholdIncome,
+              medianAge: censusData.data.medianAge,
+              medianHomeValue: censusData.data.medianHomeValue,
+              perCapitaIncome: censusData.data.perCapitaIncome,
+              medianGrossRent: censusData.data.medianGrossRent,
+              totalHousingUnits: censusData.data.totalHousingUnits,
+              ownerOccupied: censusData.data.ownerOccupied,
+              renterOccupied: censusData.data.renterOccupied,
+              unemploymentRate: censusData.data.unemploymentRate,
+              educationLevel: censusData.data.educationLevel,
+            },
+          });
         }
 
         // Fall back to stored data if all APIs fail

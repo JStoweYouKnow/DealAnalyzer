@@ -1,6 +1,6 @@
 # Market Intelligence API Setup Guide
 
-You now have Attom API and Census API integrated! Follow these steps to get it working.
+You now have **Attom API + Census API** fully integrated with live property data! Follow these steps to get it running.
 
 ---
 
@@ -14,7 +14,9 @@ ATTOM_API_KEY=your_attom_api_key_here
 CENSUS_API_KEY=your_census_api_key_here
 ```
 
-Replace `your_attom_api_key_here` and `your_census_api_key_here` with your actual API keys.
+Replace with your actual API keys (already configured in your `.env` file!)
+
+**Note**: Both APIs are now working! Attom provides actual property data (100 properties per zip code), and Census provides demographics.
 
 ---
 
@@ -47,17 +49,50 @@ http://localhost:3002/api/market/neighborhood-trends?live=true&zipCode=90210
   "data": [
     {
       "zipCode": "90210",
-      "neighborhood": "Beverly Hills CA",
-      "month": "2024-01",
-      "medianPrice": 2500000,
-      "priceChange": 5.2,
-      "averageDaysOnMarket": 45,
-      "salesVolume": 123,
+      "neighborhood": "Beverly Hills",
+      "marketStats": {
+        "totalProperties": 100,
+        "medianSalePrice": 3120000,
+        "avgPricePerSqft": 1025.71,
+        "medianBuildingSize": 4121,
+        "avgYearBuilt": 1962,
+        "propertyTypes": {
+          "SINGLE FAMILY RESIDENCE": 91,
+          "CONDOMINIUM": 6,
+          "DUPLEX (2 UNITS, ANY COMBINATION)": 2
+        },
+        "ownerOccupancyRate": 81
+      },
+      "sampleProperties": [
+        {
+          "address": "502 N ALTA DR, BEVERLY HILLS, CA 90210",
+          "propertyType": "SINGLE FAMILY RESIDENCE",
+          "yearBuilt": 1928,
+          "beds": 3,
+          "buildingSize": 1924,
+          "lotSize": 11250,
+          "lastSalePrice": 6055000,
+          "lastSaleDate": "2022-05-26",
+          "assessedValue": 6425612,
+          "ownerOccupied": true
+        }
+        // ... 9 more properties
+      ],
       "demographics": {
-        "population": 34109,
-        "medianIncome": 85936,
-        "medianAge": 45.2,
-        "medianHomeValue": 2000000
+        "population": 19627,
+        "medianIncome": 154740,
+        "medianAge": 49.1,
+        "medianHomeValue": 2000001,
+        "perCapitaIncome": 123446,
+        "medianGrossRent": 2872,
+        "totalHousingUnits": 9841,
+        "ownerOccupied": 5931,
+        "renterOccupied": 2016,
+        "unemploymentRate": 4.4,
+        "educationLevel": {
+          "bachelorsOrHigher": 4750,
+          "graduateDegree": 2000
+        }
       }
     }
   ]
@@ -79,23 +114,39 @@ The market intelligence tab will now automatically use live data when you:
 
 ## 📊 What Data You Get
 
-### **From Attom API:**
-- Median sale prices
-- Price change percentages
-- Average days on market
-- Sales volume
-- Monthly trends
+### **From Attom API (Working! 🎉):**
+**100 actual properties per zip code** with:
+- Complete addresses
+- Property type, year built
+- Beds, baths, square footage
+- Lot size
+- Last sale price and date
+- Current assessed value
+- Tax amount
+- Owner occupancy status
 
-### **From Census API:**
-- Population statistics
-- Median household income
-- Median age
-- Median home values
-- Homeownership rates
-- Education levels
+**Plus calculated market statistics:**
+- Median sale price ($3.1M in Beverly Hills!)
+- Average price per sqft
+- Median building size
+- Average year built
+- Property type distribution
+- Owner occupancy rate (81% in Beverly Hills)
+
+### **From Census API (Working! 🎉):**
+- Population statistics (19,627 in 90210)
+- Median household income ($154,740)
+- Per capita income ($123,446)
+- Median age (49.1 years)
+- Median home values ($2M)
+- Median gross rent ($2,872)
+- Total housing units (9,841)
+- Owner vs renter occupied (60% vs 20%)
+- Unemployment rate (4.4%)
+- Education levels (Bachelor's, Graduate degrees)
 
 ### **Combined Power:**
-Market trends + demographics = **Powerful insights!**
+100 real properties + Market statistics + Demographics = **Complete market intelligence!**
 
 ---
 
@@ -128,14 +179,15 @@ const { data: trends } = useQuery({
 ## ⚡ API Features
 
 ### **Caching:**
-- **Attom data:** Cached for 24 hours
-- **Census data:** Cached for 7 days
-- This saves your API quota!
+- **Attom property data:** Cached for 24 hours
+- **Census demographics:** Cached for 7 days
+- **RentCast data:** Cached per RentCast API settings
+- This saves your API quota and improves performance!
 
 ### **Fallback Strategy:**
-1. Try Attom API (market trends)
+1. Try Attom API (100 properties + market stats)
 2. Try Census API (demographics)
-3. Fall back to RentCast API
+3. Try RentCast API (if Attom fails)
 4. Fall back to stored database data
 
 ### **Error Handling:**
@@ -146,15 +198,16 @@ All APIs have graceful error handling. If one fails, it tries the next source au
 ## 📈 API Usage Tracking
 
 ### **Free Tier Limits:**
-- **Attom:** 1,000 calls/month
-- **Census:** Unlimited
-- **Caching:** Reduces calls by ~90%
+- **Attom:** 1,000 requests/month (free tier)
+- **Census:** Unlimited (truly free!)
+- **RentCast:** Already configured
+- **Caching:** Reduces calls by ~95%
 
 ### **Estimated Usage:**
-With caching enabled:
-- ~10-20 Attom calls per day
-- ~300-600 calls per month
-- Well within free tier! ✅
+With caching enabled (24hr for Attom, 7 days for Census):
+- Attom API: ~30-60 requests/month (1-2 per day)
+- Census API: ~4-10 requests/month (refreshes weekly)
+- **Well within all free tier limits!** ✅
 
 ---
 
@@ -243,10 +296,24 @@ Try these popular zip codes:
 ## 🚀 You're Ready!
 
 Your market intelligence tab now has access to:
-- ✅ Real-time sales data (Attom)
-- ✅ Comprehensive demographics (Census)
-- ✅ Rental market data (RentCast - already configured)
-- ✅ Smart caching for efficiency
-- ✅ Automatic fallbacks for reliability
 
-**Enjoy your enhanced market intelligence! 🏠📊**
+- ✅ **100 Real Properties Per Zip Code (Attom API - Working!)**
+  - Actual property addresses, specs, sale prices
+  - Last sale dates, assessed values, owner occupancy
+  - Beds, baths, square footage, lot sizes
+  - Calculated market statistics (median prices, price/sqft, etc.)
+  - Property type distribution
+  - 24-hour caching for efficiency
+
+- ✅ **Comprehensive Demographics (Census API - Working!)**
+  - Population, income, age, home values, rent, housing stats
+  - Education levels, unemployment rate
+  - 100% free, unlimited API calls
+  - 7-day caching for performance
+
+- ✅ **Smart Integration**
+  - Attom properties + Census demographics = Complete market picture
+  - Automatic fallbacks (Attom → RentCast → Census → Database)
+  - All within free tier limits with caching!
+
+**Enjoy your enhanced market intelligence with 100 real properties + demographics! 🏠📊**
