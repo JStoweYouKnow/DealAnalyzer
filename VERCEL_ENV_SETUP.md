@@ -11,7 +11,7 @@ Follow these steps to enable the new market intelligence features in your Vercel
 
 ## Step 2: Add API Keys
 
-Add these two environment variables:
+Add these environment variables:
 
 ### Attom API Key
 - **Name**: `ATTOM_API_KEY`
@@ -26,6 +26,16 @@ Click **Save**
 ### Census API Key
 - **Name**: `CENSUS_API_KEY`
 - **Value**: `61867eb674faa3f8e8113339dcdc5bc26715a19a`
+- **Environments**: Check all three:
+  - ✅ Production
+  - ✅ Preview
+  - ✅ Development
+
+Click **Save**
+
+### FRED API Key (FHFA House Price Index)
+- **Name**: `FRED_API_KEY`
+- **Value**: *Use your personal FRED developer key* (get one at https://fred.stlouisfed.org/docs/api/api_key.html)
 - **Environments**: Check all three:
   - ✅ Production
   - ✅ Preview
