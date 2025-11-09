@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 // Import Leaflet CSS - Safe because component is dynamically imported with ssr: false
 import 'leaflet/dist/leaflet.css';
+import type { Map as LeafletMapInstance } from 'leaflet';
 
 interface MapProperty {
   id: string;
@@ -36,58 +37,15 @@ interface LeafletMapProps {
   onPropertyClick: (property: MapProperty) => void;
 }
 
-// Fix Leaflet icons on client side only
-// Use useEffect to ensure this runs only in browser environment
+const DEFAULT_CENTER = { lat: 39.8283, lng: -98.5795 };
 
-const MapUpdater = ({ mapCenter, zoomLevel }: { mapCenter: { lat: number; lng: number }, zoomLevel: number }) => {
-  const map = useMap();
-  const prevCenterRef = useRef<{ lat: number; lng: number } | null>(null);
-  const prevZoomRef = useRef<number | null>(null);
-  
-  useEffect(() => {
-    const currentCenter = [mapCenter.lat, mapCenter.lng] as [number, number];
-    const currentZoom = zoomLevel;
-    
-    // Check if center or zoom has actually changed
-    const centerChanged = !prevCenterRef.current || 
-      prevCenterRef.current.lat !== mapCenter.lat || 
-      prevCenterRef.current.lng !== mapCenter.lng;
-    const zoomChanged = prevZoomRef.current === null || prevZoomRef.current !== currentZoom;
-    
-    if (centerChanged || zoomChanged) {
-      console.log('MapUpdater: Updating map view', { 
-        center: currentCenter, 
-        zoom: currentZoom,
-        centerChanged,
-        zoomChanged,
-        prevCenter: prevCenterRef.current,
-        prevZoom: prevZoomRef.current
-      });
-      
-      // Update map view with animation
-      map.setView(currentCenter, currentZoom, {
-        animate: true,
-        duration: 0.5
-      });
-      
-      // Update refs
-      prevCenterRef.current = { lat: mapCenter.lat, lng: mapCenter.lng };
-      prevZoomRef.current = currentZoom;
-    } else {
-      console.log('MapUpdater: No change detected, skipping update');
-    }
-  }, [map, mapCenter.lat, mapCenter.lng, zoomLevel]);
+const isFiniteNumber = (value?: number): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
 
-  // Invalidate map size after mount to ensure proper rendering
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      map.invalidateSize();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [map]);
-  
-  return null;
-};
+const sanitizeLatLng = (lat?: number, lng?: number) => ({
+  lat: isFiniteNumber(lat) ? lat : DEFAULT_CENTER.lat,
+  lng: isFiniteNumber(lng) ? lng : DEFAULT_CENTER.lng,
+});
 
 export function LeafletMap({
   mapCenter,
@@ -98,9 +56,18 @@ export function LeafletMap({
   showPOIs,
   onPropertyClick
 }: LeafletMapProps) {
-  const mapRef = useRef(null);
+  const mapInstanceRef = useRef<LeafletMapInstance | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   
+  const safeCenter = sanitizeLatLng(mapCenter.lat, mapCenter.lng);
+  const validProperties = mapProperties.filter((property) =>
+    isFiniteNumber(property.lat) && isFiniteNumber(property.lng)
+  );
+  const validPointsOfInterest = pointsOfInterest.filter((poi) =>
+    isFiniteNumber(poi.lat) && isFiniteNumber(poi.lng)
+  );
+  const displayedPointsOfInterest = showPOIs ? validPointsOfInterest : [];
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
   };
@@ -109,6 +76,37 @@ export function LeafletMap({
   useEffect(() => {
     console.log('LeafletMap: Props updated', { mapCenter, zoomLevel });
   }, [mapCenter.lat, mapCenter.lng, zoomLevel]);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    if (!mapInstanceRef.current) return;
+
+    const nextCenter = sanitizeLatLng(mapCenter.lat, mapCenter.lng);
+
+    try {
+      mapInstanceRef.current.setView([nextCenter.lat, nextCenter.lng], zoomLevel, {
+        animate: true,
+        duration: 0.5,
+      });
+    } catch (err) {
+      console.warn('LeafletMap: Failed to update map view', err);
+    }
+  }, [isMounted, mapCenter.lat, mapCenter.lng, zoomLevel]);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    if (!mapInstanceRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      try {
+        mapInstanceRef.current?.invalidateSize();
+      } catch (err) {
+        console.warn('LeafletMap: Failed to invalidate map size', err);
+      }
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [isMounted, validProperties.length, displayedPointsOfInterest.length]);
 
   // Ensure component is mounted on client side only
   useEffect(() => {
@@ -142,14 +140,24 @@ export function LeafletMap({
     return (
       <div className="w-full h-full" style={{ minHeight: '384px' }}>
         <MapContainer
-        center={[mapCenter.lat, mapCenter.lng]}
-        zoom={zoomLevel}
-        style={{ height: '100%', width: '100%', minHeight: '384px' }}
-        className="rounded-lg z-0"
-        ref={mapRef}
-        scrollWheelZoom={true}
-      >
-        <MapUpdater mapCenter={mapCenter} zoomLevel={zoomLevel} />
+          center={[safeCenter.lat, safeCenter.lng]}
+          zoom={zoomLevel}
+          style={{ height: '100%', width: '100%', minHeight: '384px' }}
+          className="rounded-lg z-0"
+          scrollWheelZoom
+          ref={(map) => {
+            if (map) {
+              mapInstanceRef.current = map;
+              window.setTimeout(() => {
+                try {
+                  map.invalidateSize();
+                } catch (err) {
+                  console.warn('LeafletMap: Failed to invalidate size on create', err);
+                }
+              }, 0);
+            }
+          }}
+        >
         <TileLayer
           url={
             mapLayer === 'satellite' 
@@ -168,7 +176,7 @@ export function LeafletMap({
         />
 
       {/* Property Markers */}
-      {mapProperties.map((property) => (
+      {validProperties.map((property) => (
         <Marker
           key={property.id}
           position={[property.lat, property.lng]}
@@ -196,7 +204,7 @@ export function LeafletMap({
       ))}
 
       {/* POI Markers */}
-      {showPOIs && pointsOfInterest.map((poi) => (
+      {displayedPointsOfInterest.map((poi) => (
         <Marker
           key={poi.id}
           position={[poi.lat, poi.lng]}

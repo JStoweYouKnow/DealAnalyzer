@@ -39,9 +39,30 @@ export async function GET(request: NextRequest) {
 
         // Use Attom data as primary source if available
         if (attomMarketStats) {
+          const rentCastMatch = Array.isArray(rentCastData) && rentCastData.length > 0
+            ? rentCastData.find((item: any) => {
+                if (!zipCode) return false;
+                const matchZip = item.zipCode ? String(item.zipCode).padStart(5, "0") : undefined;
+                return matchZip === zipCode;
+              }) || rentCastData[0]
+            : null;
+
           enrichedTrends.push({
             zipCode,
             neighborhood: `${city || ''} ${state || ''}`.trim() || `Zip Code ${zipCode}`,
+            averagePrice: rentCastMatch?.averagePrice ?? attomMarketStats.medianSalePrice,
+            averageRent: rentCastMatch?.averageRent ?? censusData?.data.medianGrossRent,
+            priceChangePercent1Year: rentCastMatch?.priceChangePercent1Year ?? undefined,
+            priceChangePercent6Month: rentCastMatch?.priceChangePercent6Month ?? undefined,
+            priceChangePercent3Month: rentCastMatch?.priceChangePercent3Month ?? undefined,
+            rentChangePercent1Year: rentCastMatch?.rentChangePercent1Year ?? undefined,
+            rentChangePercent6Month: rentCastMatch?.rentChangePercent6Month ?? undefined,
+            rentChangePercent3Month: rentCastMatch?.rentChangePercent3Month ?? undefined,
+            rentYield: rentCastMatch?.rentYield ?? undefined,
+            daysOnMarket: rentCastMatch?.daysOnMarket ?? undefined,
+            pricePerSqft: attomMarketStats.avgPricePerSqft ?? rentCastMatch?.pricePerSqft,
+            totalListings: attomMarketStats.totalProperties,
+            lastUpdated: new Date().toISOString(),
             // Market statistics from Attom property data
             marketStats: {
               totalProperties: attomMarketStats.totalProperties,

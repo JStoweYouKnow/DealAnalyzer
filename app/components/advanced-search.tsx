@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,14 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
-import { Search, Filter, Save, Star, Brain, Trash2, Edit, Copy } from "lucide-react";
+import { Search, Filter, Save, Trash2, Copy, Mail, MapPin, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { DealAnalysis, SavedFilter, NaturalLanguageSearch, SmartPropertyRecommendation } from "@shared/schema";
+import type { EmailDeal, SavedFilter } from "@shared/schema";
 
 interface SearchFilters {
   priceMin?: number;
@@ -31,24 +28,35 @@ interface SearchFilters {
   capRateMin?: number;
   capRateMax?: number;
   cashFlowMin?: number;
-  propertyTypes?: string[];
+  rentMin?: number;
   cities?: string[];
   states?: string[];
+  status?: ('new' | 'reviewed' | 'analyzed' | 'archived')[];
   meetsCriteria?: boolean;
-  investmentGrade?: string[];
+  hasAnalysis?: boolean;
+  searchText?: string;
 }
 
 export function AdvancedSearch() {
-  const [searchQuery, setSearchQuery] = useState("");
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
-  const [selectedFilter, setSelectedFilter] = useState<string>("");
   const [newFilterName, setNewFilterName] = useState("");
-  const [propertyResults, setPropertyResults] = useState<DealAnalysis[]>([]);
+  const [searchText, setSearchText] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch email deals
+  const { data: emailDeals = [], isLoading: dealsLoading } = useQuery<EmailDeal[]>({
+    queryKey: ['/api/email-deals'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/email-deals');
+      const data = await response.json();
+      return Array.isArray(data) ? data : data.data || [];
+    },
+    staleTime: 0,
+  });
+
   // Fetch saved filters
-  const { data: savedFilters = [], isLoading: filtersLoading, error: filtersError } = useQuery<SavedFilter[]>({
+  const { data: savedFilters = [], isLoading: filtersLoading } = useQuery<SavedFilter[]>({
     queryKey: ['/api/filters'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/filters');
@@ -57,85 +65,141 @@ export function AdvancedSearch() {
     }
   });
 
-  // Fetch search history
-  const { data: searchHistory = [], error: historyError } = useQuery<NaturalLanguageSearch[]>({
-    queryKey: ['/api/search/history'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/search/history');
-      const data = await response.json();
-      return data.data || [];
-    }
-  });
+  // Filter email deals based on search criteria
+  const filteredDeals = useMemo(() => {
+    return emailDeals.filter(deal => {
+      const property = deal.extractedProperty;
+      const analysis = deal.analysis;
 
-  // Fetch smart recommendations (using first available property for demo)
-  const { data: recommendations = [], error: recommendationsError } = useQuery<SmartPropertyRecommendation[]>({
-    queryKey: ['/api/recommendations/smart-properties'],
-    queryFn: async () => {
-      // Get first available property to generate recommendations
-      const analysisResponse = await apiRequest('GET', '/api/analysis-history');
-      const analysisData = await analysisResponse.json();
-      
-      if (analysisData.data && analysisData.data.length > 0) {
-        const firstProperty = analysisData.data[0];
-        if (firstProperty.property?.id) {
-          const response = await apiRequest('GET', `/api/properties/${firstProperty.property.id}/recommendations`);
-          const data = await response.json();
-          return data.data || [];
+      // Text search across multiple fields
+      if (searchText) {
+        const searchLower = searchText.toLowerCase();
+        const matchesText =
+          deal.subject?.toLowerCase().includes(searchLower) ||
+          deal.sender?.toLowerCase().includes(searchLower) ||
+          property?.address?.toLowerCase().includes(searchLower) ||
+          property?.city?.toLowerCase().includes(searchLower) ||
+          property?.state?.toLowerCase().includes(searchLower);
+
+        if (!matchesText) return false;
+      }
+
+      // Status filter
+      if (searchFilters.status && searchFilters.status.length > 0) {
+        if (!searchFilters.status.includes(deal.status)) return false;
+      }
+
+      // Has analysis filter
+      if (searchFilters.hasAnalysis !== undefined) {
+        if (searchFilters.hasAnalysis && !analysis) return false;
+        if (!searchFilters.hasAnalysis && analysis) return false;
+      }
+
+      // Meets criteria filter
+      if (searchFilters.meetsCriteria !== undefined) {
+        if (searchFilters.meetsCriteria && !analysis?.meetsCriteria) return false;
+      }
+
+      // Price filters
+      if (searchFilters.priceMin !== undefined) {
+        const price = analysis?.property?.purchasePrice || property?.price;
+        if (!price || price < searchFilters.priceMin) return false;
+      }
+      if (searchFilters.priceMax !== undefined) {
+        const price = analysis?.property?.purchasePrice || property?.price;
+        if (!price || price > searchFilters.priceMax) return false;
+      }
+
+      // Bedroom filters
+      if (searchFilters.bedroomsMin !== undefined) {
+        const beds = analysis?.property?.bedrooms || property?.bedrooms;
+        if (!beds || beds < searchFilters.bedroomsMin) return false;
+      }
+      if (searchFilters.bedroomsMax !== undefined) {
+        const beds = analysis?.property?.bedrooms || property?.bedrooms;
+        if (!beds || beds > searchFilters.bedroomsMax) return false;
+      }
+
+      // Bathroom filters
+      if (searchFilters.bathroomsMin !== undefined) {
+        const baths = analysis?.property?.bathrooms || property?.bathrooms;
+        if (!baths || baths < searchFilters.bathroomsMin) return false;
+      }
+      if (searchFilters.bathroomsMax !== undefined) {
+        const baths = analysis?.property?.bathrooms || property?.bathrooms;
+        if (!baths || baths > searchFilters.bathroomsMax) return false;
+      }
+
+      // Square footage filters
+      if (searchFilters.sqftMin !== undefined) {
+        const sqft = analysis?.property?.squareFootage || property?.sqft;
+        if (!sqft || sqft < searchFilters.sqftMin) return false;
+      }
+      if (searchFilters.sqftMax !== undefined) {
+        const sqft = analysis?.property?.squareFootage || property?.sqft;
+        if (!sqft || sqft > searchFilters.sqftMax) return false;
+      }
+
+      // Rent filter
+      if (searchFilters.rentMin !== undefined) {
+        const rent = analysis?.property?.monthlyRent || property?.monthlyRent;
+        if (!rent || rent < searchFilters.rentMin) return false;
+      }
+
+      // Financial filters (only for analyzed deals)
+      if (analysis) {
+        if (searchFilters.cashFlowMin !== undefined) {
+          if (!analysis.cashFlow || analysis.cashFlow < searchFilters.cashFlowMin) return false;
+        }
+
+        if (searchFilters.cocReturnMin !== undefined) {
+          if (!analysis.cocReturn || analysis.cocReturn < searchFilters.cocReturnMin / 100) return false;
+        }
+        if (searchFilters.cocReturnMax !== undefined) {
+          if (!analysis.cocReturn || analysis.cocReturn > searchFilters.cocReturnMax / 100) return false;
+        }
+
+        if (searchFilters.capRateMin !== undefined) {
+          if (!analysis.capRate || analysis.capRate < searchFilters.capRateMin / 100) return false;
+        }
+        if (searchFilters.capRateMax !== undefined) {
+          if (!analysis.capRate || analysis.capRate > searchFilters.capRateMax / 100) return false;
         }
       }
-      
-      return [];
-    }
-  });
 
-  // Natural language search mutation
-  const naturalSearchMutation = useMutation({
-    mutationFn: async (query: string) => {
-      const response = await apiRequest('POST', '/api/search/natural-language', { query });
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        setPropertyResults(data.results || []);
-        queryClient.invalidateQueries({ queryKey: ['/api/search/history'] });
-        toast({
-          title: "Search Complete",
-          description: `Found ${data.results?.length || 0} properties matching your query.`,
-        });
+      // City filter
+      if (searchFilters.cities && searchFilters.cities.length > 0) {
+        const city = property?.city || analysis?.property?.city;
+        if (!city || !searchFilters.cities.includes(city)) return false;
       }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Search Failed",
-        description: error.message || "Failed to perform natural language search",
-        variant: "destructive",
-      });
-    }
-  });
 
-  // Advanced search mutation
-  const advancedSearchMutation = useMutation({
-    mutationFn: async (filters: SearchFilters) => {
-      const response = await apiRequest('POST', '/api/search/properties', { filters });
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        setPropertyResults(data.data || []);
-        toast({
-          title: "Search Complete",
-          description: `Found ${data.data?.length || 0} properties matching your criteria.`,
-        });
+      // State filter
+      if (searchFilters.states && searchFilters.states.length > 0) {
+        const state = property?.state || analysis?.property?.state;
+        if (!state || !searchFilters.states.includes(state)) return false;
       }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Search Failed",
-        description: error.message || "Failed to search properties",
-        variant: "destructive",
-      });
-    }
-  });
+
+      return true;
+    });
+  }, [emailDeals, searchFilters, searchText]);
+
+  // Get unique cities and states from email deals
+  const availableLocations = useMemo(() => {
+    const cities = new Set<string>();
+    const states = new Set<string>();
+
+    emailDeals.forEach(deal => {
+      const city = deal.extractedProperty?.city || deal.analysis?.property?.city;
+      const state = deal.extractedProperty?.state || deal.analysis?.property?.state;
+      if (city) cities.add(city);
+      if (state) states.add(state);
+    });
+
+    return {
+      cities: Array.from(cities).sort(),
+      states: Array.from(states).sort()
+    };
+  }, [emailDeals]);
 
   // Save filter mutation
   const saveFilterMutation = useMutation({
@@ -182,15 +246,6 @@ export function AdvancedSearch() {
     }
   });
 
-  const handleNaturalSearch = () => {
-    if (!searchQuery.trim()) return;
-    naturalSearchMutation.mutate(searchQuery);
-  };
-
-  const handleAdvancedSearch = () => {
-    advancedSearchMutation.mutate(searchFilters);
-  };
-
   const handleSaveFilter = () => {
     if (!newFilterName.trim()) {
       toast({
@@ -201,19 +256,28 @@ export function AdvancedSearch() {
       return;
     }
 
+    const activeFilters = Object.keys(searchFilters).length;
     saveFilterMutation.mutate({
       name: newFilterName,
-      description: `Custom filter with ${Object.keys(searchFilters).length} criteria`,
+      description: `Email deals filter with ${activeFilters} criteria`,
       filterCriteria: searchFilters
     });
   };
 
   const loadSavedFilter = (filter: SavedFilter) => {
     setSearchFilters(filter.filterCriteria);
-    setSelectedFilter(filter.id!);
     toast({
       title: "Filter Loaded",
       description: `Applied filter: ${filter.name}`,
+    });
+  };
+
+  const clearFilters = () => {
+    setSearchFilters({});
+    setSearchText("");
+    toast({
+      title: "Filters Cleared",
+      description: "All search filters have been reset.",
     });
   };
 
@@ -221,86 +285,75 @@ export function AdvancedSearch() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
   };
 
-  const getInvestmentGradeBadge = (grade: string) => {
-    const colors = {
-      'A': 'bg-green-100 text-green-800 border-green-200',
-      'B': 'bg-blue-100 text-blue-800 border-blue-200',
-      'C': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'D': 'bg-red-100 text-red-800 border-red-200'
-    };
-    return colors[grade as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-200';
+  const getStatusColor = (status: EmailDeal['status']) => {
+    switch (status) {
+      case 'new': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'reviewed': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'analyzed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'archived': return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
   };
+
+  const activeFilterCount = Object.keys(searchFilters).length + (searchText ? 1 : 0);
 
   return (
     <div className="space-y-6" data-testid="advanced-search">
       <div className="flex flex-col space-y-4">
-        <h1 className="text-3xl font-bold">Advanced Property Search</h1>
-        <p className="text-muted-foreground">
-          Use natural language queries or detailed filters to find properties that match your investment criteria.
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Search Email Deals</h1>
+            <p className="text-muted-foreground">
+              Filter and search through your uploaded email deals using advanced criteria.
+            </p>
+          </div>
+          <Badge variant="outline" className="mt-2">
+            <Mail className="w-3 h-3 mr-1" />
+            {emailDeals.length} total deals
+          </Badge>
+        </div>
       </div>
 
-      <Tabs defaultValue="search" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="search" data-testid="tab-search">Smart Search</TabsTrigger>
-          <TabsTrigger value="filters" data-testid="tab-filters">Advanced Filters</TabsTrigger>
-          <TabsTrigger value="saved" data-testid="tab-saved">Saved Filters</TabsTrigger>
-          <TabsTrigger value="recommendations" data-testid="tab-recommendations">Recommendations</TabsTrigger>
+      {/* Quick Search Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex space-x-2">
+            <div className="flex-1">
+              <Input
+                placeholder="Search by address, city, sender, or subject..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full"
+                data-testid="input-search-text"
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={clearFilters}
+              disabled={activeFilterCount === 0}
+            >
+              Clear All
+            </Button>
+          </div>
+          {activeFilterCount > 0 && (
+            <p className="text-sm text-muted-foreground mt-2">
+              {activeFilterCount} active filter{activeFilterCount !== 1 ? 's' : ''} • {filteredDeals.length} result{filteredDeals.length !== 1 ? 's' : ''}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="filters" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="filters" data-testid="tab-filters">
+            <Filter className="w-4 h-4 mr-2" />
+            Advanced Filters
+          </TabsTrigger>
+          <TabsTrigger value="saved" data-testid="tab-saved">
+            <Save className="w-4 h-4 mr-2" />
+            Saved Filters ({savedFilters.length})
+          </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="search" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Brain className="w-5 h-5 mr-2" />
-                Natural Language Search
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex space-x-2">
-                <Textarea
-                  placeholder="Try: 3 bedroom houses under $300k with positive cash flow in Austin, TX"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1"
-                  rows={3}
-                  data-testid="textarea-natural-search"
-                />
-                <Button 
-                  onClick={handleNaturalSearch}
-                  disabled={naturalSearchMutation.isPending || !searchQuery.trim()}
-                  data-testid="button-natural-search"
-                >
-                  <Search className="w-4 h-4 mr-2" />
-                  Search
-                </Button>
-              </div>
-
-              {searchHistory.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Recent Searches</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {searchHistory.slice(0, 5).map((search) => (
-                      <Button
-                        key={search.id}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSearchQuery(search.query)}
-                        className="text-xs"
-                        data-testid={`button-recent-search-${search.id}`}
-                      >
-                        {search.query.substring(0, 50)}...
-                        <Badge variant="secondary" className="ml-2">
-                          {search.resultCount}
-                        </Badge>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="filters" className="space-y-6">
           <Card>
@@ -308,30 +361,88 @@ export function AdvancedSearch() {
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center">
                   <Filter className="w-5 h-5 mr-2" />
-                  Advanced Filters
+                  Filter Criteria
                 </div>
                 <div className="flex space-x-2">
                   <Input
-                    placeholder="Filter name"
+                    placeholder="Filter name..."
                     value={newFilterName}
                     onChange={(e) => setNewFilterName(e.target.value)}
                     className="w-48"
                     data-testid="input-filter-name"
                   />
-                  <Button 
+                  <Button
                     onClick={handleSaveFilter}
                     variant="outline"
                     size="sm"
-                    disabled={!newFilterName.trim()}
+                    disabled={!newFilterName.trim() || activeFilterCount === 0}
                     data-testid="button-save-filter"
                   >
                     <Save className="w-4 h-4 mr-2" />
-                    Save
+                    Save Filter
                   </Button>
                 </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Status and Analysis Filters */}
+              <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
+                <h3 className="font-medium">Deal Status</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {(['new', 'reviewed', 'analyzed', 'archived'] as const).map((status) => (
+                    <div key={status} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`status-${status}`}
+                        checked={searchFilters.status?.includes(status) || false}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSearchFilters(prev => ({
+                              ...prev,
+                              status: [...(prev.status || []), status]
+                            }));
+                          } else {
+                            setSearchFilters(prev => ({
+                              ...prev,
+                              status: prev.status?.filter(s => s !== status)
+                            }));
+                          }
+                        }}
+                        data-testid={`checkbox-status-${status}`}
+                      />
+                      <Label htmlFor={`status-${status}`} className="capitalize text-sm">
+                        {status}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center space-x-4 pt-2 border-t">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="has-analysis"
+                      checked={searchFilters.hasAnalysis || false}
+                      onCheckedChange={(checked) => setSearchFilters(prev => ({ ...prev, hasAnalysis: !!checked }))}
+                      data-testid="checkbox-has-analysis"
+                    />
+                    <Label htmlFor="has-analysis" className="text-sm">
+                      Only analyzed deals
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="meets-criteria"
+                      checked={searchFilters.meetsCriteria || false}
+                      onCheckedChange={(checked) => setSearchFilters(prev => ({ ...prev, meetsCriteria: !!checked }))}
+                      data-testid="checkbox-meets-criteria"
+                    />
+                    <Label htmlFor="meets-criteria" className="text-sm">
+                      Meets investment criteria
+                    </Label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Property Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Price Range */}
                 <div className="space-y-3">
@@ -375,6 +486,60 @@ export function AdvancedSearch() {
                   </div>
                 </div>
 
+                {/* Bathrooms */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Bathrooms</Label>
+                  <div className="space-y-2">
+                    <Input
+                      type="number"
+                      placeholder="Min Bathrooms"
+                      value={searchFilters.bathroomsMin || ""}
+                      onChange={(e) => setSearchFilters(prev => ({ ...prev, bathroomsMin: Number(e.target.value) || undefined }))}
+                      data-testid="input-bathrooms-min"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Max Bathrooms"
+                      value={searchFilters.bathroomsMax || ""}
+                      onChange={(e) => setSearchFilters(prev => ({ ...prev, bathroomsMax: Number(e.target.value) || undefined }))}
+                      data-testid="input-bathrooms-max"
+                    />
+                  </div>
+                </div>
+
+                {/* Square Footage */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Square Footage</Label>
+                  <div className="space-y-2">
+                    <Input
+                      type="number"
+                      placeholder="Min Sq Ft"
+                      value={searchFilters.sqftMin || ""}
+                      onChange={(e) => setSearchFilters(prev => ({ ...prev, sqftMin: Number(e.target.value) || undefined }))}
+                      data-testid="input-sqft-min"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Max Sq Ft"
+                      value={searchFilters.sqftMax || ""}
+                      onChange={(e) => setSearchFilters(prev => ({ ...prev, sqftMax: Number(e.target.value) || undefined }))}
+                      data-testid="input-sqft-max"
+                    />
+                  </div>
+                </div>
+
+                {/* Monthly Rent */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Monthly Rent (Min)</Label>
+                  <Input
+                    type="number"
+                    placeholder="Min Monthly Rent"
+                    value={searchFilters.rentMin || ""}
+                    onChange={(e) => setSearchFilters(prev => ({ ...prev, rentMin: Number(e.target.value) || undefined }))}
+                    data-testid="input-rent-min"
+                  />
+                </div>
+
                 {/* Cash Flow */}
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">Min Cash Flow</Label>
@@ -385,6 +550,7 @@ export function AdvancedSearch() {
                     onChange={(e) => setSearchFilters(prev => ({ ...prev, cashFlowMin: Number(e.target.value) || undefined }))}
                     data-testid="input-cash-flow-min"
                   />
+                  <p className="text-xs text-muted-foreground">Only applies to analyzed deals</p>
                 </div>
 
                 {/* COC Return */}
@@ -406,67 +572,30 @@ export function AdvancedSearch() {
                       data-testid="input-coc-max"
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">Only applies to analyzed deals</p>
                 </div>
 
-                {/* Property Types */}
+                {/* Cap Rate */}
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">Property Types</Label>
+                  <Label className="text-sm font-medium">Cap Rate Range (%)</Label>
                   <div className="space-y-2">
-                    {['single-family', 'multi-family', 'condo', 'townhouse', 'duplex'].map((type) => (
-                      <div key={type} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={type}
-                          checked={searchFilters.propertyTypes?.includes(type) || false}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSearchFilters(prev => ({
-                                ...prev,
-                                propertyTypes: [...(prev.propertyTypes || []), type]
-                              }));
-                            } else {
-                              setSearchFilters(prev => ({
-                                ...prev,
-                                propertyTypes: prev.propertyTypes?.filter(t => t !== type)
-                              }));
-                            }
-                          }}
-                          data-testid={`checkbox-property-type-${type}`}
-                        />
-                        <Label htmlFor={type} className="capitalize text-sm">
-                          {type.replace('-', ' ')}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Meets Criteria */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Investment Criteria</Label>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="meets-criteria"
-                      checked={searchFilters.meetsCriteria || false}
-                      onCheckedChange={(checked) => setSearchFilters(prev => ({ ...prev, meetsCriteria: !!checked }))}
-                      data-testid="checkbox-meets-criteria"
+                    <Input
+                      type="number"
+                      placeholder="Min Cap Rate"
+                      value={searchFilters.capRateMin || ""}
+                      onChange={(e) => setSearchFilters(prev => ({ ...prev, capRateMin: Number(e.target.value) || undefined }))}
+                      data-testid="input-cap-rate-min"
                     />
-                    <Label htmlFor="meets-criteria" className="text-sm">
-                      Only show properties that meet investment criteria
-                    </Label>
+                    <Input
+                      type="number"
+                      placeholder="Max Cap Rate"
+                      value={searchFilters.capRateMax || ""}
+                      onChange={(e) => setSearchFilters(prev => ({ ...prev, capRateMax: Number(e.target.value) || undefined }))}
+                      data-testid="input-cap-rate-max"
+                    />
                   </div>
+                  <p className="text-xs text-muted-foreground">Only applies to analyzed deals</p>
                 </div>
-              </div>
-
-              <div className="flex justify-center pt-4">
-                <Button 
-                  onClick={handleAdvancedSearch}
-                  disabled={advancedSearchMutation.isPending}
-                  size="lg"
-                  data-testid="button-advanced-search"
-                >
-                  <Search className="w-4 h-4 mr-2" />
-                  Search Properties
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -475,22 +604,29 @@ export function AdvancedSearch() {
         <TabsContent value="saved" className="space-y-6">
           {filtersLoading ? (
             <div className="text-center py-8">Loading saved filters...</div>
-          ) : filtersError ? (
-            <div className="text-center py-8 text-red-600">Failed to load saved filters. Please try again later.</div>
           ) : savedFilters.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No saved filters yet. Create a filter above and save it to see it here.</div>
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Filter className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Saved Filters</h3>
+                <p className="text-muted-foreground">
+                  Create a filter in the Advanced Filters tab and save it to see it here.
+                </p>
+              </CardContent>
+            </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {savedFilters.map((filter) => (
                 <Card key={filter.id} className="hover:shadow-lg transition-shadow" data-testid={`saved-filter-${filter.id}`}>
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center justify-between">
-                      <span className="text-lg">{filter.name}</span>
+                      <span className="text-lg truncate">{filter.name}</span>
                       <div className="flex space-x-1">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => loadSavedFilter(filter)}
+                          title="Load filter"
                           data-testid={`button-load-filter-${filter.id}`}
                         >
                           <Copy className="w-4 h-4" />
@@ -498,7 +634,8 @@ export function AdvancedSearch() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => deleteFilterMutation.mutate(filter.id!)}
+                          onClick={() => filter.id && deleteFilterMutation.mutate(filter.id)}
+                          title="Delete filter"
                           data-testid={`button-delete-filter-${filter.id}`}
                         >
                           <Trash2 className="w-4 h-4 text-red-500" />
@@ -510,19 +647,18 @@ export function AdvancedSearch() {
                     )}
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Usage Count:</span>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Usage Count:</span>
                         <Badge variant="secondary">{filter.usageCount}</Badge>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Created:</span>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Created:</span>
                         <span>{new Date(filter.createdAt).toLocaleDateString()}</span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span>System Filter:</span>
-                        <span>{filter.isSystem ? 'Yes' : 'No'}</span>
-                      </div>
+                      {filter.isSystem && (
+                        <Badge variant="outline" className="mt-2">System Filter</Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -530,138 +666,140 @@ export function AdvancedSearch() {
             </div>
           )}
         </TabsContent>
-
-        <TabsContent value="recommendations" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Star className="w-5 h-5 mr-2" />
-                Smart Property Recommendations
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {recommendationsError ? (
-                <div className="text-center py-8 text-red-600">
-                  Failed to load recommendations. Please try again later.
-                </div>
-              ) : recommendations.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No recommendations available. Analyze some properties to get personalized suggestions.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {recommendations.map((rec) => (
-                    <Card key={rec.id} className="hover:shadow-lg transition-shadow" data-testid={`recommendation-${rec.id}`}>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center justify-between">
-                          <span className="text-lg capitalize">{rec.recommendationType.replace('_', ' ')}</span>
-                          <Badge variant="outline">{(rec.similarityScore).toFixed(0)}% match</Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="space-y-2">
-                          <p className="text-sm font-medium">Match Reasons:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {rec.matchReasons.map((reason, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-xs">
-                                {reason}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        <div className="pt-2 border-t">
-                          <p className="text-sm font-medium mb-2">AI Insights:</p>
-                          <p className="text-sm text-muted-foreground">{rec.aiInsights}</p>
-                        </div>
-                        
-                        <div className="flex justify-between text-sm">
-                          <span>Confidence:</span>
-                          <span className="font-medium">{(rec.confidenceScore * 100).toFixed(0)}%</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* Search Results */}
-      {propertyResults.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Search Results ({propertyResults.length} properties)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {propertyResults.map((property) => (
-                <Card key={property.id} className="hover:shadow-lg transition-shadow" data-testid={`result-property-${property.id}`}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center justify-between">
-                      <span className="text-lg">{property.property.address}</span>
-                      {property.meetsCriteria && (
-                        <Badge className="bg-green-100 text-green-800 border-green-200">
-                          Meets Criteria
-                        </Badge>
-                      )}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {property.property.city}, {property.property.state}
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Price</p>
-                        <p className="text-lg font-semibold">{formatCurrency(property.property.purchasePrice)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Monthly Rent</p>
-                        <p className="text-lg font-semibold text-green-600">{formatCurrency(property.property.monthlyRent)}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div className="text-center">
-                        <p className="font-medium">{property.property.bedrooms}</p>
-                        <p className="text-muted-foreground">Beds</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium">{property.property.bathrooms}</p>
-                        <p className="text-muted-foreground">Baths</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium">{property.property.squareFootage.toLocaleString()}</p>
-                        <p className="text-muted-foreground">Sq Ft</p>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t">
-                      <div className="flex justify-between text-sm">
-                        <span>Cash Flow:</span>
-                        <span className={`font-medium ${property.cashFlow > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(property.cashFlow)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>COC Return:</span>
-                        <span className="font-medium">{(property.cocReturn * 100).toFixed(1)}%</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Cap Rate:</span>
-                        <span className="font-medium">{(property.capRate * 100).toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Search Results</span>
+            <Badge variant="outline">
+              {filteredDeals.length} of {emailDeals.length} deals
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {dealsLoading ? (
+            <div className="text-center py-8">Loading email deals...</div>
+          ) : emailDeals.length === 0 ? (
+            <div className="text-center py-8">
+              <Mail className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Email Deals Found</h3>
+              <p className="text-muted-foreground">
+                Connect your Gmail account and sync emails to see deals here.
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : filteredDeals.length === 0 ? (
+            <div className="text-center py-8">
+              <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Matches Found</h3>
+              <p className="text-muted-foreground">
+                Try adjusting your search criteria or clearing filters.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredDeals.map((deal) => {
+                const property = deal.extractedProperty;
+                const analysis = deal.analysis;
+
+                return (
+                  <Card key={deal.id} className="hover:shadow-lg transition-shadow" data-testid={`result-deal-${deal.id}`}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <Badge className={getStatusColor(deal.status)} variant="outline">
+                          {deal.status}
+                        </Badge>
+                        {analysis?.meetsCriteria && (
+                          <Badge className="bg-green-100 text-green-800 border-green-200">
+                            Meets Criteria
+                          </Badge>
+                        )}
+                      </div>
+                      <CardTitle className="text-base line-clamp-2">
+                        {property?.address || deal.subject}
+                      </CardTitle>
+                      {property?.city && property?.state && (
+                        <p className="text-sm text-muted-foreground flex items-center mt-1">
+                          <MapPin className="w-3 h-3 mr-1" />
+                          {property.city}, {property.state}
+                        </p>
+                      )}
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        {(analysis?.property?.purchasePrice || property?.price) && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">Price</p>
+                            <p className="font-semibold">
+                              {formatCurrency(analysis?.property?.purchasePrice || property?.price || 0)}
+                            </p>
+                          </div>
+                        )}
+                        {(analysis?.property?.monthlyRent || property?.monthlyRent) && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">Rent</p>
+                            <p className="font-semibold text-green-600">
+                              {formatCurrency(analysis?.property?.monthlyRent || property?.monthlyRent || 0)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {(property?.bedrooms || property?.bathrooms || property?.sqft) && (
+                        <div className="grid grid-cols-3 gap-2 text-center text-xs border-t pt-2">
+                          {property?.bedrooms && (
+                            <div>
+                              <p className="font-medium">{property.bedrooms}</p>
+                              <p className="text-muted-foreground">Beds</p>
+                            </div>
+                          )}
+                          {property?.bathrooms && (
+                            <div>
+                              <p className="font-medium">{property.bathrooms}</p>
+                              <p className="text-muted-foreground">Baths</p>
+                            </div>
+                          )}
+                          {property?.sqft && (
+                            <div>
+                              <p className="font-medium">{property.sqft.toLocaleString()}</p>
+                              <p className="text-muted-foreground">Sq Ft</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {analysis && (
+                        <div className="space-y-1 text-xs border-t pt-2">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Cash Flow:</span>
+                            <span className={`font-medium ${analysis.cashFlow > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {formatCurrency(analysis.cashFlow)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">COC Return:</span>
+                            <span className="font-medium">{(analysis.cocReturn * 100).toFixed(1)}%</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Cap Rate:</span>
+                            <span className="font-medium">{(analysis.capRate * 100).toFixed(1)}%</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="text-xs text-muted-foreground border-t pt-2">
+                        <p className="truncate">From: {deal.sender}</p>
+                        <p>{new Date(deal.receivedDate).toLocaleDateString()}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

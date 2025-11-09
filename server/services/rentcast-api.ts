@@ -73,14 +73,15 @@ export class RentCastAPIService {
 
           if (!response.ok) {
             const errorBody = await response.text();
-            console.warn(`[RentCast] ${endpoint} responded ${response.status} ${response.statusText}: ${errorBody}`);
-            return null;
+            const message = `[RentCast] ${endpoint} responded ${response.status} ${response.statusText}: ${errorBody}`;
+            console.warn(message);
+            throw new Error(message);
           }
 
           return await response.json();
         } catch (error) {
           console.error('RentCast API request failed:', error);
-          return null;
+          throw error instanceof Error ? error : new Error(String(error));
         }
       }
     );
@@ -118,6 +119,7 @@ export class RentCastAPIService {
         daysOnMarket: area.daysOnMarket || 30,
         pricePerSqft: area.pricePerSqft || 0,
         rentYield: area.averageRent && area.averageValue ? (area.averageRent * 12) / area.averageValue : 0,
+        totalListings: area.totalListings || area.listingCount || 0,
         marketHeat: this.calculateMarketHeat(area.priceChangePercent || 0, area.daysOnMarket || 30),
         lastUpdated: new Date()
       }));
@@ -283,6 +285,10 @@ export class RentCastAPIService {
       console.error('RentCast API connection test failed:', error);
       return false;
     }
+  }
+
+  isConfigured(): boolean {
+    return Boolean(this.apiKey);
   }
 }
 

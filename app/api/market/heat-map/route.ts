@@ -4,6 +4,7 @@ import { rentCastAPI } from "../../../../server/services/rentcast-api";
 import { censusAPI } from "../../../../server/services/census-api";
 import { attomAPI } from "../../../../server/services/attom-api";
 import { fhfaAPI } from "../../../../server/services/fhfa-api";
+import type { MarketHeatMapData } from "@shared/schema";
 import NodeCache from "node-cache";
 
 const defaultZipCodes = ['90210', '78701', '33139', '10001', '94110', '37203', '85001', '30309', '80202', '02101'];
@@ -195,6 +196,28 @@ async function buildHeatEntry(zip: string): Promise<HeatEntry | null> {
   return entry;
 }
 
+function mapRentCastEntryToHeatEntry(entry: MarketHeatMapData): HeatEntry {
+  return {
+    id: entry.id || entry.zipCode,
+    zipCode: entry.zipCode,
+    city: entry.city,
+    state: entry.state,
+    latitude: entry.latitude,
+    longitude: entry.longitude,
+    averagePrice: entry.averagePrice,
+    priceChangePercent: entry.priceChangePercent,
+    averageRent: entry.averageRent,
+    rentChangePercent: entry.rentChangePercent,
+    dealVolume: entry.dealVolume,
+    investmentScore: entry.investmentScore,
+    heatLevel: entry.heatLevel as HeatLevel,
+    lastUpdated: entry.lastUpdated instanceof Date ? entry.lastUpdated.toISOString() : new Date(entry.lastUpdated).toISOString(),
+    marketStats: undefined,
+    sampleProperties: undefined,
+    demographics: undefined,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -222,6 +245,13 @@ export async function GET(request: NextRequest) {
 
         const liveEntries = await Promise.all(zips.map((zip) => buildHeatEntry(zip)));
         heatMapData = liveEntries.filter((entry): entry is HeatEntry => Boolean(entry));
+
+        if (heatMapData.length === 0 && rentCastAPI.isConfigured()) {
+          const rentCastEntries = await rentCastAPI.getMarketHeatMapData(zips);
+          if (rentCastEntries && rentCastEntries.length > 0) {
+            heatMapData = rentCastEntries.map(mapRentCastEntryToHeatEntry);
+          }
+        }
 
         if (heatMapData.length === 0) {
           heatMapData = await storage.getMarketHeatMapData(bounds);

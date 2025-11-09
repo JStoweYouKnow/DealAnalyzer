@@ -58,6 +58,10 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
   const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpenses>({});
   const [fundingSource, setFundingSource] = useState<FundingSource>('conventional');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // URL extraction state
+  const [propertyUrl, setPropertyUrl] = useState("");
+  const [extractingUrl, setExtractingUrl] = useState(false);
   
   // Mortgage calculator state
   const [mortgageLoading, setMortgageLoading] = useState(false);
@@ -80,20 +84,98 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
     const file = e.target.files?.[0];
     if (file) {
       // Check file type
-      const allowedTypes = ['.pdf', '.csv', '.txt', '.xlsx', '.xls'];
+      const allowedTypes = ['.pdf', '.csv', '.txt', '.xlsx', '.xls', '.json'];
       const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-      
+
       if (!allowedTypes.includes(fileExtension)) {
-        alert('Please select a PDF, CSV, TXT, or Excel file');
+        alert('Please select a PDF, CSV, TXT, Excel, or JSON file');
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
         return;
       }
-      
+
       setSelectedFile(file);
     } else {
       setSelectedFile(null);
+    }
+  };
+
+  const handleExtractFromUrl = async () => {
+    if (!propertyUrl.trim()) {
+      toast({
+        title: "URL Required",
+        description: "Please enter a property listing URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setExtractingUrl(true);
+    try {
+      const response = await fetch('/api/extract-property-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: propertyUrl.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to extract property data');
+      }
+
+      const propertyData = data.data;
+
+      // Create a JSON file from the extracted data
+      const jsonContent = JSON.stringify({
+        address: propertyData.address || '',
+        city: propertyData.city || '',
+        state: propertyData.state || '',
+        zipCode: propertyData.zipCode || '',
+        purchasePrice: propertyData.purchasePrice || 0,
+        bedrooms: propertyData.bedrooms || 0,
+        bathrooms: propertyData.bathrooms || 0,
+        squareFootage: propertyData.squareFootage || 0,
+        yearBuilt: propertyData.yearBuilt || 0,
+        propertyType: propertyData.propertyType || 'single-family',
+        listingUrl: propertyData.listingUrl || propertyUrl,
+        source: propertyData.source || 'web',
+      }, null, 2);
+
+      const blob = new Blob([jsonContent], { type: 'application/json' });
+      const file = new File([blob], `property-${Date.now()}.json`, { type: 'application/json' });
+
+      setSelectedFile(file);
+
+      // Auto-populate form fields if available
+      if (propertyData.monthlyRent) {
+        setLTRMetrics({ monthlyRent: propertyData.monthlyRent });
+      }
+
+      if (propertyData.propertyTaxes) {
+        setMonthlyExpenses(prev => ({ ...prev, propertyTaxes: propertyData.propertyTaxes / 12 }));
+      }
+
+      if (propertyData.hoa) {
+        setMonthlyExpenses(prev => ({ ...prev, other: propertyData.hoa }));
+      }
+
+      toast({
+        title: "Property Data Extracted",
+        description: `Successfully extracted data from ${propertyData.source || 'listing'}. Review and analyze.`,
+      });
+    } catch (error: any) {
+      console.error('Error extracting from URL:', error);
+      toast({
+        title: "Extraction Failed",
+        description: error.message || "Could not extract property data from URL. Try uploading a file instead.",
+        variant: "destructive",
+      });
+    } finally {
+      setExtractingUrl(false);
     }
   };
 
@@ -228,6 +310,58 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
         
         <CardContent className="p-6 pt-6">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* URL Extraction Section */}
+            <div>
+              <Label htmlFor="property-url" className="text-base font-semibold mb-3 block">
+                <i className="fas fa-link mr-2 text-primary"></i>
+                Extract from Listing URL
+              </Label>
+              <p className="text-sm text-muted-foreground mb-3">
+                Paste a property listing URL from Zillow, Redfin, Realtor.com, or other sites
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  id="property-url"
+                  type="url"
+                  placeholder="https://www.zillow.com/homedetails/..."
+                  value={propertyUrl}
+                  onChange={(e) => setPropertyUrl(e.target.value)}
+                  className="h-10"
+                  data-testid="input-property-url"
+                />
+                <Button
+                  type="button"
+                  onClick={handleExtractFromUrl}
+                  disabled={extractingUrl || !propertyUrl.trim()}
+                  variant="outline"
+                  className="whitespace-nowrap"
+                  data-testid="button-extract-url"
+                >
+                  {extractingUrl ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Extracting...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-magic mr-2"></i>
+                      Extract
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Divider with "OR" */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border/50"></span>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or</span>
+              </div>
+            </div>
+
             {/* File Upload Section */}
             <div>
               <Label htmlFor="file-upload" className="text-base font-semibold mb-3 block">Upload Property Data File</Label>
@@ -237,7 +371,7 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
                     ref={fileInputRef}
                     id="file-upload"
                     type="file"
-                    accept=".pdf,.csv,.txt,.xlsx,.xls"
+                    accept=".pdf,.csv,.txt,.xlsx,.xls,.json"
                     onChange={handleFileChange}
                     className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                     data-testid="input-file-upload"

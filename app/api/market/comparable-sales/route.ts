@@ -85,62 +85,73 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    let sales;
+    let sales: ComparableSale[] = [];
+    let dataSource: 'attom' | 'attom_cache' | 'rentcast' | 'storage' | 'unavailable' = 'unavailable';
+    const requestedRadius = radius ? Number(radius) : 1;
+    const cacheKey = `attom_comps_${address}_${requestedRadius}`;
     
     // Try to get live data first if requested
     if (live === 'true') {
+      // 1) Try ATTOM (with caching) if configured
       try {
-        const cacheKey = `attom_comps_${address}_${radius || 1}`;
-        const cached = getCachedComparables(cacheKey);
-        if (cached) {
-          sales = cached;
-        } else if (attomAPI.isConfigured()) {
-          const attomResponse = await attomAPI.getComparableSales(
-            address as string,
-            radius ? Number(radius) : 1
-          );
-          if (attomResponse && attomResponse.length > 0) {
-            const mapped = attomResponse
-              .map(mapAttomComparable)
-              .filter((item): item is ComparableSale => Boolean(item));
-            if (mapped.length > 0) {
-              sales = mapped;
-              setCachedComparables(cacheKey, mapped);
+        if (attomAPI.isConfigured()) {
+          const cached = getCachedComparables(cacheKey);
+          if (cached) {
+            sales = cached;
+            dataSource = 'attom_cache';
+          } else {
+            const attomResponse = await attomAPI.getComparableSales(address, requestedRadius);
+            if (attomResponse && attomResponse.length > 0) {
+              const mapped = attomResponse
+                .map(mapAttomComparable)
+                .filter((item): item is ComparableSale => Boolean(item));
+              if (mapped.length > 0) {
+                sales = mapped;
+                dataSource = 'attom';
+                setCachedComparables(cacheKey, mapped);
+              }
             }
           }
+        } else {
+          console.warn("ATTOM_API_KEY not configured; skipping Attom comparable sales lookup.");
         }
+      } catch (attomError) {
+        console.warn("Attom API failed when fetching comparable sales:", attomError);
+      }
 
-        if (!sales || sales.length === 0) {
-          sales = await rentCastAPI.getComparableSales(
-            address as string,
-            radius ? Number(radius) : 1
-          );
+      // 2) Try RentCast if nothing from ATTOM
+      if (sales.length === 0) {
+        if (rentCastAPI.isConfigured()) {
+          try {
+            const rentCastResults = await rentCastAPI.getComparableSales(address, requestedRadius);
+            if (rentCastResults && rentCastResults.length > 0) {
+              sales = rentCastResults;
+              dataSource = 'rentcast';
+            }
+          } catch (rentCastError) {
+            console.warn("RentCast API failed when fetching comparable sales:", rentCastError);
+          }
+        } else {
+          console.warn("RENTCAST_API_KEY not configured; skipping RentCast comparable sales lookup.");
         }
+      }
 
-        if (!sales || sales.length === 0) {
-          // Fall back to stored data if API returns no results
-          sales = await storage.getComparableSales(
-            address as string,
-            radius ? Number(radius) : undefined
-          );
-        }
-      } catch (apiError) {
-        console.warn("RentCast API failed, falling back to stored data:", apiError);
-        sales = await storage.getComparableSales(
-          address as string,
-          radius ? Number(radius) : undefined
-        );
+      // 3) Fall back to stored historical data
+      if (sales.length === 0) {
+        sales = await storage.getComparableSales(address, radius ? Number(radius) : undefined);
+        dataSource = 'storage';
       }
     } else {
       // Use stored data by default
       sales = await storage.getComparableSales(
-        address as string,
+        address,
         radius ? Number(radius) : undefined
       );
+      dataSource = 'storage';
     }
     
     return NextResponse.json(
-      { success: true, data: sales },
+      { success: true, data: sales, source: dataSource },
       {
         headers: {
           // Cache for 1 hour on CDN, allow stale for 2 hours while revalidating
