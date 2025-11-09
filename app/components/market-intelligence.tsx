@@ -48,7 +48,7 @@ type DemographicsSnapshot = {
   ownerOccupied?: number;
   renterOccupied?: number;
   unemploymentRate?: number;
-  educationLevel?: string;
+  educationLevel?: string | Record<string, number>;
 };
 
 type MarketTrend = {
@@ -177,6 +177,14 @@ export function MarketIntelligence() {
       return 'N/A';
     }
     return decimals > 0 ? value.toFixed(decimals) : value.toLocaleString();
+  };
+
+  const formatRatioToPercent = (value?: number, decimals = 1) => {
+    if (value === undefined || value === null || Number.isNaN(value)) {
+      return 'N/A';
+    }
+    const normalized = value > 1 ? value : value * 100;
+    return `${normalized.toFixed(decimals)}%`;
   };
 
   const formatDateOptional = (value?: string) => {
@@ -689,9 +697,27 @@ export function MarketIntelligence() {
                             </div>
                           </div>
                           {trend.demographics.educationLevel && (
-                            <p className="text-xs text-muted-foreground">
-                              Education Highlights: {trend.demographics.educationLevel}
-                            </p>
+                            <div className="space-y-1 text-xs text-muted-foreground">
+                              <p className="font-semibold uppercase tracking-wide">Education Highlights</p>
+                              {typeof trend.demographics.educationLevel === 'string' ? (
+                                <p>{trend.demographics.educationLevel}</p>
+                              ) : (
+                                <div className="flex flex-wrap gap-2">
+                                  {Object.entries(trend.demographics.educationLevel).map(([level, value]) => (
+                                    <Badge
+                                      key={`${cardKey}-education-${level}`}
+                                      variant="outline"
+                                      className="border border-border bg-muted/40 text-foreground"
+                                    >
+                                      {level}
+                                      <span className="ml-1 text-[10px] text-muted-foreground">
+                                        ({formatRatioToPercent(value)})
+                                      </span>
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </section>
                       )}
