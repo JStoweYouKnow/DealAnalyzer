@@ -7,29 +7,111 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Home, MapPin, Calendar, DollarSign } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { TrendingUp, TrendingDown, Home, MapPin, Calendar } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import type { NeighborhoodTrend, ComparableSale, MarketHeatMapData } from "@shared/schema";
+import type { ComparableSale, MarketHeatMapData } from "@shared/schema";
+
+type MarketStats = {
+  totalProperties?: number;
+  medianSalePrice?: number;
+  avgPricePerSqft?: number;
+  medianBuildingSize?: number;
+  avgYearBuilt?: number;
+  propertyTypes?: Record<string, number>;
+  ownerOccupancyRate?: number;
+  propertiesWithSaleData?: number;
+};
+
+type SampleProperty = {
+  address?: string;
+  propertyType?: string;
+  yearBuilt?: number;
+  beds?: number;
+  baths?: number;
+  buildingSize?: number;
+  lotSize?: number;
+  lastSalePrice?: number;
+  lastSaleDate?: string;
+  assessedValue?: number;
+  ownerOccupied?: boolean;
+};
+
+type DemographicsSnapshot = {
+  population?: number;
+  medianIncome?: number;
+  medianAge?: number;
+  medianHomeValue?: number;
+  perCapitaIncome?: number;
+  medianGrossRent?: number;
+  totalHousingUnits?: number;
+  ownerOccupied?: number;
+  renterOccupied?: number;
+  unemploymentRate?: number;
+  educationLevel?: string;
+};
+
+type MarketTrend = {
+  id?: string;
+  zipCode?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  marketHeat?: string;
+  averagePrice?: number;
+  averageRent?: number;
+  priceChangePercent1Year?: number;
+  rentChangePercent1Year?: number;
+  daysOnMarket?: number;
+  pricePerSqft?: number;
+  rentYield?: number;
+  marketStats?: MarketStats;
+  sampleProperties?: SampleProperty[];
+  demographics?: DemographicsSnapshot;
+};
 
 export function MarketIntelligence() {
-  const [selectedCity, setSelectedCity] = useState<string>("all");
-  const [selectedState, setSelectedState] = useState<string>("all");
+  const [zipInput, setZipInput] = useState<string>("");
+  const [zipCode, setZipCode] = useState<string>("");
   const [searchAddress, setSearchAddress] = useState<string>("");
   const [useLiveData, setUseLiveData] = useState<boolean>(false);
 
+  const isZipValid = zipInput.trim().length === 5;
+
+  const handleZipSubmit = () => {
+    const sanitized = zipInput.trim();
+    if (!sanitized) {
+      return;
+    }
+    setZipInput(sanitized);
+    setZipCode(sanitized);
+  };
+
+  const handleZipClear = () => {
+    setZipInput("");
+    setZipCode("");
+  };
+
   // Fetch neighborhood trends
-  const { data: neighborhoodTrends = [], isLoading: trendsLoading, error: trendsError } = useQuery<NeighborhoodTrend[]>({
-    queryKey: ['/api/market/neighborhood-trends', selectedCity, selectedState, useLiveData],
+  const { data: neighborhoodTrends = [], isLoading: trendsLoading, error: trendsError } = useQuery<MarketTrend[]>({
+    queryKey: ['/api/market/neighborhood-trends', zipCode || 'all', useLiveData],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (selectedCity !== "all") params.append('city', selectedCity);
-      if (selectedState !== "all") params.append('state', selectedState);
-      if (useLiveData) params.append('live', 'true');
-      
-      const response = await apiRequest('GET', `/api/market/neighborhood-trends?${params}`);
+      const trimmedZip = zipCode.trim();
+      if (trimmedZip) {
+        params.append('zipCode', trimmedZip);
+      }
+      if (useLiveData) {
+        params.append('live', 'true');
+      }
+
+      const queryString = params.toString();
+      const response = await apiRequest(
+        'GET',
+        `/api/market/neighborhood-trends${queryString ? `?${queryString}` : ''}`
+      );
       const data = await response.json();
-      return data.data || [];
+      return (data.data as MarketTrend[]) || [];
     }
   });
 
@@ -70,6 +152,56 @@ export function MarketIntelligence() {
 
   const formatPercent = (percent: number) => {
     return `${percent > 0 ? '+' : ''}${percent.toFixed(1)}%`;
+  };
+
+  const formatCount = (value?: number) => {
+    return value !== undefined && value !== null
+      ? value.toLocaleString()
+      : 'N/A';
+  };
+
+  const formatCurrencyOptional = (value?: number) => {
+    return value !== undefined && value !== null
+      ? formatCurrency(value)
+      : 'N/A';
+  };
+
+  const formatPercentageOptional = (value?: number, decimals = 1) => {
+    return value !== undefined && value !== null
+      ? `${value.toFixed(decimals)}%`
+      : 'N/A';
+  };
+
+  const formatNumberOptional = (value?: number, decimals = 0) => {
+    if (value === undefined || value === null || Number.isNaN(value)) {
+      return 'N/A';
+    }
+    return decimals > 0 ? value.toFixed(decimals) : value.toLocaleString();
+  };
+
+  const formatDateOptional = (value?: string) => {
+    return value ? new Date(value).toLocaleDateString() : 'N/A';
+  };
+
+  const getTrendBadge = (trend: MarketTrend) => {
+    if (trend.marketHeat) {
+      return {
+        label: trend.marketHeat,
+        className: getMarketHeatBadge(trend.marketHeat),
+      };
+    }
+
+    if (trend.marketStats) {
+      return {
+        label: 'Live Data',
+        className: 'bg-green-100 text-green-800 border-green-200',
+      };
+    }
+
+    return {
+      label: 'Historical',
+      className: 'bg-slate-100 text-slate-800 border-slate-200',
+    };
   };
 
   const getHeatLevelColor = (level: string) => {
@@ -132,107 +264,441 @@ export function MarketIntelligence() {
           <TabsTrigger value="heatmap" data-testid="tab-heatmap">Market Heat Map</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="trends" className="space-y-4">
-          <div className="flex space-x-4">
-            <Select value={selectedState} onValueChange={setSelectedState}>
-              <SelectTrigger className="w-48" data-testid="select-state">
-                <SelectValue placeholder="Select State" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All States</SelectItem>
-                <SelectItem value="CA">California</SelectItem>
-                <SelectItem value="TX">Texas</SelectItem>
-                <SelectItem value="FL">Florida</SelectItem>
-                <SelectItem value="NY">New York</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedCity} onValueChange={setSelectedCity}>
-              <SelectTrigger className="w-48" data-testid="select-city">
-                <SelectValue placeholder="Select City" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Cities</SelectItem>
-                <SelectItem value="Los Angeles">Los Angeles</SelectItem>
-                <SelectItem value="Austin">Austin</SelectItem>
-                <SelectItem value="Miami">Miami</SelectItem>
-                <SelectItem value="New York">New York</SelectItem>
-              </SelectContent>
-            </Select>
+        <TabsContent value="trends" className="space-y-6">
+          <div className="space-y-3">
+            <div className="flex flex-col md:flex-row md:items-end gap-3">
+              <div className="flex-1 md:max-w-xs">
+                <Label htmlFor="zip-search" className="text-sm font-medium">
+                  ZIP Code
+                </Label>
+                <Input
+                  id="zip-search"
+                  placeholder="Enter 5-digit ZIP"
+                  value={zipInput}
+                  onChange={(e) => setZipInput(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && isZipValid) {
+                      e.preventDefault();
+                      handleZipSubmit();
+                    }
+                  }}
+                  className="h-10"
+                  data-testid="input-zip-search"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleZipSubmit}
+                  disabled={!isZipValid}
+                  data-testid="button-search-zip"
+                >
+                  Search
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleZipClear}
+                  disabled={!zipInput && !zipCode}
+                  data-testid="button-clear-zip"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1 text-sm text-muted-foreground">
+              <p>
+                {zipCode
+                  ? `Showing market intelligence for ZIP ${zipCode}${useLiveData ? ' with live data sources.' : '.'}`
+                  : 'Enter a ZIP code to explore localized market intelligence. Without a ZIP we display sample historical data.'}
+              </p>
+              {useLiveData && !zipCode && (
+                <p className="text-xs text-amber-600">
+                  Enter a ZIP code to activate live Attom & Census insights.
+                </p>
+              )}
+            </div>
           </div>
 
           {trendsLoading ? (
             <div className="text-center py-8">Loading neighborhood trends...</div>
           ) : trendsError ? (
-            <div className="text-center py-8 text-red-600">Failed to load neighborhood trends. Please try again later.</div>
+            <div className="text-center py-8 text-red-600">
+              Failed to load neighborhood trends. Please try again later.
+            </div>
           ) : neighborhoodTrends.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No neighborhood trends available for the selected area.</div>
+            <div className="text-center py-8 text-muted-foreground">
+              No neighborhood trends available. Try a different ZIP code or toggle off live data.
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {neighborhoodTrends.map((trend) => (
-                <Card key={trend.id} className="hover:shadow-lg transition-shadow" data-testid={`trend-card-${trend.id}`}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center justify-between">
-                      <span className="text-lg">{trend.neighborhood}</span>
-                      <Badge className={getMarketHeatBadge(trend.marketHeat)}>
-                        {trend.marketHeat}
-                      </Badge>
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground flex items-center">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      {trend.city}, {trend.state}
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Avg Price</p>
-                        <p className="text-lg font-semibold">{formatCurrency(trend.averagePrice)}</p>
-                        <div className="flex items-center text-sm">
-                          {trend.priceChangePercent1Year > 0 ? (
-                            <TrendingUp className="w-4 h-4 mr-1 text-green-600" />
-                          ) : (
-                            <TrendingDown className="w-4 h-4 mr-1 text-red-600" />
-                          )}
-                          <span className={trend.priceChangePercent1Year > 0 ? "text-green-600" : "text-red-600"}>
-                            {formatPercent(trend.priceChangePercent1Year)} YoY
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Avg Rent</p>
-                        <p className="text-lg font-semibold">{formatCurrency(trend.averageRent)}</p>
-                        <div className="flex items-center text-sm">
-                          {trend.rentChangePercent1Year > 0 ? (
-                            <TrendingUp className="w-4 h-4 mr-1 text-green-600" />
-                          ) : (
-                            <TrendingDown className="w-4 h-4 mr-1 text-red-600" />
-                          )}
-                          <span className={trend.rentChangePercent1Year > 0 ? "text-green-600" : "text-red-600"}>
-                            {formatPercent(trend.rentChangePercent1Year)} YoY
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+              {neighborhoodTrends.map((trend, index) => {
+                const { label, className } = getTrendBadge(trend);
+                const propertyTypeEntries = trend.marketStats?.propertyTypes
+                  ? Object.entries(trend.marketStats.propertyTypes)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 6)
+                  : [];
+                const priceChange =
+                  typeof trend.priceChangePercent1Year === 'number'
+                    ? trend.priceChangePercent1Year
+                    : undefined;
+                const rentChange =
+                  typeof trend.rentChangePercent1Year === 'number'
+                    ? trend.rentChangePercent1Year
+                    : undefined;
+                const rentYieldPercent =
+                  typeof trend.rentYield === 'number' ? trend.rentYield * 100 : undefined;
 
-                    <div className="pt-2 border-t">
-                      <div className="flex justify-between text-sm">
-                        <span>Days on Market:</span>
-                        <span className="font-medium">{trend.daysOnMarket}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Price per Sq Ft:</span>
-                        <span className="font-medium">{formatCurrency(trend.pricePerSqft)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Rent Yield:</span>
-                        <span className="font-medium">{(trend.rentYield * 100).toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                const hasLegacyMetrics =
+                  typeof trend.averagePrice === 'number' ||
+                  typeof trend.averageRent === 'number' ||
+                  typeof trend.daysOnMarket === 'number' ||
+                  typeof trend.pricePerSqft === 'number' ||
+                  typeof priceChange === 'number' ||
+                  typeof rentChange === 'number' ||
+                  typeof rentYieldPercent === 'number';
+
+                const cardKey = trend.zipCode || trend.id || trend.neighborhood || `trend-${index}`;
+
+                return (
+                  <Card
+                    key={cardKey}
+                    className="hover:shadow-lg transition-shadow"
+                    data-testid={`trend-card-${trend.zipCode || trend.id || index}`}
+                  >
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center justify-between gap-3">
+                        <span className="text-lg">
+                          {trend.neighborhood || (trend.zipCode ? `Zip ${trend.zipCode}` : 'Market Area')}
+                        </span>
+                        <Badge className={className}>{label}</Badge>
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        {[
+                          trend.city,
+                          trend.state,
+                          trend.zipCode ? `ZIP ${trend.zipCode}` : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" • ") || "Location unavailable"}
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {trend.marketStats && (
+                        <section className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                              Market Snapshot
+                            </h4>
+                            {trend.marketStats.propertiesWithSaleData !== undefined && (
+                              <span className="text-xs text-muted-foreground">
+                                Sale data for {formatCount(trend.marketStats.propertiesWithSaleData)} properties
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="rounded-lg border border-border bg-muted/30 p-3">
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                Total Properties
+                              </p>
+                              <p className="text-lg font-semibold">{formatCount(trend.marketStats.totalProperties)}</p>
+                            </div>
+                            <div className="rounded-lg border border-border bg-muted/30 p-3">
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                Median Sale Price
+                              </p>
+                              <p className="text-lg font-semibold">
+                                {formatCurrencyOptional(trend.marketStats.medianSalePrice)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-border bg-muted/30 p-3">
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                Avg Price / Sq Ft
+                              </p>
+                              <p className="text-lg font-semibold">
+                                {formatCurrencyOptional(trend.marketStats.avgPricePerSqft)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-border bg-muted/30 p-3">
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                Median Building Size
+                              </p>
+                              <p className="text-lg font-semibold">
+                                {trend.marketStats.medianBuildingSize
+                                  ? `${Math.round(trend.marketStats.medianBuildingSize).toLocaleString()} sq ft`
+                                  : 'N/A'}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-border bg-muted/30 p-3">
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                Avg Year Built
+                              </p>
+                              <p className="text-lg font-semibold">
+                                {formatNumberOptional(trend.marketStats.avgYearBuilt)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-border bg-muted/30 p-3">
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                Owner Occupancy
+                              </p>
+                              <p className="text-lg font-semibold">
+                                {formatPercentageOptional(trend.marketStats.ownerOccupancyRate)}
+                              </p>
+                            </div>
+                          </div>
+                          {propertyTypeEntries.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+                                Property Mix
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {propertyTypeEntries.map(([type, count]) => (
+                                  <Badge
+                                    key={`${cardKey}-${type}`}
+                                    variant="outline"
+                                    className="border border-border bg-muted/40 text-foreground"
+                                  >
+                                    {type || 'Unknown'}{" "}
+                                    <span className="ml-1 text-xs text-muted-foreground">({count})</span>
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </section>
+                      )}
+
+                      {hasLegacyMetrics && (
+                        <section className="space-y-3">
+                          <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                            Historical Rent & Price Trends
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Avg Price</p>
+                              <p className="text-lg font-semibold">
+                                {typeof trend.averagePrice === 'number'
+                                  ? formatCurrency(trend.averagePrice)
+                                  : 'N/A'}
+                              </p>
+                              {priceChange !== undefined && (
+                                <div className="flex items-center text-sm">
+                                  {priceChange > 0 ? (
+                                    <TrendingUp className="w-4 h-4 mr-1 text-green-600" />
+                                  ) : (
+                                    <TrendingDown className="w-4 h-4 mr-1 text-red-600" />
+                                  )}
+                                  <span className={priceChange > 0 ? "text-green-600" : "text-red-600"}>
+                                    {formatPercent(priceChange)} YoY
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Avg Rent</p>
+                              <p className="text-lg font-semibold">
+                                {typeof trend.averageRent === 'number'
+                                  ? formatCurrency(trend.averageRent)
+                                  : 'N/A'}
+                              </p>
+                              {rentChange !== undefined && (
+                                <div className="flex items-center text-sm">
+                                  {rentChange > 0 ? (
+                                    <TrendingUp className="w-4 h-4 mr-1 text-green-600" />
+                                  ) : (
+                                    <TrendingDown className="w-4 h-4 mr-1 text-red-600" />
+                                  )}
+                                  <span className={rentChange > 0 ? "text-green-600" : "text-red-600"}>
+                                    {formatPercent(rentChange)} YoY
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="pt-2 border-t space-y-2 text-sm">
+                            {typeof trend.daysOnMarket === 'number' && (
+                              <div className="flex justify-between">
+                                <span>Days on Market:</span>
+                                <span className="font-medium">{trend.daysOnMarket}</span>
+                              </div>
+                            )}
+                            {typeof trend.pricePerSqft === 'number' && (
+                              <div className="flex justify-between">
+                                <span>Price per Sq Ft:</span>
+                                <span className="font-medium">{formatCurrency(trend.pricePerSqft)}</span>
+                              </div>
+                            )}
+                            {typeof rentYieldPercent === 'number' && (
+                              <div className="flex justify-between">
+                                <span>Rent Yield:</span>
+                                <span className="font-medium">{rentYieldPercent.toFixed(1)}%</span>
+                              </div>
+                            )}
+                          </div>
+                        </section>
+                      )}
+
+                      {trend.sampleProperties?.length ? (
+                        <section className="space-y-3">
+                          <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                            Sample Properties
+                          </h4>
+                          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                            {trend.sampleProperties.slice(0, 5).map((property, propertyIndex) => (
+                              <div
+                                key={`${cardKey}-property-${propertyIndex}`}
+                                className="border border-border rounded-lg bg-muted/20 p-3 space-y-2"
+                              >
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                  <div className="text-sm font-medium flex items-center gap-2">
+                                    <Home className="w-4 h-4 text-muted-foreground" />
+                                    {property.address || 'Address unavailable'}
+                                  </div>
+                                  {property.lastSalePrice && (
+                                    <span className="text-sm font-semibold text-green-700">
+                                      {formatCurrency(property.lastSalePrice)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                  <div>
+                                    <p className="font-medium text-muted-foreground uppercase">Type</p>
+                                    <p className="text-muted-foreground/80 capitalize">
+                                      {property.propertyType || 'Unknown'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-muted-foreground uppercase">Year Built</p>
+                                    <p className="text-muted-foreground/80">
+                                      {property.yearBuilt ?? '—'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-muted-foreground uppercase">Beds / Baths</p>
+                                    <p className="text-muted-foreground/80">
+                                      {property.beds ?? '—'} / {property.baths ?? '—'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-muted-foreground uppercase">Building Size</p>
+                                    <p className="text-muted-foreground/80">
+                                      {property.buildingSize
+                                        ? `${Math.round(property.buildingSize).toLocaleString()} sq ft`
+                                        : 'N/A'}
+                                    </p>
+                                  </div>
+                                  {property.lotSize !== undefined && (
+                                    <div>
+                                      <p className="font-medium text-muted-foreground uppercase">Lot Size</p>
+                                      <p className="text-muted-foreground/80">
+                                        {property.lotSize
+                                          ? `${Math.round(property.lotSize).toLocaleString()} sq ft`
+                                          : 'N/A'}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                  {property.lastSaleDate && (
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3" />
+                                      {formatDateOptional(property.lastSaleDate)}
+                                    </span>
+                                  )}
+                                  {property.assessedValue && (
+                                    <span>Assessed: {formatCurrency(property.assessedValue)}</span>
+                                  )}
+                                  {property.ownerOccupied !== undefined && (
+                                    <span>
+                                      Owner Occupied: {property.ownerOccupied ? 'Yes' : 'No'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
+
+                      {trend.demographics && (
+                        <section className="space-y-3">
+                          <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                            Demographics Snapshot
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Population</p>
+                              <p className="text-lg font-semibold">
+                                {formatCount(trend.demographics.population)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Median Income</p>
+                              <p className="text-lg font-semibold">
+                                {formatCurrencyOptional(trend.demographics.medianIncome)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Median Age</p>
+                              <p className="text-lg font-semibold">
+                                {formatNumberOptional(trend.demographics.medianAge, 1)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Median Home Value</p>
+                              <p className="text-lg font-semibold">
+                                {formatCurrencyOptional(trend.demographics.medianHomeValue)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Per Capita Income</p>
+                              <p className="text-lg font-semibold">
+                                {formatCurrencyOptional(trend.demographics.perCapitaIncome)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Median Gross Rent</p>
+                              <p className="text-lg font-semibold">
+                                {formatCurrencyOptional(trend.demographics.medianGrossRent)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Total Housing Units</p>
+                              <p className="text-lg font-semibold">
+                                {formatCount(trend.demographics.totalHousingUnits)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Owner Occupied</p>
+                              <p className="text-lg font-semibold">
+                                {formatCount(trend.demographics.ownerOccupied)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Renter Occupied</p>
+                              <p className="text-lg font-semibold">
+                                {formatCount(trend.demographics.renterOccupied)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">Unemployment Rate</p>
+                              <p className="text-lg font-semibold">
+                                {formatPercentageOptional(trend.demographics.unemploymentRate)}
+                              </p>
+                            </div>
+                          </div>
+                          {trend.demographics.educationLevel && (
+                            <p className="text-xs text-muted-foreground">
+                              Education Highlights: {trend.demographics.educationLevel}
+                            </p>
+                          )}
+                        </section>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
