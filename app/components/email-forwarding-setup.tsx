@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,9 @@ export function EmailForwardingSetup({ userId }: EmailForwardingSetupProps) {
   // Generate unique email address for this user
   // If no userId, use a default or generate a session-based ID
   const userIdentifier = userId || 'default';
-  const forwardingEmail = `deals+${userIdentifier}@yourdomain.com`; // TODO: Replace with actual domain
+  // TODO: Replace 'dealanalyzer.com' with your actual domain after purchase
+  // Example: deals+user123@inbound.dealanalyzer.com
+  const forwardingEmail = `deals+${userIdentifier}@inbound.dealanalyzer.com`;
 
   const copyToClipboard = async () => {
     try {
