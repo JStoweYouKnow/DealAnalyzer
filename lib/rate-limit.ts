@@ -4,7 +4,14 @@ import { Redis } from '@upstash/redis';
 // Create Redis client - will use UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN from env
 // If not configured, will gracefully fail and allow requests through
 let redis: Redis | null = null;
-let ratelimit: Ratelimit | null = null;
+
+type RateLimitTier = 'general' | 'expensive' | 'strict';
+
+const rateLimiters: Record<RateLimitTier, Ratelimit | null> = {
+  general: null,
+  expensive: null,
+  strict: null,
+};
 
 try {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
@@ -13,16 +20,28 @@ try {
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
     });
 
-    // Configure rate limiting: 10 requests per 60 seconds
-    ratelimit = new Ratelimit({
+    // Configure documented rate limiting tiers
+    rateLimiters.general = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(100, '60 s'),
+      analytics: true,
+    });
+    rateLimiters.expensive = new Ratelimit({
       redis,
       limiter: Ratelimit.slidingWindow(10, '60 s'),
+      analytics: true,
+    });
+    rateLimiters.strict = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, '60 s'),
       analytics: true,
     });
   }
 } catch (error) {
   console.warn('Rate limiting not configured - requests will not be rate limited');
 }
+
+export const RATE_LIMIT_TIERS: Record<RateLimitTier, Ratelimit | null> = rateLimiters;
 
 /**
  * Rate limit middleware for API routes
@@ -40,11 +59,16 @@ try {
  * }
  * ```
  */
-export async function checkRateLimit(request: Request): Promise<{
+export async function checkRateLimit(
+  request: Request,
+  tier: RateLimitTier = 'general'
+): Promise<{
   success: boolean;
   response?: Response;
 }> {
   // If rate limiting is not configured, allow the request through
+  const ratelimit = rateLimiters[tier];
+
   if (!ratelimit) {
     return { success: true };
   }
