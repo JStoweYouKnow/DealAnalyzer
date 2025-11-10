@@ -4,8 +4,10 @@ import { join } from "path";
 import { storage } from "../../../server/storage";
 import { aiAnalysisService as photoAnalysisService } from "../../../server/services/ai-analysis-service";
 import fs from "fs";
+import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  return withRateLimit(request, expensiveRateLimit, async (req) => {
   let uploadedFiles: string[] = [];
   
   try {
@@ -95,5 +97,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  });
 }
 

@@ -18,25 +18,33 @@ if (process.env.NODE_ENV === 'production' && ALLOW_PUBLIC_ROUTES_IN_DEV) {
 
 // Define safe public routes that don't require authentication
 // These are endpoints that must be accessible without auth:
-// - Root and static pages
+// - Root and static pages (landing page)
 // - Authentication pages (sign-in/sign-up)
-// - Health check endpoint
-// - OAuth callbacks (required for OAuth flow)
-// - Main application pages (deals, market, search, comparison)
+// - Legal pages (privacy, terms) - required for OAuth verification
+// - Specific public API endpoints only:
+//   * Health check for monitoring
+//   * OAuth callbacks for authentication flow
+//   * Webhook endpoints for external services
+//   * Open Graph images for social sharing
 const safePublicRoutes = [
-  '/',
-  '/sign-in(.*)',
+  '/',                         // Landing page
+  '/sign-in(.*)',              // Authentication pages
   '/sign-up(.*)',
-  '/api/(.*)', // All API endpoints are accessible after email auth gate
-  '/deals(.*)', // Deals page and sub-routes
-  '/market(.*)', // Market page
-  '/search(.*)', // Search page
-  '/comparison(.*)', // Comparison page
+  '/privacy',                  // Legal pages
+  '/terms',
+  '/api/health',               // Health check - monitoring
+  '/api/gmail-callback',       // OAuth callback - required for Gmail auth
+  '/api/receive-email',        // SendGrid webhook - email forwarding
+  '/api/og-image(.*)',         // Open Graph images - social sharing
 ];
 
-// Development-only: permissive routes for testing
-// Note: Main app routes are now in safePublicRoutes above
+// Development-only: additional routes that are public in dev but protected in production
+// In production, all routes except those in safePublicRoutes will require authentication
+// This includes: /deals, /market, /search, /comparison, and all other API endpoints
 const devOnlyPublicRoutes: string[] = [];
+
+// SECURITY NOTE: Public webhooks (e.g., /api/receive-email) should implement their own
+// authentication/verification mechanisms (e.g., SendGrid signature verification)
 
 // Combine safe and dev-only routes
 const publicRoutes = [...safePublicRoutes, ...devOnlyPublicRoutes];

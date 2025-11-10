@@ -3,8 +3,10 @@ import { storage } from "../../../server/storage";
 import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
 import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
+import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
     const { dealId, emailContent, fundingSource, mortgageValues } = await request.json();
     
@@ -161,5 +163,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  });
 }
 

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { withRateLimit, expensiveRateLimit } from '../../lib/rate-limit';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function POST(request: NextRequest) {
+  return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
     const { url } = await request.json();
 
@@ -128,4 +130,5 @@ Important: Return ONLY the JSON object, no additional text or markdown.`,
       { status: 500 }
     );
   }
+  });
 }

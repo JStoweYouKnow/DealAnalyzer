@@ -7,8 +7,10 @@ import { getMortgageRate } from "../../../server/mortgage-rate-service";
 import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
 import { FUNDING_SOURCE_DOWN_PAYMENTS, mortgageValuesSchema } from "../../../shared/schema";
 import { getPdfExtractor } from "../../lib/lazy-load";
+import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
     console.log('=== Analyze File API Called ===');
     console.log('Request headers:', Object.fromEntries(request.headers.entries()));
@@ -257,10 +259,11 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error in analyze-file endpoint:", error);
-    
+
     return NextResponse.json(
       { success: false, error: `Internal server error during file analysis: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     );
   }
+  });
 }
