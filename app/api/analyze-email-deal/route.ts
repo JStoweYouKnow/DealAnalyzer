@@ -8,7 +8,7 @@ import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
-    const { dealId, emailContent, fundingSource, mortgageValues } = await request.json();
+    const { dealId, emailContent, fundingSource, mortgageValues } = await req.json();
     
     if (!dealId || !emailContent) {
       return NextResponse.json(

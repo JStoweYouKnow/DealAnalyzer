@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,13 +12,90 @@ interface EmailForwardingSetupProps {
   userId?: string;
 }
 
+/**
+ * Generates a unique identifier that is URL/email-safe.
+ * Uses crypto.randomUUID() if available, otherwise falls back to a random hex string.
+ */
+function generateUniqueId(): string {
+  // Try crypto.randomUUID() first (available in modern browsers)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // Fallback: generate a random hex string (16 bytes = 32 hex chars)
+  // This is safe for URLs and email addresses
+  const array = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(array);
+  } else {
+    // Last resort fallback for environments without crypto
+    for (let i = 0; i < array.length; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  
+  // Convert to hex string
+  return Array.from(array)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Gets or creates a unique identifier for anonymous users.
+ * Persists to localStorage to survive sessions.
+ */
+function getOrCreateAnonymousId(): string {
+  const STORAGE_KEY = 'dealanalyzer_anonymous_id';
+  
+  if (typeof window === 'undefined') {
+    // Server-side: return a placeholder (shouldn't happen in client component)
+    return 'temp';
+  }
+  
+  try {
+    // Check if we already have an ID stored
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return stored;
+    }
+    
+    // Generate a new unique ID
+    const newId = generateUniqueId();
+    
+    // Store it for future sessions
+    localStorage.setItem(STORAGE_KEY, newId);
+    
+    return newId;
+  } catch (error) {
+    // If localStorage is unavailable (e.g., private browsing), generate a session-only ID
+    console.warn('localStorage unavailable, using session-only ID:', error);
+    return generateUniqueId();
+  }
+}
+
 export function EmailForwardingSetup({ userId }: EmailForwardingSetupProps) {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  
+  // Initialize anonymous ID with lazy initialization to avoid hydration mismatches
+  // and ensure we get the persisted value immediately
+  const [anonymousId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    return !userId ? getOrCreateAnonymousId() : null;
+  });
 
   // Generate unique email address for this user
-  // If no userId, use a default or generate a session-based ID
-  const userIdentifier = userId || 'default';
+  // If no userId, use a unique anonymous identifier
+  const userIdentifier = useMemo(() => {
+    if (userId) {
+      return userId;
+    }
+    // anonymousId is guaranteed to be set if userId is not provided
+    return anonymousId || generateUniqueId();
+  }, [userId, anonymousId]);
+  
   // TODO: Replace 'dealanalyzer.com' with your actual domain after purchase
   // Example: deals+user123@inbound.dealanalyzer.com
   const forwardingEmail = `deals+${userIdentifier}@inbound.dealanalyzer.com`;

@@ -1,0 +1,237 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
+import { Ionicons } from '@expo/vector-icons';
+import api from '../services/api';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+interface EmailDeal {
+  id: string;
+  subject: string;
+  sender: string;
+  receivedDate: string;
+  status: 'new' | 'analyzing' | 'analyzed';
+  extractedProperty?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    price?: number;
+  };
+}
+
+export default function DealsScreen() {
+  const navigation = useNavigation<NavigationProp>();
+  const [deals, setDeals] = useState<EmailDeal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchDeals = async () => {
+    try {
+      const response = await api.getEmailDeals();
+      setDeals(response.data || []);
+    } catch (error) {
+      console.error('Error fetching deals:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDeals();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDeals();
+  };
+
+  const renderDealItem = ({ item }: { item: EmailDeal }) => {
+    const statusColor = {
+      new: '#FF9500',
+      analyzing: '#007AFF',
+      analyzed: '#34C759',
+    }[item.status];
+
+    return (
+      <TouchableOpacity
+        style={styles.dealCard}
+        onPress={() => navigation.navigate('DealDetail', { dealId: item.id })}
+      >
+        <View style={styles.dealHeader}>
+          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {item.status.toUpperCase()}
+            </Text>
+          </View>
+          <Text style={styles.dateText}>
+            {new Date(item.receivedDate).toLocaleDateString()}
+          </Text>
+        </View>
+
+        <Text style={styles.subjectText} numberOfLines={2}>
+          {item.subject}
+        </Text>
+
+        {item.extractedProperty?.address && (
+          <View style={styles.propertyInfo}>
+            <Ionicons name="location" size={16} color="#8E8E93" />
+            <Text style={styles.addressText} numberOfLines={1}>
+              {item.extractedProperty.address}, {item.extractedProperty.city},{' '}
+              {item.extractedProperty.state}
+            </Text>
+          </View>
+        )}
+
+        {item.extractedProperty?.price && (
+          <Text style={styles.priceText}>
+            ${item.extractedProperty.price.toLocaleString()}
+          </Text>
+        )}
+
+        <View style={styles.senderInfo}>
+          <Ionicons name="mail" size={14} color="#8E8E93" />
+          <Text style={styles.senderText}>{item.sender}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={deals}
+        renderItem={renderDealItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="mail-outline" size={64} color="#C7C7CC" />
+            <Text style={styles.emptyTitle}>No Deals Yet</Text>
+            <Text style={styles.emptyText}>
+              Connect your Gmail or set up email forwarding to start receiving
+              property deals
+            </Text>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listContainer: {
+    padding: 16,
+  },
+  dealCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dealHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  subjectText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 8,
+  },
+  propertyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 6,
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    flex: 1,
+  },
+  priceText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 8,
+  },
+  senderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  senderText: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000000',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    textAlign: 'center',
+    paddingHorizontal: 40,
+  },
+});

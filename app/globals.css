@@ -92,3 +92,20 @@
   @apply bg-card rounded-lg border border-border shadow-sm;
 }
 
+/* Enhanced background texture utilities */
+.bg-texture {
+  background-image: 
+    radial-gradient(circle at 2px 2px, hsl(var(--primary) / 0.1) 1px, transparent 0),
+    linear-gradient(hsl(var(--border) / 0.2) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--border) / 0.2) 1px, transparent 1px);
+  background-size: 24px 24px, 48px 48px, 48px 48px;
+}
+
+/* Dark mode texture adjustments */
+.dark .bg-texture {
+  background-image: 
+    radial-gradient(circle at 2px 2px, hsl(var(--primary) / 0.15) 1px, transparent 0),
+    linear-gradient(hsl(var(--border) / 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--border) / 0.3) 1px, transparent 1px);
+}
+

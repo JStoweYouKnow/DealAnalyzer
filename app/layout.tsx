@@ -32,15 +32,56 @@ export default function RootLayout({
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
           <ConvexClientProvider>
             <Providers>
-              <div className="min-h-screen relative">
-                {/* Subtle background pattern */}
-                <div className="absolute inset-0 opacity-30">
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
-                  <div className="absolute inset-0" style={{
-                    backgroundImage: `radial-gradient(circle at 1px 1px, rgba(var(--primary), 0.15) 1px, transparent 0)`,
-                    backgroundSize: '20px 20px'
-                  }} />
+              <div className="min-h-screen relative bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
+                {/* Layered texture background */}
+                <div className="absolute inset-0 overflow-hidden">
+                  {/* Base gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-secondary/8" />
+                  
+                  {/* Dot pattern texture */}
+                  <div 
+                    className="absolute inset-0 opacity-40"
+                    style={{
+                      backgroundImage: `radial-gradient(circle at 2px 2px, hsl(var(--primary) / 0.15) 1px, transparent 0)`,
+                      backgroundSize: '24px 24px',
+                    }}
+                  />
+                  
+                  {/* Mesh gradient overlay for depth */}
+                  <div 
+                    className="absolute inset-0 opacity-30"
+                    style={{
+                      background: `
+                        radial-gradient(at 0% 0%, hsl(var(--primary) / 0.1) 0px, transparent 50%),
+                        radial-gradient(at 100% 0%, hsl(var(--secondary) / 0.08) 0px, transparent 50%),
+                        radial-gradient(at 100% 100%, hsl(var(--primary) / 0.06) 0px, transparent 50%),
+                        radial-gradient(at 0% 100%, hsl(var(--secondary) / 0.08) 0px, transparent 50%)
+                      `,
+                    }}
+                  />
+                  
+                  {/* Subtle noise texture */}
+                  <div 
+                    className="absolute inset-0 opacity-[0.03]"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+                      backgroundSize: '200px 200px',
+                    }}
+                  />
+                  
+                  {/* Grid pattern for structure */}
+                  <div 
+                    className="absolute inset-0 opacity-20"
+                    style={{
+                      backgroundImage: `
+                        linear-gradient(hsl(var(--border) / 0.3) 1px, transparent 1px),
+                        linear-gradient(90deg, hsl(var(--border) / 0.3) 1px, transparent 1px)
+                      `,
+                      backgroundSize: '48px 48px',
+                    }}
+                  />
                 </div>
+                
                 <Navigation />
                 <main className="relative z-10">
                   {children}

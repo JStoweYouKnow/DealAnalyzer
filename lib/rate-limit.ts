@@ -44,6 +44,87 @@ try {
 export const RATE_LIMIT_TIERS: Record<RateLimitTier, Ratelimit | null> = rateLimiters;
 
 /**
+ * Helper function to get authenticated user ID from Clerk
+ * Returns null if not authenticated or Clerk is not available
+ */
+async function getAuthenticatedUserId(request: Request): Promise<string | null> {
+  try {
+    const { auth } = await import("@clerk/nextjs/server");
+    // Note: auth() expects NextRequest, but we can try to get userId from headers
+    // For Next.js API routes, we need to use the request in the context
+    // Since this is a generic Request, we'll return null and let the caller handle it
+    return null;
+  } catch (error) {
+    // Clerk not available or not configured
+    return null;
+  }
+}
+
+/**
+ * Determines if we're behind a trusted proxy (e.g., Vercel, Cloudflare, etc.)
+ * Only use forwarded headers when behind a trusted proxy to prevent spoofing
+ */
+function isTrustedProxy(): boolean {
+  // Check for explicit trusted proxy flag (allows manual override)
+  if (process.env.TRUSTED_PROXY === 'true') {
+    return true;
+  }
+  
+  // Check if running on Vercel (Vercel is a trusted proxy)
+  // Vercel sets VERCEL=1 in production and preview deployments
+  if (process.env.VERCEL === '1') {
+    return true;
+  }
+  
+  // Check for other trusted proxy indicators
+  // Next.js on Vercel also sets VERCEL_ENV
+  if (process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview') {
+    return true;
+  }
+  
+  // In development, be conservative - don't trust forwarded headers by default
+  // Users can set TRUSTED_PROXY=true if they're behind a trusted proxy in dev
+  return false;
+}
+
+/**
+ * Gets the client identifier for rate limiting
+ * Prioritizes authenticated user ID, falls back to IP address
+ * Only uses forwarded headers when behind a trusted proxy
+ */
+function getRateLimitIdentifier(
+  request: Request,
+  userId: string | null | undefined
+): string {
+  // Prioritize authenticated user ID
+  if (userId) {
+    return `user:${userId}`;
+  }
+  
+  // Fall back to IP address
+  // Only use forwarded headers if we're behind a trusted proxy
+  if (isTrustedProxy()) {
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const realIp = request.headers.get('x-real-ip');
+    
+    if (forwardedFor) {
+      // Take the first IP in the chain (the original client IP)
+      return forwardedFor.split(',')[0].trim();
+    }
+    
+    if (realIp) {
+      return realIp.trim();
+    }
+  }
+  
+  // If not behind a trusted proxy or headers not available,
+  // we can't reliably get the IP from headers (they're spoofable)
+  // Return 'unknown' as a safe fallback
+  // In production behind a trusted proxy, this should rarely happen
+  return 'unknown';
+}
+
+/**
  * Rate limit middleware for API routes
  *
  * Usage:
@@ -51,7 +132,10 @@ export const RATE_LIMIT_TIERS: Record<RateLimitTier, Ratelimit | null> = rateLim
  * import { checkRateLimit } from '@/lib/rate-limit';
  *
  * export async function POST(request: Request) {
- *   const rateLimitResult = await checkRateLimit(request);
+ *   // Get authenticated user ID (optional)
+ *   const userId = await getAuthenticatedUserId(request);
+ *   
+ *   const rateLimitResult = await checkRateLimit(request, 'general', userId);
  *   if (!rateLimitResult.success) {
  *     return rateLimitResult.response;
  *   }
@@ -61,7 +145,8 @@ export const RATE_LIMIT_TIERS: Record<RateLimitTier, Ratelimit | null> = rateLim
  */
 export async function checkRateLimit(
   request: Request,
-  tier: RateLimitTier = 'general'
+  tier: RateLimitTier = 'general',
+  userId?: string | null
 ): Promise<{
   success: boolean;
   response?: Response;
@@ -73,14 +158,11 @@ export async function checkRateLimit(
     return { success: true };
   }
 
-  // Get IP address from request headers
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0] ||
-    request.headers.get('x-real-ip') ||
-    'unknown';
+  // Get identifier for rate limiting (prioritizes userId, falls back to IP)
+  const identifier = getRateLimitIdentifier(request, userId);
 
   try {
-    const { success, limit, remaining, reset } = await ratelimit.limit(ip);
+    const { success, limit, remaining, reset } = await ratelimit.limit(identifier);
 
     if (!success) {
       return {

@@ -176,6 +176,14 @@ Subject contains: "deal alert"
 }
 ```
 
+**Authentication & Access Control Requirements**:
+- Validate the SendGrid event webhook signature on every request by checking `X-Twilio-Email-Event-Webhook-Signature` and the accompanying timestamp using your configured SendGrid signing key/public key. Reject requests with mismatched signatures or timestamps outside your acceptable drift window.
+- Enable IP allowlisting for SendGrid’s published webhook IP ranges to add defense in depth before any application logic runs.
+- Require an additional shared secret, API key header, or mutual TLS credential that is configurable via environment variables; respond with `401`/`403` when it is missing or invalid.
+- When using custom or third-party senders, sign requests or compute an HMAC that the endpoint verifies prior to processing.
+- Apply strict rate limiting to the endpoint and log failed authentication attempts (without storing secrets) so you can investigate anomalies quickly.
+- Reject any unsigned or unauthenticated request to prevent arbitrary POSTs from creating deals.
+
 ### Deduplication
 
 Emails are deduplicated using a SHA-256 hash of:

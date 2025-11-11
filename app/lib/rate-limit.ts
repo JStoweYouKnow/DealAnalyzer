@@ -181,20 +181,93 @@ export async function strictRateLimit(): Promise<Ratelimit | null> {
   return await getStrictRateLimit();
 }
 
-// Get client identifier (IP address or user ID)
-function getIdentifier(request: NextRequest): string {
-  // Try to get user ID from Clerk auth if available
-  // For now, use IP address as fallback
-  const forwarded = request.headers.get('x-forwarded-for');
-  const ip = forwarded ? forwarded.split(',')[0] : request.headers.get('x-real-ip') || 'unknown';
-  return ip;
+/**
+ * Determines if we're behind a trusted proxy (e.g., Vercel, Cloudflare, etc.)
+ * Only use forwarded headers when behind a trusted proxy to prevent spoofing
+ */
+function isTrustedProxy(): boolean {
+  // Check for explicit trusted proxy flag (allows manual override)
+  if (process.env.TRUSTED_PROXY === 'true') {
+    return true;
+  }
+  
+  // Check if running on Vercel (Vercel is a trusted proxy)
+  // Vercel sets VERCEL=1 in production and preview deployments
+  if (process.env.VERCEL === '1') {
+    return true;
+  }
+  
+  // Check for other trusted proxy indicators
+  // Next.js on Vercel also sets VERCEL_ENV
+  if (process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview') {
+    return true;
+  }
+  
+  // In development, be conservative - don't trust forwarded headers by default
+  // Users can set TRUSTED_PROXY=true if they're behind a trusted proxy in dev
+  return false;
+}
+
+/**
+ * Gets the client identifier for rate limiting
+ * Prioritizes authenticated user ID, falls back to IP address
+ * Only uses forwarded headers when behind a trusted proxy
+ */
+function getIdentifier(
+  request: NextRequest,
+  userId: string | null | undefined
+): string {
+  // Prioritize authenticated user ID
+  if (userId) {
+    return `user:${userId}`;
+  }
+  
+  // Fall back to IP address
+  // Only use forwarded headers if we're behind a trusted proxy
+  if (isTrustedProxy()) {
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const realIp = request.headers.get('x-real-ip');
+    
+    if (forwardedFor) {
+      // Take the first IP in the chain (the original client IP)
+      return forwardedFor.split(',')[0].trim();
+    }
+    
+    if (realIp) {
+      return realIp.trim();
+    }
+  }
+  
+  // If not behind a trusted proxy or headers not available,
+  // we can't reliably get the IP from headers (they're spoofable)
+  // Return 'unknown' as a safe fallback
+  // In production behind a trusted proxy, this should rarely happen
+  return 'unknown';
+}
+
+/**
+ * Helper function to get authenticated user ID from Clerk
+ * Returns null if not authenticated or Clerk is not available
+ */
+async function getAuthenticatedUserId(request: NextRequest): Promise<string | null> {
+  try {
+    const { auth } = await import("@clerk/nextjs/server");
+    const authResult = await auth();
+    if (authResult?.userId) {
+      return authResult.userId;
+    }
+  } catch (error) {
+    // Clerk not available or not configured, continue without user ID
+  }
+  return null;
 }
 
 // Rate limit middleware wrapper
 export async function withRateLimit(
   request: NextRequest,
   limiterGetter: (() => Promise<Ratelimit | null> | Ratelimit | null) | Ratelimit = generalRateLimit,
-  handler: (request: NextRequest) => Promise<NextResponse>
+  handler: (request: NextRequest) => Promise<NextResponse>,
+  userId?: string | null
 ): Promise<NextResponse> {
   // Get the limiter (support both function and direct instance for backward compatibility)
   // Functions can now return either Promise<Ratelimit | null> or Ratelimit | null
@@ -216,7 +289,12 @@ export async function withRateLimit(
     return handler(request);
   }
 
-  const identifier = getIdentifier(request);
+  // Get authenticated user ID if not provided
+  const authenticatedUserId = userId !== undefined 
+    ? userId 
+    : await getAuthenticatedUserId(request);
+  
+  const identifier = getIdentifier(request, authenticatedUserId);
   const { success, limit, remaining, reset } = await limiter.limit(identifier);
 
   if (!success) {

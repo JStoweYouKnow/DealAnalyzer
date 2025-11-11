@@ -20,7 +20,7 @@ if (process.env.NODE_ENV === 'production' && ALLOW_PUBLIC_ROUTES_IN_DEV) {
 // These are endpoints that must be accessible without auth:
 // - Root and static pages (landing page)
 // - Authentication pages (sign-in/sign-up)
-// - Legal pages (privacy, terms) - required for OAuth verification
+// - Legal pages (privacy, terms) - required for OAuth provider registration/compliance
 // - Specific public API endpoints only:
 //   * Health check for monitoring
 //   * OAuth callbacks for authentication flow
@@ -35,7 +35,7 @@ const safePublicRoutes = [
   '/api/health',               // Health check - monitoring
   '/api/gmail-callback',       // OAuth callback - required for Gmail auth
   '/api/receive-email',        // SendGrid webhook - email forwarding
-  '/api/og-image(.*)',         // Open Graph images - social sharing
+  '/api/og-image',              // Open Graph images - social sharing (query params only)
 ];
 
 // Development-only: additional routes that are public in dev but protected in production
@@ -43,8 +43,53 @@ const safePublicRoutes = [
 // This includes: /deals, /market, /search, /comparison, and all other API endpoints
 const devOnlyPublicRoutes: string[] = [];
 
-// SECURITY NOTE: Public webhooks (e.g., /api/receive-email) should implement their own
-// authentication/verification mechanisms (e.g., SendGrid signature verification)
+// SECURITY DIRECTIVE: All public webhook routes MUST implement signature verification
+// 
+// Required implementation for webhook endpoints (e.g., /api/receive-email):
+// 
+// 1. VERIFY WEBHOOK SIGNATURES:
+//    - SendGrid: Extract and verify X-Twilio-Email-Event-Webhook-Signature header
+//      using ECDSA with the public key from SENDGRID_WEBHOOK_PUBLIC_KEY env var
+//      Docs: https://www.twilio.com/docs/sendgrid/for-developers/tracking-events/getting-started-event-webhook-security-features
+//    - Other providers: Use provider-specific HMAC verification (e.g., X-Hub-Signature-256 for GitHub,
+//      X-Stripe-Signature for Stripe) with secret from env vars
+// 
+// 2. EXTRACT AND VALIDATE SIGNATURE + TIMESTAMP:
+//    - Extract signature from header (e.g., X-Twilio-Email-Event-Webhook-Signature)
+//    - Extract timestamp from header (e.g., X-Twilio-Email-Event-Webhook-Timestamp)
+//    - Validate signature against raw request body + timestamp using configured secret/public key from env
+//    - Reject if signature is missing, malformed, or invalid
+// 
+// 3. ENFORCE REPLAY PREVENTION:
+//    - Extract timestamp from request headers
+//    - Calculate age: currentTimestamp - requestTimestamp
+//    - Reject requests with timestamp age > 5 minutes (300 seconds) or < 0 (future timestamps)
+//    - This prevents replay attacks using captured webhook payloads
+// 
+// 4. FAIL CLOSED ON VERIFICATION FAILURE:
+//    - Return 401 Unauthorized if signature/timestamp headers are missing
+//    - Return 403 Forbidden if signature verification fails or timestamp is stale
+//    - Do NOT process the request if verification fails - fail closed, not open
+//    - Log verification failures for security monitoring
+// 
+// 5. IMPLEMENTATION EXAMPLE:
+//    ```typescript
+//    // In your webhook route handler (e.g., app/api/receive-email/route.ts):
+//    export async function POST(request: NextRequest) {
+//      // Verify webhook signature FIRST, before any processing
+//      const verificationResult = await verifyWebhook(request);
+//      if (!verificationResult.valid) {
+//        console.error('Webhook verification failed:', verificationResult.error);
+//        return NextResponse.json(
+//          { error: 'Unauthorized' },
+//          { status: verificationResult.error?.includes('missing') ? 401 : 403 }
+//        );
+//      }
+//      // ... rest of webhook processing
+//    }
+//    ```
+// 
+// See app/api/receive-email/route.ts for a complete implementation example.
 
 // Combine safe and dev-only routes
 const publicRoutes = [...safePublicRoutes, ...devOnlyPublicRoutes];
@@ -68,7 +113,15 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   const { userId } = await auth();
   
   if (!userId) {
-    // Redirect to sign-in for protected routes
+    // For API routes, return 401 instead of redirecting
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    
+    // For page routes, redirect to sign-in
     const signInUrl = new URL('/sign-in', request.url);
     signInUrl.searchParams.set('redirect_url', request.url);
     return NextResponse.redirect(signInUrl);

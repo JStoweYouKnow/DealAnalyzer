@@ -9,7 +9,7 @@ const openai = new OpenAI({
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
-    const { url } = await request.json();
+    const { url } = await req.json();
 
     if (!url) {
       return NextResponse.json(

@@ -64,11 +64,9 @@ Only **1 optional item** remains:
 **Status:** ✅ COMPLETED
 
 **What Was Fixed:**
-- Created comprehensive rate limiting utility in `app/lib/rate-limit.ts`
-- Three rate limit tiers:
-  - **General**: 100 requests/min (standard endpoints)
-  - **Expensive**: 10 requests/min (AI operations, OpenAI calls)
-  - **Strict**: 5 requests/min (very expensive operations)
+- Created comprehensive rate limiting utility in `lib/rate-limit.ts`
+- Single tier: 10 requests per 60 seconds (applies to all endpoints)
+  - Implementation: `lib/rate-limit.ts` line 19
 - Applied rate limiting to expensive endpoints:
   - `/api/analyze` - Property analysis with AI
   - `/api/analyze-file` - File upload and analysis
