@@ -98,7 +98,17 @@ const publicRoutes = [...safePublicRoutes, ...devOnlyPublicRoutes];
 const isPublicRoute = createRouteMatcher(publicRoutes);
 
 export default clerkMiddleware(async (auth, request: NextRequest) => {
+  const pathname = request.nextUrl.pathname;
+  const method = request.method;
+  
+  // Explicitly check for /api/criteria GET requests FIRST (before any other checks)
+  // This ensures criteria endpoint is always accessible for GET requests
+  if (pathname === '/api/criteria' && method === 'GET') {
+    return NextResponse.next();
+  }
+  
   // Allow public routes through without authentication
+  // Check this before any auth checks
   if (isPublicRoute(request)) {
     return NextResponse.next();
   }
@@ -115,7 +125,7 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   
   if (!userId) {
     // For API routes, return 401 instead of redirecting
-    if (request.nextUrl.pathname.startsWith('/api/')) {
+    if (pathname.startsWith('/api/')) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
