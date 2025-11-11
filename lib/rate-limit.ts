@@ -44,23 +44,6 @@ try {
 export const RATE_LIMIT_TIERS: Record<RateLimitTier, Ratelimit | null> = rateLimiters;
 
 /**
- * Helper function to get authenticated user ID from Clerk
- * Returns null if not authenticated or Clerk is not available
- */
-async function getAuthenticatedUserId(request: Request): Promise<string | null> {
-  try {
-    const { auth } = await import("@clerk/nextjs/server");
-    // Note: auth() expects NextRequest, but we can try to get userId from headers
-    // For Next.js API routes, we need to use the request in the context
-    // Since this is a generic Request, we'll return null and let the caller handle it
-    return null;
-  } catch (error) {
-    // Clerk not available or not configured
-    return null;
-  }
-}
-
-/**
  * Determines if we're behind a trusted proxy (e.g., Vercel, Cloudflare, etc.)
  * Only use forwarded headers when behind a trusted proxy to prevent spoofing
  */
@@ -130,10 +113,14 @@ function getRateLimitIdentifier(
  * Usage:
  * ```typescript
  * import { checkRateLimit } from '@/lib/rate-limit';
+ * import { auth } from '@clerk/nextjs/server'; // or your app-specific auth helper
  *
  * export async function POST(request: Request) {
- *   // Get authenticated user ID (optional)
- *   const userId = await getAuthenticatedUserId(request);
+ *   // Get authenticated user ID using your app-specific authentication helper
+ *   // For Clerk with Next.js: const { userId } = await auth();
+ *   // For other auth systems: obtain userId from your auth provider
+ *   const authResult = await auth();
+ *   const userId = authResult?.userId ?? null;
  *   
  *   const rateLimitResult = await checkRateLimit(request, 'general', userId);
  *   if (!rateLimitResult.success) {
@@ -142,6 +129,11 @@ function getRateLimitIdentifier(
  *   // ... rest of handler
  * }
  * ```
+ *
+ * Note: Callers must supply an explicit userId parameter (or null/undefined if unauthenticated).
+ * The rate limiter works with generic Request objects and does not perform authentication itself.
+ * If userId is provided, rate limiting will be per-user. If not provided (or null/undefined),
+ * rate limiting will fall back to IP-based identification.
  */
 export async function checkRateLimit(
   request: Request,

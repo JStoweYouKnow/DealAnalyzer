@@ -1,16 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 
 export default function AnalyzeScreen() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>Analyze Property</Text>
         <Text style={styles.placeholder}>
           Property analysis form will appear here
         </Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

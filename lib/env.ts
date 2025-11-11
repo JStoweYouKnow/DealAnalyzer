@@ -35,14 +35,14 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
   // Optional: Sentry Error Tracking
-  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
+  NEXT_PUBLIC_SENTRY_DSN: z.preprocess((v) => v === '' ? undefined : v, z.string().url().optional()),
   SENTRY_ORG: z.string().optional(),
   SENTRY_PROJECT: z.string().optional(),
 
   // Optional: Gmail OAuth (if using Gmail integration)
   GMAIL_CLIENT_ID: z.string().optional(),
   GMAIL_CLIENT_SECRET: z.string().optional(),
-  GMAIL_REDIRECT_URI: z.string().url().optional(),
+  GMAIL_REDIRECT_URI: z.preprocess((v) => v === '' ? undefined : v, z.string().url().optional()),
 
   // Optional: Session Secret
   SESSION_SECRET: z.string().optional(),
@@ -51,7 +51,7 @@ const envSchema = z.object({
   FEATURE_ALLOW_PUBLIC_ROUTES: z.string().optional(),
 
   // Optional: Upstash Redis for Rate Limiting (highly recommended for production)
-  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_URL: z.preprocess((v) => v === '' ? undefined : v, z.string().url().optional()),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 });
 

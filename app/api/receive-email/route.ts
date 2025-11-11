@@ -326,7 +326,7 @@ function verifySendGridWebhookSignature(
   // If public key is not configured, skip verification in development
   // In production, this should always be set
   if (!publicKey) {
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV !== 'development') {
       console.warn('⚠️  SENDGRID_WEBHOOK_PUBLIC_KEY not set - webhook verification disabled');
       return { valid: false, error: 'Webhook verification not configured' };
     }
@@ -376,9 +376,11 @@ function verifySendGridWebhookSignature(
   }
 
   try {
-    // Reconstruct the payload: timestamp + raw body (as binary string)
+    // Reconstruct the payload: timestamp + raw body (as bytes)
     // SendGrid signs the concatenation of timestamp and raw body
-    const payload = timestamp + rawBodyBuffer.toString('binary');
+    // Use byte-accurate buffer concatenation instead of string concatenation
+    const timestampBuffer = Buffer.from(timestamp, 'utf8');
+    const payloadBuffer = Buffer.concat([timestampBuffer, rawBodyBuffer]);
     
     // The signature from SendGrid is base64-encoded
     const signatureBuffer = Buffer.from(signature, 'base64');
@@ -396,7 +398,7 @@ function verifySendGridWebhookSignature(
     // SendGrid uses ECDSA with secp256r1 (prime256v1) curve
     // createVerify hashes the data with SHA256 and then verifies the signature
     const verifyInstance = createVerify('SHA256');
-    verifyInstance.update(payload, 'binary');
+    verifyInstance.update(payloadBuffer);
     
     const isValid = verifyInstance.verify(publicKeyPem, signatureBuffer);
     

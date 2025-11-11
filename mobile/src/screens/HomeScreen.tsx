@@ -31,7 +31,7 @@ export default function HomeScreen() {
       description: 'View and analyze deals from your inbox',
       icon: 'mail',
       color: '#34C759',
-      onPress: () => navigation.navigate('MainTabs', { screen: 'Deals' } as any),
+      onPress: () => navigation.navigate('MainTabs', { screen: 'Deals' }),
     },
     {
       id: 'market',
@@ -39,7 +39,7 @@ export default function HomeScreen() {
       description: 'Get insights on market trends and comps',
       icon: 'analytics',
       color: '#FF9500',
-      onPress: () => navigation.navigate('MainTabs', { screen: 'Market' } as any),
+      onPress: () => navigation.navigate('MainTabs', { screen: 'Market' }),
     },
     {
       id: 'search',
@@ -47,7 +47,7 @@ export default function HomeScreen() {
       description: 'Find properties matching your criteria',
       icon: 'search',
       color: '#5856D6',
-      onPress: () => navigation.navigate('MainTabs', { screen: 'Search' } as any),
+      onPress: () => navigation.navigate('MainTabs', { screen: 'Search' }),
     },
   ];
 

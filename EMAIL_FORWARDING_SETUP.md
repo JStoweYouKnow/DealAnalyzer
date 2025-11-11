@@ -177,11 +177,24 @@ Subject contains: "deal alert"
 ```
 
 **Authentication & Access Control Requirements**:
-- Validate the SendGrid event webhook signature on every request by checking `X-Twilio-Email-Event-Webhook-Signature` and the accompanying timestamp using your configured SendGrid signing key/public key. Reject requests with mismatched signatures or timestamps outside your acceptable drift window.
-- Enable IP allowlisting for SendGrid’s published webhook IP ranges to add defense in depth before any application logic runs.
-- Require an additional shared secret, API key header, or mutual TLS credential that is configurable via environment variables; respond with `401`/`403` when it is missing or invalid.
-- When using custom or third-party senders, sign requests or compute an HMAC that the endpoint verifies prior to processing.
-- Apply strict rate limiting to the endpoint and log failed authentication attempts (without storing secrets) so you can investigate anomalies quickly.
+- **MANDATORY**: The `X-Twilio-Email-Event-Webhook-Signature` header MUST be validated on every webhook request. The validation MUST include timestamp checking with acceptable drift tolerance (typically 5-15 minutes). Requests with missing signatures, mismatched signatures, or timestamps outside the acceptable drift window MUST be rejected with a 401 status code.
+- Enable IP allowlisting for SendGrid's published webhook IP ranges to add defense in depth before any application logic runs.
+- Require an additional shared secret, API key header, or mutual TLS credential that is configurable via environment variables:
+  - Respond with `401 Unauthorized` when authentication is missing or invalid (e.g., missing API key/shared secret, invalid credentials)
+  - Respond with `403 Forbidden` when authentication is valid but the requester is not authorized to perform the action (e.g., credential lacks required scope, IP not allowlisted)
+- **MANDATORY**: When using SendGrid or any custom/third-party sender, the sender MUST sign outgoing POST requests (for example, by computing an HMAC with a shared secret). The receiving endpoint MUST verify those signatures before processing any request. Requests with missing or invalid signatures MUST be rejected.
+- Apply strict rate limiting to the endpoint and log failed authentication attempts with appropriate security controls:
+  - **MANDATORY**: Log non-secret diagnostic details for failed auth attempts to enable investigation:
+    - Timestamp of the failed attempt
+    - Request source IP address
+    - Authentication method used (e.g., "API key", "shared secret", "mTLS", "webhook signature")
+    - Non-sensitive credential identifier (e.g., API key ID, truncated/hashed version of the key, or key prefix)
+    - Failure reason or status (e.g., "missing credential", "invalid signature", "expired timestamp", "key not found")
+    - Request/correlation ID for tracing
+  - **FORBIDDEN**: Never log full secrets, API keys, shared secrets, or any credential material in plaintext
+  - **REQUIRED**: Redact or hash any key material that must be logged (e.g., log only first 4 characters + "..." + last 4 characters, or a SHA-256 hash of the key)
+  - **RECOMMENDED**: Implement rate limiting and log aggregation to prevent log flooding from repeated failed attempts (e.g., aggregate multiple failures from the same IP within a time window)
+  - **REQUIRED**: Make all logging behaviors configurable via environment variables (e.g., `ENABLE_AUTH_LOGGING`, `LOG_AUTH_FAILURES`, `AUTH_LOG_LEVEL`, `AUTH_LOG_AGGREGATION_WINDOW`)
 - Reject any unsigned or unauthenticated request to prevent arbitrary POSTs from creating deals.
 
 ### Deduplication
@@ -240,8 +253,8 @@ The webhook uses OpenAI GPT-4o-mini to extract property information from email c
 
 ### Email Verification
 
-The webhook should verify requests are coming from SendGrid:
-- Check SendGrid signature (if configured)
+The webhook MUST verify requests are coming from SendGrid:
+- **MANDATORY**: Validate the `X-Twilio-Email-Event-Webhook-Signature` header on every request with timestamp checking and acceptable drift
 - Validate sender domain
 - Rate limit the endpoint
 

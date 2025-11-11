@@ -93,10 +93,62 @@ Or press `a` in the Expo terminal to open in Android Emulator.
 
 The app connects to the DealAnalyzer backend API. The API URL is configured in `src/services/api.ts`:
 
-- **Development**: `http://localhost:3000` (your local server)
+- **Development**: Configurable via `DEV_SERVER_URL` environment variable (see below)
 - **Production**: `https://comfort-finder-analyzer.vercel.app`
 
 The app automatically uses the development URL when running with `__DEV__` flag.
+
+### Development Server URL Configuration
+
+The app uses platform-aware defaults for the development server URL:
+
+- **Android Emulator**: `http://10.0.2.2:3000` (special IP for Android emulator)
+- **iOS Simulator**: `http://localhost:3000`
+- **Physical Devices**: Requires explicit configuration (see below)
+
+#### Setting DEV_SERVER_URL for Physical Devices
+
+For physical devices, you **must** set `DEV_SERVER_URL` to your machine's LAN IP address. The app will automatically use this value if provided.
+
+**Option 1: Using app.json (Recommended)**
+
+Add the dev server URL to `app.json`:
+
+```json
+{
+  "expo": {
+    "extra": {
+      "devServerUrl": "http://192.168.1.100:3000"
+    }
+  }
+}
+```
+
+Replace `192.168.1.100` with your actual LAN IP address.
+
+**Option 2: Using Environment Variable**
+
+Create a `.env` file in the `mobile/` directory (requires `expo-constants`):
+
+```bash
+DEV_SERVER_URL=http://192.168.1.100:3000
+```
+
+**Finding Your LAN IP Address**
+
+- **macOS/Linux**: 
+  ```bash
+  ifconfig | grep "inet " | grep -v 127.0.0.1
+  ```
+  Look for the IP address (usually starts with `192.168.x.x` or `10.x.x.x`)
+
+- **Windows**: 
+  ```bash
+  ipconfig
+  ```
+  Look for "IPv4 Address" under your active network adapter
+
+**Example**: If your IP is `192.168.1.100`, set `DEV_SERVER_URL=http://192.168.1.100:3000`
 
 ### Testing with Local Backend
 
@@ -106,12 +158,14 @@ The app automatically uses the development URL when running with `__DEV__` flag.
    npm run dev
    ```
 
-2. Make sure your mobile device/simulator can reach your local machine:
-   - iOS Simulator: Use `localhost`
-   - Android Emulator: Use `10.0.2.2` instead of `localhost`
-   - Physical device: Use your computer's local IP address
+2. Configure the dev server URL based on your testing environment:
+   - **iOS Simulator**: No configuration needed (uses `localhost` by default)
+   - **Android Emulator**: No configuration needed (uses `10.0.2.2` by default)
+   - **Physical Device**: Set `DEV_SERVER_URL` in `app.json` or `.env` to your LAN IP
 
-Update the development API URL in `src/services/api.ts` if needed.
+3. Ensure your device/simulator can reach your local machine:
+   - Simulators/Emulators: Should work automatically
+   - Physical devices: Must be on the same WiFi network as your development machine
 
 ## API Integration
 

@@ -1,16 +1,27 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function MarketScreen() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} accessibilityLabel="Market screen">
       <View style={styles.content}>
-        <Text style={styles.title}>Market Intelligence</Text>
-        <Text style={styles.placeholder}>
+        <Text 
+          style={styles.title}
+          accessibilityRole="header"
+          accessibilityLabel="Market Intelligence"
+        >
+          Market Intelligence
+        </Text>
+        <Text 
+          style={styles.placeholder}
+          accessibilityLabel="Market data placeholder"
+          accessibilityHint="Displays market data and comparable sales when available"
+        >
           Market data and comparable sales will appear here
         </Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

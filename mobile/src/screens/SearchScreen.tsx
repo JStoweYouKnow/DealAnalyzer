@@ -1,16 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 
 export default function SearchScreen() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Search Properties</Text>
-        <Text style={styles.placeholder}>
+        <Text 
+          style={styles.title}
+          accessibilityRole="header"
+          accessibilityLabel="Search Properties screen title"
+        >
+          Search Properties
+        </Text>
+        <Text 
+          style={styles.placeholder}
+        >
           Property search functionality will appear here
         </Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

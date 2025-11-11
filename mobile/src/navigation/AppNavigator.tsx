@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,14 +12,9 @@ import MarketScreen from '../screens/MarketScreen';
 import SearchScreen from '../screens/SearchScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AnalyzeScreen from '../screens/AnalyzeScreen';
+import { navigationRef } from './navigationRef';
 
-export type RootStackParamList = {
-  MainTabs: undefined;
-  DealDetail: { dealId: string };
-  Analyze: undefined;
-};
-
-export type BottomTabParamList = {
+export type TabParamList = {
   Home: undefined;
   Deals: undefined;
   Market: undefined;
@@ -27,8 +22,14 @@ export type BottomTabParamList = {
   Settings: undefined;
 };
 
+export type RootStackParamList = {
+  MainTabs: NavigatorScreenParams<TabParamList>;
+  DealDetail: { dealId: string };
+  Analyze: undefined;
+};
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator<BottomTabParamList>();
+const Tab = createBottomTabNavigator<TabParamList>();
 
 function MainTabs() {
   return (
@@ -95,7 +96,7 @@ function MainTabs() {
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator>
         <Stack.Screen
           name="MainTabs"
