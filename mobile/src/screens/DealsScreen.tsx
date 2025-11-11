@@ -13,8 +13,22 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
+import InfoTooltip from '../components/InfoTooltip';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+function getStatusInfo(status: string): string {
+  switch (status) {
+    case 'new':
+      return "This deal has been received but not yet analyzed. Tap on the deal to view details and run an analysis with your investment criteria.";
+    case 'analyzing':
+      return "This deal is currently being analyzed. Property data is being extracted and financial metrics are being calculated. Please wait for the analysis to complete.";
+    case 'analyzed':
+      return "This deal has been fully analyzed. View the analysis results to see ROI, cash flow, and other key investment metrics.";
+    default:
+      return "Deal status information.";
+  }
+}
 
 interface EmailDeal {
   id: string;
@@ -103,10 +117,18 @@ export default function DealsScreen() {
         onPress={() => navigation.navigate('DealDetail', { dealId: item.id })}
       >
         <View style={styles.dealHeader}>
-          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
-            <Text style={[styles.statusText, { color: statusColor }]}>
-              {item.status.toUpperCase()}
-            </Text>
+          <View style={styles.statusContainer}>
+            <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {item.status.toUpperCase()}
+              </Text>
+            </View>
+            <InfoTooltip
+              title={`Deal Status: ${item.status.toUpperCase()}`}
+              content={getStatusInfo(item.status)}
+              iconSize={14}
+              iconColor={statusColor}
+            />
           </View>
           <Text style={styles.dateText}>
             {formatDate(item.receivedDate)}
@@ -156,6 +178,24 @@ export default function DealsScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.infoHeader}>
+        <View style={styles.infoHeaderRow}>
+          <Text style={styles.infoHeaderText}>Email Deals</Text>
+          <InfoTooltip
+            title="Email Deals"
+            content={[
+              "This screen shows all property deals received via email. Deals are automatically extracted from your inbox when you connect your Gmail account or set up email forwarding.",
+              "• Pull down to refresh and load new deals",
+              "• Tap on a deal to view details and analyze the property",
+              "• Deal statuses: NEW (not analyzed), ANALYZING (in progress), ANALYZED (complete)",
+            ]}
+            iconSize={20}
+          />
+        </View>
+        <Text style={styles.infoSubtext}>
+          Pull down to refresh • Tap deals to analyze
+        </Text>
+      </View>
       <FlatList
         data={deals}
         renderItem={renderDealItem}
@@ -206,6 +246,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  infoHeader: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  infoHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  infoHeaderText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  infoSubtext: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 4,
+  },
   listContainer: {
     padding: 16,
   },
@@ -225,6 +287,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   statusBadge: {
     paddingHorizontal: 12,

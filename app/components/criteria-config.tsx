@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { configurableCriteriaSchema, type ConfigurableCriteria, type CriteriaResponse } from "@shared/schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { InfoTooltip } from "@/components/info-tooltip";
 
 interface CriteriaConfigProps {
   criteria?: CriteriaResponse;
@@ -89,9 +90,19 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
       <Card className="analysis-card">
         <CardHeader className="border-b border-border">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-card-foreground flex items-center">
+            <h3 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
               <i className="fas fa-sliders-h text-primary mr-3"></i>
               Investment Criteria
+              <InfoTooltip
+                title="Investment Criteria"
+                content={[
+                  "Set your investment criteria to automatically evaluate properties. DealAnalyzer will compare each property against these criteria to determine if it meets your investment standards.",
+                  "• Purchase Price Range: Maximum price you're willing to pay for a property",
+                  "• COC Return Range: Cash-on-Cash return percentage (annual return on cash investment). Higher is better for passive income.",
+                  "• Cap Rate Range: Capitalization rate percentage (NOI / property value). Indicates the property's potential return.",
+                  "Properties that meet your criteria will be marked with a green indicator. You can adjust these criteria at any time to refine your search.",
+                ]}
+              />
             </h3>
             <Button 
               onClick={() => setIsEditing(true)}
@@ -145,9 +156,19 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
   return (
     <Card className="analysis-card">
       <CardHeader className="border-b border-border">
-        <h3 className="text-lg font-semibold text-card-foreground flex items-center">
+        <h3 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
           <i className="fas fa-sliders-h text-primary mr-3"></i>
           Configure Investment Criteria
+          <InfoTooltip
+            title="Investment Criteria"
+            content={[
+              "Set your investment criteria to automatically evaluate properties. DealAnalyzer will compare each property against these criteria to determine if it meets your investment standards.",
+              "• Purchase Price Range: Maximum price you're willing to pay for a property",
+              "• COC Return Range: Cash-on-Cash return percentage (annual return on cash investment). Higher is better for passive income.",
+              "• Cap Rate Range: Capitalization rate percentage (NOI / property value). Indicates the property's potential return.",
+              "Properties that meet your criteria will be marked with a green indicator. You can adjust these criteria at any time to refine your search.",
+            ]}
+          />
         </h3>
       </CardHeader>
       

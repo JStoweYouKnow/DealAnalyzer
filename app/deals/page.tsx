@@ -15,6 +15,7 @@ import { Loader2 } from "lucide-react";
 import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
 import type { EmailDeal, EmailMonitoringResponse, AnalyzePropertyResponse, FundingSource } from "@shared/schema";
 import { EmailForwardingSetup } from "@/components/email-forwarding-setup";
+import { InfoTooltip } from "@/components/info-tooltip";
 
 interface MortgageValues {
   loanAmount: number;
@@ -862,7 +863,22 @@ export default function DealsPage() {
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Email Deal Pipeline</h1>
+              <div className="flex items-center gap-2 mb-2">
+                <h1 className="text-3xl font-bold">Email Deal Pipeline</h1>
+                <InfoTooltip
+                  title="Email Deal Pipeline"
+                  content={[
+                    "This screen shows all property deals received via email. Deals are automatically extracted from your inbox when you connect your Gmail account or set up email forwarding.",
+                    "• Connect Gmail: Link your Gmail account to automatically receive and analyze property deals",
+                    "• Sync Emails: Manually sync emails from your inbox to get the latest deals",
+                    "• Deal Statuses: NEW (not analyzed), REVIEWED (viewed), ANALYZED (complete analysis), ARCHIVED (hidden)",
+                    "• Analyze Deals: Click on a deal to view details and run a property analysis with your investment criteria",
+                    "• Filter & Search: Use the filters and search bar to find specific deals",
+                    "• Edit Properties: Update property details like price, rent, and metrics before analyzing",
+                    "• Generate Reports: Create detailed PDF reports for analyzed properties",
+                  ]}
+                />
+              </div>
               <p className="text-muted-foreground">Review and analyze your real estate email opportunities</p>
             </div>
             

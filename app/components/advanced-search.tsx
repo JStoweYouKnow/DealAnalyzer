@@ -13,6 +13,7 @@ import { Search, Filter, Save, Trash2, Copy, Mail, MapPin, Home } from "lucide-r
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { EmailDeal, SavedFilter } from "@shared/schema";
+import { InfoTooltip } from "@/components/info-tooltip";
 
 interface SearchFilters {
   priceMin?: number;
@@ -302,7 +303,24 @@ export function AdvancedSearch() {
       <div className="flex flex-col space-y-4">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Search Email Deals</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold">Search Email Deals</h1>
+              <InfoTooltip
+                title="Search Email Deals"
+                content={[
+                  "Search and filter your email deals using advanced criteria. Find properties that match your specific investment requirements.",
+                  "• Text Search: Search across deal subjects, sender emails, addresses, cities, and states",
+                  "• Price Filters: Filter by purchase price range",
+                  "• Property Features: Filter by bedrooms, bathrooms, and square footage",
+                  "• Investment Metrics: Filter by cash-on-cash return, cap rate, and cash flow",
+                  "• Location Filters: Filter by cities and states",
+                  "• Status Filters: Filter by deal status (new, reviewed, analyzed, archived)",
+                  "• Criteria Match: Filter by whether properties meet your investment criteria",
+                  "• Save Filters: Save frequently used filter combinations for quick access",
+                  "Use the filters to narrow down deals that match your investment criteria and find the best opportunities.",
+                ]}
+              />
+            </div>
             <p className="text-muted-foreground">
               Filter and search through your uploaded email deals using advanced criteria.
             </p>

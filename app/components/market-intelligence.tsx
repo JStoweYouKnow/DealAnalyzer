@@ -19,6 +19,7 @@ import {
 import { TrendingUp, TrendingDown, Home, MapPin, Calendar, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useRouter } from "next/navigation";
+import { InfoTooltip } from "@/components/info-tooltip";
 
 type MarketStats = {
   totalProperties?: number;
@@ -316,7 +317,22 @@ export function MarketIntelligence() {
     <div className="space-y-6" data-testid="market-intelligence">
       <div className="flex flex-col space-y-4">
         <div>
-          <h1 className="text-3xl font-bold">Market Intelligence</h1>
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-3xl font-bold">Market Intelligence</h1>
+            <InfoTooltip
+              title="Market Intelligence"
+              content={[
+                "Market Intelligence provides comprehensive market data and analysis to help you make informed investment decisions.",
+                "• Comparable Sales: View recently sold properties in the area with sale prices and dates",
+                "• Market Trends: Analyze price trends and market conditions over time (3-month, 6-month, 1-year)",
+                "• Property Valuations: Get estimated property values based on market data and comparable sales",
+                "• Neighborhood Analytics: Understand local market dynamics including demographics, income, and housing statistics",
+                "• Rent Yield: Calculate potential rental yield based on market rents and property values",
+                "• Days on Market: See how long properties stay on the market in the area",
+                "Enter one or more ZIP codes to view market data and comparable sales for those locations. You can compare up to 4 ZIP codes at once.",
+              ]}
+            />
+          </div>
           <p className="text-muted-foreground">
             Analyze neighborhood trends and market conditions to make informed investment decisions.
           </p>

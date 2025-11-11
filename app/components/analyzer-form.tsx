@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import type { FundingSource } from "../../shared/schema";
+import { InfoTooltip } from "@/components/info-tooltip";
 
 interface STRMetrics {
   adr?: number;
@@ -302,7 +303,26 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
               <i className="fas fa-calculator text-primary text-xl"></i>
             </div>
             <div className="flex-1">
-              <h3 className="text-xl font-semibold text-card-foreground mb-1">Property Analysis Input</h3>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-xl font-semibold text-card-foreground">Property Analysis Input</h3>
+                <InfoTooltip
+                  title="Property Analysis"
+                  content={[
+                    "Analyze properties to get detailed investment metrics and recommendations. You can analyze properties by:",
+                    "• Uploading a PDF: Property listings, flyers, or documents",
+                    "• Pasting Email Content: Property deal emails from brokers or listings",
+                    "• Manual Entry: Enter property details manually",
+                    "• Property URL: Extract data from listing websites (Zillow, Redfin, Realtor.com)",
+                    "The analysis will calculate:",
+                    "• Cash-on-Cash Return: Annual return on your cash investment",
+                    "• Cap Rate: Net operating income divided by property value",
+                    "• ROI: Total return on investment over time",
+                    "• Cash Flow: Monthly and annual cash flow projections",
+                    "• Break-even Analysis: When your investment becomes profitable",
+                    "• STR Metrics: For short-term rentals, analyzes ADR, occupancy, and revenue potential",
+                  ]}
+                />
+              </div>
               <p className="text-sm text-muted-foreground leading-relaxed">Enter property details and rental metrics</p>
             </div>
           </div>
