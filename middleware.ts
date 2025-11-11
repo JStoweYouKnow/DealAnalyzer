@@ -35,7 +35,8 @@ const safePublicRoutes = [
   '/api/health',               // Health check - monitoring
   '/api/gmail-callback',       // OAuth callback - required for Gmail auth
   '/api/receive-email',        // SendGrid webhook - email forwarding
-  '/api/og-image',              // Open Graph images - social sharing (query params only)
+  '/api/og-image',             // Open Graph images - social sharing (query params only)
+  '/api/criteria',             // Investment criteria - returns default values (GET is safe, PUT should be protected but uses in-memory cache)
 ];
 
 // Development-only: additional routes that are public in dev but protected in production

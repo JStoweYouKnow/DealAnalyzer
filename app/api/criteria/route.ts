@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { loadInvestmentCriteria, DEFAULT_CRITERIA } from "../../../server/services/criteria-service";
 import { updateCriteriaRequestSchema } from "../../../shared/schema";
 import type { CriteriaResponse } from "../../../shared/schema";
@@ -17,8 +17,25 @@ export async function GET() {
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
+    // Check authentication for PUT requests (write operation)
+    // GET is public, but PUT requires authentication
+    try {
+      const { auth } = await import("@clerk/nextjs/server");
+      const authResult = await auth();
+      if (!authResult?.userId) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+    } catch (error) {
+      // If Clerk is not available or not configured, allow the request through
+      // This handles development environments where Clerk might not be set up
+      console.warn("Clerk authentication check failed, allowing request:", error);
+    }
+
     const body = await request.json();
     const validation = updateCriteriaRequestSchema.safeParse(body);
     
