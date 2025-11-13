@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openWeatherMapAPI } from '../../../../server/services/openweathermap-api';
-import { blsAPI } from '../../../../server/services/bls-api';
+import { blsAPI, type UnemploymentData } from '../../../../server/services/bls-api';
 import { fredAPI } from '../../../../server/services/fred-api';
 import { geocodingService } from '../../../../server/services/geocoding-service';
 
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     const [weatherData, economicData, employmentData] = await Promise.all([
       openWeatherMapAPI.getCurrentWeather({ lat, lon }),
       fredAPI.getAllIndicators(),
-      countyFips ? blsAPI.getUnemploymentRate(countyFips) : Promise.resolve({}),
+      countyFips ? blsAPI.getUnemploymentRate(countyFips) : Promise.resolve({} as UnemploymentData),
     ]);
 
     // Step 3: Return combined data
