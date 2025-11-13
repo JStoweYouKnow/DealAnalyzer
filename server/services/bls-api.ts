@@ -95,21 +95,6 @@ export const blsAPI = {
         period: latestPeriod?.period,
         periodName: latestPeriod?.periodName,
       };
-          employed: getMostRecent(seriesIds[2]),
-          laborForce: getMostRecent(seriesIds[3]),
-        };
-      }
-      const latestPeriod = firstSeries.data[0];
-
-      return {
-        unemploymentRate: getMostRecent(seriesIds[0]),
-        unemployed: getMostRecent(seriesIds[1]),
-        employed: getMostRecent(seriesIds[2]),
-        laborForce: getMostRecent(seriesIds[3]),
-        year: latestPeriod?.year ? parseInt(latestPeriod.year) : undefined,
-        period: latestPeriod?.period,
-        periodName: latestPeriod?.periodName,
-      };
     } catch (error) {
       console.error('BLS API error:', error);
       return {};
