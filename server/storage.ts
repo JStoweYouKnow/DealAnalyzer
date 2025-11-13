@@ -1319,10 +1319,19 @@ export class MemStorage implements IStorage {
 const globalForStorage = globalThis as unknown as {
   storageInstance: MemStorage | undefined;
   convexStorage: any | undefined;
+  storageWrapper: IStorage | undefined;
+  storageInitialized: boolean;
 };
 
-export const storage = (() => {
+// Lazy initialization function - checks env vars when first called
+function initializeStorage(): IStorage {
+  // Check if already initialized
+  if (globalForStorage.storageInitialized && globalForStorage.storageWrapper) {
+    return globalForStorage.storageWrapper;
+  }
+  
   // Check if we should use Convex (when NEXT_PUBLIC_CONVEX_URL is set)
+  // This is called lazily, so dotenv.config() should have run by now
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
   const useConvex = !!convexUrl;
   
@@ -1337,6 +1346,8 @@ export const storage = (() => {
       }).catch((error) => {
         console.warn('[Storage] Convex storage initialization failed, will use fallback:', error instanceof Error ? error.message : 'Unknown error');
       });
+      globalForStorage.storageWrapper = wrapper;
+      globalForStorage.storageInitialized = true;
       return wrapper;
     } catch (error) {
       console.warn('[Storage] Convex storage wrapper creation failed, falling back to in-memory storage:', error instanceof Error ? error.message : 'Unknown error');
@@ -1351,8 +1362,19 @@ export const storage = (() => {
     console.log('[Storage] Creating new MemStorage instance (fallback)');
     globalForStorage.storageInstance = new MemStorage();
   }
+  globalForStorage.storageWrapper = globalForStorage.storageInstance;
+  globalForStorage.storageInitialized = true;
   return globalForStorage.storageInstance;
-})();
+}
+
+// Lazy getter - initializes on first access
+export const storage = new Proxy({} as IStorage, {
+  get(_target, prop) {
+    const storageInstance = initializeStorage();
+    const value = (storageInstance as any)[prop];
+    return typeof value === 'function' ? value.bind(storageInstance) : value;
+  }
+});
 
 // Lazy import Convex storage to avoid errors when not configured
 async function getConvexStorage() {

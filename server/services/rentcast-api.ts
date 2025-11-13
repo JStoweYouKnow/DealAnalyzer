@@ -34,17 +34,26 @@ interface RentCastMarketStats {
 
 export class RentCastAPIService {
   private baseUrl = 'https://api.rentcast.io/v1';
-  private apiKey: string;
+  private _apiKey: string | null = null;
+
+  // Lazy getter for API key - checks env var when first accessed
+  private get apiKey(): string {
+    if (this._apiKey === null) {
+      this._apiKey = process.env.RENTCAST_API_KEY || '';
+      if (!this._apiKey) {
+        console.warn('RentCast API key not found. Using fallback data.');
+      }
+    }
+    return this._apiKey;
+  }
 
   constructor() {
-    this.apiKey = process.env.RENTCAST_API_KEY || '';
-    if (!this.apiKey) {
-      console.warn('RentCast API key not found. Using fallback data.');
-    }
+    // Don't read API key in constructor - use lazy getter instead
   }
 
   private async makeRequest(endpoint: string, params: Record<string, any> = {}): Promise<any> {
-    if (!this.apiKey) {
+    const key = this.apiKey; // Trigger lazy initialization
+    if (!key) {
       throw new Error('RentCast API key not configured');
     }
 
@@ -66,7 +75,7 @@ export class RentCastAPIService {
         try {
           const response = await fetch(url.toString(), {
             headers: {
-              'X-Api-Key': this.apiKey,
+              'X-Api-Key': key,
               'Content-Type': 'application/json'
             }
           });
@@ -288,7 +297,7 @@ export class RentCastAPIService {
   }
 
   isConfigured(): boolean {
-    return Boolean(this.apiKey);
+    return Boolean(this.apiKey); // This will trigger lazy initialization
   }
 }
 
