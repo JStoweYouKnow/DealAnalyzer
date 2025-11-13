@@ -197,6 +197,12 @@ export function LeafletMap({
       // Update the stored ID
       prevPrimaryIdRef.current = primaryPropertyId;
       
+      // Ensure container is ready when new property is detected
+      if (!isContainerReady && containerRef.current) {
+        setIsContainerReady(true);
+        cleanupDoneRef.current = true;
+      }
+      
       // Don't remount - just update the map center if we have a map instance
       // The map will update its markers and center through props
       if (mapInstanceRef.current && mapProperties.length > 0) {
@@ -213,10 +219,14 @@ export function LeafletMap({
         }
       }
     } else if (primaryPropertyId && !prevPrimaryIdRef.current) {
-      // First mount - just store the ID
+      // First mount - just store the ID and ensure container is ready
       prevPrimaryIdRef.current = primaryPropertyId;
+      if (!isContainerReady && containerRef.current) {
+        setIsContainerReady(true);
+        cleanupDoneRef.current = true;
+      }
     }
-  }, [mapProperties, zoomLevel, isMounted]);
+  }, [mapProperties, zoomLevel, isMounted, isContainerReady]);
 
   // Debug: Log when props change
   useEffect(() => {
@@ -298,8 +308,11 @@ export function LeafletMap({
         }
       }
       
-      // Always mark as ready after a brief delay to ensure DOM is ready
-      // This ensures the map can render even if cleanup happens asynchronously
+      // Always mark as ready - use immediate set and also a timeout as backup
+      setIsContainerReady(true);
+      cleanupDoneRef.current = true;
+      
+      // Also set with timeout as backup in case immediate set doesn't work
       setTimeout(() => {
         if (containerRef.current === node) {
           setIsContainerReady(true);
@@ -373,17 +386,28 @@ export function LeafletMap({
       });
       
       // Fallback: Force container ready after a timeout to ensure map always initializes
+      // Use shorter timeout and more aggressive fallback
       const fallbackTimer = setTimeout(() => {
-        if (!isContainerReady && containerRef.current) {
+        if (!isContainerReady) {
           console.log('LeafletMap: Fallback - forcing container ready');
           setIsContainerReady(true);
           cleanupDoneRef.current = true;
         }
-      }, 500);
+      }, 100);
+      
+      // Additional fallback with longer timeout
+      const longFallbackTimer = setTimeout(() => {
+        if (!isContainerReady) {
+          console.log('LeafletMap: Long fallback - forcing container ready');
+          setIsContainerReady(true);
+          cleanupDoneRef.current = true;
+        }
+      }, 1000);
       
       // Cleanup: Remove any existing Leaflet instances from container on unmount
       return () => {
         clearTimeout(fallbackTimer);
+        clearTimeout(longFallbackTimer);
         if (containerRef.current) {
           try {
           // Check if container has a Leaflet instance attached
@@ -419,7 +443,9 @@ export function LeafletMap({
   // We'll do a final check inside the render to prevent double initialization
   const container = containerRef.current;
   const hasLeafletInstance = container && (container as any)._leaflet_id;
-  const shouldRenderMap = isMounted && isContainerReady && container && !hasLeafletInstance;
+  // Simplified: render if mounted and we have a container (isContainerReady will be set by ref callback)
+  // If container is ready OR we have a container ref, allow rendering
+  const shouldRenderMap = isMounted && (isContainerReady || container) && !hasLeafletInstance;
 
   // Render the map - use key on wrapper to force complete DOM recreation
   // This avoids the "Map container is already initialized" error
