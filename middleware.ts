@@ -39,6 +39,8 @@ const safePublicRoutes = [
   '/api/criteria',             // Investment criteria - returns default values (GET is safe, PUT should be protected but uses in-memory cache)
   '/api/extract-property-url', // Property URL extraction - rate limited, safe for public use
   '/api/mortgage-calculator',  // Mortgage calculator - utility endpoint, safe for public use
+  '/api/analyze',              // Property analysis from text - rate limited, safe for public use
+  '/api/analyze-file',         // Property analysis from file - rate limited, safe for public use
 ];
 
 // Development-only: additional routes that are public in dev but protected in production
