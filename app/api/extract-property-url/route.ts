@@ -19,12 +19,17 @@ function getOpenAIClient(): OpenAI {
 }
 
 export async function POST(request: NextRequest) {
-  return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
+    console.log('[extract-property-url] Request received');
+    const response = await withRateLimit(request, expensiveRateLimit, async (req) => {
+    try {
+    console.log('[extract-property-url] Inside rate limit handler');
     let requestBody;
     try {
       requestBody = await req.json();
+      console.log('[extract-property-url] Request body parsed:', { hasUrl: !!requestBody?.url });
     } catch (parseError) {
+      console.error('[extract-property-url] Failed to parse request body:', parseError);
       return NextResponse.json(
         { success: false, error: 'Invalid request body. Expected JSON.' },
         { status: 400 }
@@ -72,7 +77,21 @@ export async function POST(request: NextRequest) {
     const truncatedHtml = html.substring(0, 100000);
 
     // Use OpenAI to extract property information
-    const openai = getOpenAIClient();
+    let openai;
+    try {
+      openai = getOpenAIClient();
+    } catch (openaiError: any) {
+      console.error('[extract-property-url] Failed to initialize OpenAI client:', openaiError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: openaiError.message || 'OpenAI API key is not configured'
+        },
+        { status: 500 }
+      );
+    }
+    
+    console.log('[extract-property-url] Calling OpenAI API');
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -301,5 +320,32 @@ Important: Return ONLY the JSON object, no additional text or markdown.`,
       { status: 500 }
     );
   }
-  });
+    });
+    console.log('[extract-property-url] Response generated:', { hasResponse: !!response });
+    
+    // Ensure we always return a valid response
+    if (!response) {
+      console.error('[extract-property-url] withRateLimit returned undefined/null');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Internal server error: No response generated'
+        },
+        { status: 500 }
+      );
+    }
+    
+    return response;
+  } catch (error: any) {
+    // Catch any errors from withRateLimit itself
+    console.error('[extract-property-url] Error in withRateLimit wrapper:', error);
+    console.error('[extract-property-url] Error stack:', error?.stack);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || 'Failed to process request'
+      },
+      { status: 500 }
+    );
+  }
 }
