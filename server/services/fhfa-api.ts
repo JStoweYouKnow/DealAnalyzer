@@ -29,19 +29,27 @@ export interface StateHpiMetrics {
 }
 
 export class FhfaApiService {
-  private apiKey: string;
+  private apiKey: string | null = null;
 
   constructor() {
-    if (!process.env.FRED_API_KEY) {
-      console.warn('FRED_API_KEY not configured. FHFA price trend features are disabled.');
-      this.apiKey = '';
-    } else {
-      this.apiKey = process.env.FRED_API_KEY;
+    // Don't load API key in constructor - load lazily when needed
+  }
+
+  private getApiKey(): string {
+    if (this.apiKey === null) {
+      // Lazy load API key to ensure environment variables are loaded
+      if (!process.env.FRED_API_KEY) {
+        console.warn('FRED_API_KEY not configured. FHFA price trend features are disabled.');
+        this.apiKey = '';
+      } else {
+        this.apiKey = process.env.FRED_API_KEY;
+      }
     }
+    return this.apiKey;
   }
 
   isConfigured(): boolean {
-    return !!this.apiKey;
+    return !!this.getApiKey();
   }
 
   private getSeriesIdForState(state: string): string {
@@ -51,7 +59,8 @@ export class FhfaApiService {
   }
 
   private async fetchSeries(seriesId: string): Promise<any | null> {
-    if (!this.apiKey) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
       return null;
     }
 
@@ -63,7 +72,7 @@ export class FhfaApiService {
 
     const url = new URL(FRED_API_BASE);
     url.searchParams.append('series_id', seriesId);
-    url.searchParams.append('api_key', this.apiKey);
+    url.searchParams.append('api_key', apiKey);
     url.searchParams.append('file_type', 'json');
     // Retrieve 10 years of data to compute medium-term trend
     url.searchParams.append('observation_start', '2013-01-01');
@@ -143,7 +152,7 @@ export class FhfaApiService {
   }
 
   async getStateHpi(state: string): Promise<StateHpiMetrics | null> {
-    if (!this.apiKey) {
+    if (!this.getApiKey()) {
       return null;
     }
 
