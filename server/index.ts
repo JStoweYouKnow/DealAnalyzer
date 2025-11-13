@@ -84,8 +84,17 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    // Log error for debugging but don't throw after responding
+    console.error('Express error handler:', {
+      status,
+      message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+
+    // Only send response if not already sent
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
   });
 
   // importantly only setup vite in development and after

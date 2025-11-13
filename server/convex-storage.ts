@@ -14,17 +14,31 @@ async function initializeConvex() {
   }
 
   try {
-    // Directly import the generated API file - it should be available at build time
+    // Try importing the generated API file - handle both .js and .ts extensions
     // Using dynamic imports with relative paths that work in both Node.js and Next.js
-    // This avoids needing to check file existence with fs/path modules
-    const apiModule = await import('../convex/_generated/api.js');
+    let apiModule;
+    try {
+      apiModule = await import('../convex/_generated/api.js');
+    } catch (jsError) {
+      // Fallback: try without extension (TypeScript/ESM resolution)
+      try {
+        apiModule = await import('../convex/_generated/api');
+      } catch (tsError) {
+        throw new Error(`Convex API not found. JS error: ${jsError}, TS error: ${tsError}`);
+      }
+    }
+    
+    if (!apiModule || !apiModule.api) {
+      throw new Error('Convex API module loaded but api object is missing');
+    }
     
     api = apiModule.api;
     convexInitialized = true;
     console.log("Convex API initialized successfully");
     return true;
   } catch (error) {
-    console.warn("Convex generated files not found. Using fallback storage.", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn("Convex generated files not found. Using fallback storage.", errorMessage);
     return false;
   }
 }
@@ -59,12 +73,21 @@ class ConvexStorageImpl implements ConvexStorage {
   private initPromise: Promise<boolean>;
 
   constructor() {
-    if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
+    const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+    if (!convexUrl) {
       throw new Error("NEXT_PUBLIC_CONVEX_URL is required for Convex storage");
     }
     
-    this.convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+    // Validate URL format
+    try {
+      new URL(convexUrl);
+    } catch {
+      throw new Error(`Invalid NEXT_PUBLIC_CONVEX_URL format: ${convexUrl}`);
+    }
+    
+    this.convex = new ConvexHttpClient(convexUrl);
     this.initPromise = initializeConvex();
+    console.log(`ConvexStorage initialized with URL: ${convexUrl.substring(0, 30)}...`);
   }
 
   private async ensureInitialized() {
@@ -374,13 +397,26 @@ class ConvexStorageImpl implements ConvexStorage {
   }
 }
 
-// Create singleton instance
+// Create singleton instance with lazy initialization
 let convexStorageInstance: ConvexStorage | null = null;
+let convexStorageInitError: Error | null = null;
 
 export const convexStorage = (() => {
-  if (!convexStorageInstance) {
-    console.log('Creating new ConvexStorage instance');
-    convexStorageInstance = new ConvexStorageImpl();
+  if (convexStorageInstance) {
+    return convexStorageInstance;
   }
-  return convexStorageInstance;
+  
+  if (convexStorageInitError) {
+    throw convexStorageInitError;
+  }
+  
+  try {
+    console.log('[ConvexStorage] Creating new ConvexStorage instance');
+    convexStorageInstance = new ConvexStorageImpl();
+    return convexStorageInstance;
+  } catch (error) {
+    convexStorageInitError = error instanceof Error ? error : new Error(String(error));
+    console.error('[ConvexStorage] Failed to create instance:', convexStorageInitError.message);
+    throw convexStorageInitError;
+  }
 })();

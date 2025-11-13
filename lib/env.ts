@@ -24,8 +24,8 @@ const envSchema = z.object({
   // Census API Key - Required for demographic data
   CENSUS_API_KEY: z.string().min(1, 'CENSUS_API_KEY is required'),
 
-  // Convex Database URL - Required for data storage
-  NEXT_PUBLIC_CONVEX_URL: z.string().url('NEXT_PUBLIC_CONVEX_URL must be a valid URL'),
+  // Convex Database URL - Optional (falls back to in-memory storage if not set)
+  NEXT_PUBLIC_CONVEX_URL: z.preprocess((v) => v === '' ? undefined : v, z.string().url('NEXT_PUBLIC_CONVEX_URL must be a valid URL').optional()),
 
   // Clerk Authentication Keys - Required for user authentication
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1, 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required'),

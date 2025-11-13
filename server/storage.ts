@@ -1323,22 +1323,32 @@ const globalForStorage = globalThis as unknown as {
 
 export const storage = (() => {
   // Check if we should use Convex (when NEXT_PUBLIC_CONVEX_URL is set)
-  const useConvex = !!process.env.NEXT_PUBLIC_CONVEX_URL;
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  const useConvex = !!convexUrl;
   
   if (useConvex) {
     try {
-      console.log('Attempting to use Convex storage backend');
+      console.log(`[Storage] Attempting to use Convex storage backend (URL: ${convexUrl?.substring(0, 30)}...)`);
       // Return a wrapper that implements IStorage interface but uses Convex
-      return createConvexStorageWrapper();
+      const wrapper = createConvexStorageWrapper();
+      // Test initialization asynchronously (don't block)
+      getConvexStorage().then(() => {
+        console.log('[Storage] Convex storage backend initialized successfully');
+      }).catch((error) => {
+        console.warn('[Storage] Convex storage initialization failed, will use fallback:', error instanceof Error ? error.message : 'Unknown error');
+      });
+      return wrapper;
     } catch (error) {
-      console.warn('Convex storage not available, falling back to in-memory storage:', error instanceof Error ? error.message : 'Unknown error');
+      console.warn('[Storage] Convex storage wrapper creation failed, falling back to in-memory storage:', error instanceof Error ? error.message : 'Unknown error');
       // Fall through to in-memory storage
     }
+  } else {
+    console.log('[Storage] NEXT_PUBLIC_CONVEX_URL not set, using in-memory storage');
   }
   
   // Fallback to in-memory storage
   if (!globalForStorage.storageInstance) {
-    console.log('Creating new MemStorage instance (fallback)');
+    console.log('[Storage] Creating new MemStorage instance (fallback)');
     globalForStorage.storageInstance = new MemStorage();
   }
   return globalForStorage.storageInstance;
@@ -1347,8 +1357,15 @@ export const storage = (() => {
 // Lazy import Convex storage to avoid errors when not configured
 async function getConvexStorage() {
   if (!globalForStorage.convexStorage) {
-    const { convexStorage } = await import("./convex-storage");
-    globalForStorage.convexStorage = convexStorage;
+    try {
+      const { convexStorage } = await import("./convex-storage");
+      globalForStorage.convexStorage = convexStorage;
+      console.log('[Storage] Convex storage module loaded successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[Storage] Failed to load Convex storage module:', errorMessage);
+      throw new Error(`Convex storage not available: ${errorMessage}`);
+    }
   }
   return globalForStorage.convexStorage;
 }

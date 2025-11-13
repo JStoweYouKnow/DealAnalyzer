@@ -427,6 +427,18 @@ function recalculateCorrectedMetrics(analysis: any) {
 }
 
 function generateHTMLReport(data: ReportData, options: ReportOptions): string {
+  // HTML escape function to prevent XSS attacks
+  const escapeHtml = (text: string | number | undefined | null): string => {
+    if (text === null || text === undefined) return '';
+    const str = String(text);
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -447,21 +459,21 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
       <p class="text-xs font-semibold leading-7 text-indigo-600">
         Property Analysis ${index + 1}
       </p>
-      <h1 class="mt-2 text-3xl font-bold tracking-tight text-gray-900">${analysis.property.address || 'Unknown Address'}</h1>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-gray-900">${escapeHtml(analysis.property.address || 'Unknown Address')}</h1>
       
       <div class="mt-6 grid grid-cols-2 gap-6">
         <div class="p-4 border border-gray-200 rounded-lg">
           <h3 class="text-sm font-semibold text-indigo-600 mb-4">Property Details</h3>
           <dl class="space-y-2 text-sm">
-            <div class="flex justify-between"><dt class="font-medium">Address:</dt><dd>${analysis.property.address || 'Unknown Address'}</dd></div>
-            <div class="flex justify-between"><dt class="font-medium">City, State:</dt><dd>${analysis.property.city || 'N/A'}, ${analysis.property.state || 'N/A'}</dd></div>
-            <div class="flex justify-between"><dt class="font-medium">Property Type:</dt><dd>${analysis.property.propertyType || 'N/A'}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Address:</dt><dd>${escapeHtml(analysis.property.address || 'Unknown Address')}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">City, State:</dt><dd>${escapeHtml(analysis.property.city || 'N/A')}, ${escapeHtml(analysis.property.state || 'N/A')}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Property Type:</dt><dd>${escapeHtml(analysis.property.propertyType || 'N/A')}</dd></div>
             <div class="flex justify-between"><dt class="font-medium">Purchase Price:</dt><dd class="font-semibold">${formatCurrency(analysis.property.purchasePrice || 0)}</dd></div>
             <div class="flex justify-between"><dt class="font-medium">Monthly Rent:</dt><dd class="font-semibold">${formatCurrency(analysis.property.monthlyRent || 0)}</dd></div>
-            <div class="flex justify-between"><dt class="font-medium">Bedrooms:</dt><dd>${analysis.property.bedrooms || 'N/A'}</dd></div>
-            <div class="flex justify-between"><dt class="font-medium">Bathrooms:</dt><dd>${analysis.property.bathrooms || 'N/A'}</dd></div>
-            <div class="flex justify-between"><dt class="font-medium">Square Footage:</dt><dd>${analysis.property.squareFootage?.toLocaleString() || 'N/A'}</dd></div>
-            <div class="flex justify-between"><dt class="font-medium">Year Built:</dt><dd>${analysis.property.yearBuilt || 'N/A'}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Bedrooms:</dt><dd>${escapeHtml(analysis.property.bedrooms || 'N/A')}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Bathrooms:</dt><dd>${escapeHtml(analysis.property.bathrooms || 'N/A')}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Square Footage:</dt><dd>${escapeHtml(analysis.property.squareFootage?.toLocaleString() || 'N/A')}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Year Built:</dt><dd>${escapeHtml(analysis.property.yearBuilt || 'N/A')}</dd></div>
           </dl>
         </div>
         
@@ -497,8 +509,8 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
     <body class="p-6 bg-white">
       <div class="text-center mb-8 pb-6 border-b-2 border-indigo-600">
         <p class="text-xs font-semibold leading-7 text-indigo-600">Real Estate Investment Report</p>
-        <h1 class="mt-2 text-4xl font-bold tracking-tight text-gray-900">${options.title}</h1>
-        <p class="mt-2 text-sm text-gray-600">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+        <h1 class="mt-2 text-4xl font-bold tracking-tight text-gray-900">${escapeHtml(options.title)}</h1>
+        <p class="mt-2 text-sm text-gray-600">Generated on ${escapeHtml(new Date().toLocaleDateString())} at ${escapeHtml(new Date().toLocaleTimeString())}</p>
       </div>
       
       ${analysesHtml}
