@@ -37,6 +37,7 @@ const safePublicRoutes = [
   '/api/receive-email',        // SendGrid webhook - email forwarding
   '/api/og-image',             // Open Graph images - social sharing (query params only)
   '/api/criteria',             // Investment criteria - returns default values (GET is safe, PUT should be protected but uses in-memory cache)
+  '/api/extract-property-url', // Property URL extraction - rate limited, safe for public use
 ];
 
 // Development-only: additional routes that are public in dev but protected in production
