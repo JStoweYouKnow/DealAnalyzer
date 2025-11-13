@@ -420,6 +420,11 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
     setSelectedProperty(property);
   };
 
+  // Memoize the combined properties array to prevent unnecessary re-renders
+  const combinedMapProperties = useMemo(() => {
+    return searchMarker ? [...mapProperties, searchMarker] : mapProperties;
+  }, [mapProperties, searchMarker]);
+
   return (
     <div className="space-y-6" data-testid="map-integration">
       <div className="flex flex-col space-y-4">
@@ -498,10 +503,11 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
               {/* Leaflet Map Container */}
               <div className="w-full h-96 rounded-lg overflow-hidden relative" data-testid="map-container" style={{ minHeight: '384px' }}>
                 <DynamicMap
+                  key={analysis?.propertyId || 'map'}
                   mapCenter={mapCenter}
                   zoomLevel={zoomLevel}
                   mapLayer={mapLayer}
-                  mapProperties={searchMarker ? [...mapProperties, searchMarker] : mapProperties}
+                  mapProperties={combinedMapProperties}
                   pointsOfInterest={pointsOfInterest}
                   showPOIs={showPOIs}
                   onPropertyClick={handlePropertyClick}

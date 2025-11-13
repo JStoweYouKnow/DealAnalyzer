@@ -19,6 +19,35 @@ export function STRMetrics({ analysis, criteria, onAnalysisUpdate }: STRMetricsP
   const [isEditingAdr, setIsEditingAdr] = useState(false);
   const { toast } = useToast();
 
+  // Calculate corrected expenses to match Financial Breakdown
+  // Get actual mortgage payment from analysis if available
+  const analysisData = analysis as any;
+  const actualMortgagePayment = analysisData.monthlyMortgagePayment;
+  
+  // Calculate mortgage payment if not available from analysis
+  const loanAmount = analysis.property.purchasePrice - analysis.calculatedDownpayment;
+  const monthlyInterestRate = 0.07 / 12;
+  const numberOfPayments = 30 * 12;
+  const calculatedMortgagePayment = loanAmount * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, numberOfPayments)) / (Math.pow(1 + monthlyInterestRate, numberOfPayments) - 1);
+  const mortgagePayment = actualMortgagePayment ?? calculatedMortgagePayment;
+  
+  // Calculate expenses the same way as Financial Breakdown
+  const propertyTax = analysis.property.purchasePrice * 0.012 / 12;
+  const insurance = 100;
+  const vacancy = analysis.property.monthlyRent * 0.05;
+  const propertyManagement = analysis.property.monthlyRent * 0.10;
+  const utilities = (analysis.property as any).monthlyExpenses?.utilities || 0;
+  const cleaning = (analysis.property as any).monthlyExpenses?.cleaning || 0;
+  const supplies = (analysis.property as any).monthlyExpenses?.supplies || 0;
+  const other = (analysis.property as any).monthlyExpenses?.other || 0;
+  
+  const correctedTotalMonthlyExpenses = mortgagePayment + propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other;
+  
+  // Recalculate STR Net Income using corrected expenses
+  const correctedStrNetIncome = analysis.projectedAnnualRevenue 
+    ? (analysis.projectedAnnualRevenue / 12) - correctedTotalMonthlyExpenses
+    : undefined;
+
   // Mutation for updating ADR and re-analyzing
   const updateAdrMutation = useMutation({
     mutationFn: async (newAdr: number) => {
@@ -186,23 +215,21 @@ export function STRMetrics({ analysis, criteria, onAnalysisUpdate }: STRMetricsP
                 </div>
               )}
               
-              {analysis.strNetIncome && (
+              {correctedStrNetIncome !== undefined && (
                 <div className="flex justify-between p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
                   <span className="text-sm font-medium">Monthly Net Income</span>
-                  <span className={`font-bold ${analysis.strNetIncome > 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="text-str-net-income">
-                    {formatCurrency(analysis.strNetIncome)}
+                  <span className={`font-bold ${correctedStrNetIncome > 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="text-str-net-income">
+                    {formatCurrency(correctedStrNetIncome)}
                   </span>
                 </div>
               )}
               
-              {analysis.totalMonthlyExpenses && (
-                <div className="flex justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
-                  <span className="text-sm font-medium">Monthly Expenses</span>
-                  <span className="font-bold text-red-600" data-testid="text-str-monthly-expenses">
-                    {formatCurrency(analysis.totalMonthlyExpenses)}
-                  </span>
-                </div>
-              )}
+              <div className="flex justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                <span className="text-sm font-medium">Monthly Expenses</span>
+                <span className="font-bold text-red-600" data-testid="text-str-monthly-expenses">
+                  {formatCurrency(correctedTotalMonthlyExpenses)}
+                </span>
+              </div>
             </div>
           </div>
 

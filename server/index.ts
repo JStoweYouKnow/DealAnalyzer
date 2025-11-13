@@ -1,3 +1,11 @@
+// Load environment variables first, before any other imports
+import dotenv from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env.local first (takes precedence), then .env
+dotenv.config({ path: resolve(process.cwd(), '.env.local') });
+dotenv.config({ path: resolve(process.cwd(), '.env') });
+
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import Redis from "ioredis";

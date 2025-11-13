@@ -1,8 +1,20 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY 
-});
+// Lazy initialization of OpenAI client to ensure environment variables are loaded first
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is not set. Please configure it in your .env file.');
+    }
+    openai = new OpenAI({ 
+      apiKey: apiKey 
+    });
+  }
+  return openai;
+}
 
 export interface LinkQualityScore {
   score: number; // 0-10
@@ -28,7 +40,7 @@ export class AIQualityScoringService {
     if (!links || links.length === 0) return [];
     
     try {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released August 7, 2025. do not change this unless explicitly requested by the user
         messages: [
           {
@@ -92,7 +104,7 @@ Provide quality scores focusing on property investment value.`
     if (!imageUrls || imageUrls.length === 0) return [];
 
     try {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released August 7, 2025. do not change this unless explicitly requested by the user
         messages: [
           {

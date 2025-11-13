@@ -1,17 +1,29 @@
 import OpenAI from "openai";
 import type { Property, AIAnalysis, SmartPropertyRecommendation, RentPricingRecommendation, InvestmentTimingAdvice } from "@shared/schema";
 
+// Lazy initialization of OpenAI client to ensure environment variables are loaded first
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is not set. Please configure it in your .env file.');
+    }
+    openai = new OpenAI({
+      apiKey: apiKey,
+    });
+  }
+  return openai;
+}
 
 export class AIAnalysisService {
   async analyzeProperty(property: Property): Promise<AIAnalysis> {
     const prompt = this.buildAnalysisPrompt(property);
     
     try {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: "gpt-5",
         messages: [
           {
@@ -234,7 +246,7 @@ Create a professional 2-3 paragraph summary that highlights the key investment m
 risks, and recommendation. Write in a clear, professional tone suitable for an investment report.`;
 
     try {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: "gpt-5",
         messages: [
           {
@@ -295,7 +307,7 @@ Use these recommendation types:
 - "diversification": Different but complementary investment opportunities`;
 
     try {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: "gpt-5",
         messages: [
           {
@@ -373,7 +385,7 @@ Provide rent pricing recommendation in this JSON format:
 }`;
 
     try {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: "gpt-5",
         messages: [
           {
@@ -466,7 +478,7 @@ Provide investment timing advice in this JSON format:
 Consider current market conditions, property fundamentals, and optimal timing for real estate investment decisions.`;
 
     try {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: "gpt-5",
         messages: [
           {

@@ -232,3 +232,19 @@ class ApiClient {
 
 export const api = new ApiClient();
 export default api;
+
+// Export market data APIs
+export {
+  marketDataService,
+  walkScoreAPI,
+  openWeatherMapAPI,
+  blsAPI,
+  fredAPI,
+  geocodingAPI,
+  WalkScoreAPI,
+  OpenWeatherMapAPI,
+  BLSAPI,
+  FREDAPI,
+  GeocodingAPI,
+  MarketDataService,
+} from './marketDataAPIs';

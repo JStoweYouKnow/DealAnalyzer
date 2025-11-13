@@ -47,25 +47,57 @@ export function InteractiveCharts({ analysis, criteria, comparisonAnalyses = [] 
     return `${(percent * 100).toFixed(1)}%`;
   };
 
+  // Calculate corrected cash flow and metrics to match other components
+  const analysisData = analysis as any;
+  const actualMortgagePayment = analysisData.monthlyMortgagePayment;
+  
+  const loanAmount = analysis.property.purchasePrice - analysis.calculatedDownpayment;
+  const monthlyInterestRate = 0.07 / 12;
+  const numberOfPayments = 30 * 12;
+  const calculatedMortgagePayment = loanAmount * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, numberOfPayments)) / (Math.pow(1 + monthlyInterestRate, numberOfPayments) - 1);
+  const mortgagePayment = actualMortgagePayment ?? calculatedMortgagePayment;
+  
+  const propertyTax = analysis.property.purchasePrice * 0.012 / 12;
+  const insurance = 100;
+  const vacancy = analysis.property.monthlyRent * 0.05;
+  const propertyManagement = analysis.property.monthlyRent * 0.10;
+  const utilities = (analysis.property as any).monthlyExpenses?.utilities || 0;
+  const cleaning = (analysis.property as any).monthlyExpenses?.cleaning || 0;
+  const supplies = (analysis.property as any).monthlyExpenses?.supplies || 0;
+  const other = (analysis.property as any).monthlyExpenses?.other || 0;
+  
+  const correctedTotalMonthlyExpenses = mortgagePayment + propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other;
+  const correctedCashFlow = analysis.property.monthlyRent - correctedTotalMonthlyExpenses;
+  const correctedCashFlowPositive = correctedCashFlow >= 0;
+  const correctedAnnualCashFlow = correctedCashFlow * 12;
+  const correctedCocReturn = analysis.totalCashNeeded > 0 ? correctedAnnualCashFlow / analysis.totalCashNeeded : 0;
+  const annualOperatingExpenses = (propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other) * 12;
+  const netOperatingIncome = (analysis.property.monthlyRent * 12) - annualOperatingExpenses;
+  const correctedCapRate = analysis.property.purchasePrice > 0 ? netOperatingIncome / analysis.property.purchasePrice : 0;
+  const cocMeetsMinimum = correctedCocReturn >= (criteria?.coc_minimum_min ?? 0.08);
+  const cocMeetsBenchmark = correctedCocReturn >= (criteria?.coc_benchmark_min ?? 0.15);
+  const capMeetsMinimum = correctedCapRate >= (criteria?.cap_minimum ?? 0.05);
+  const capMeetsBenchmark = correctedCapRate >= (criteria?.cap_benchmark_min ?? 0.12);
+
   // Financial Overview Data
   const financialData = [
     {
       name: 'Monthly Cash Flow',
-      value: analysis.cashFlow,
+      value: correctedCashFlow,
       target: (criteria as any)?.minCashFlow || 0,
-      status: analysis.cashFlowPositive ? 'positive' : 'negative'
+      status: correctedCashFlowPositive ? 'positive' : 'negative'
     },
     {
       name: 'COC Return',
-      value: analysis.cocReturn * 100,
-      target: ((criteria as any)?.minCocReturn || 0) * 100,
-      status: analysis.cocMeetsBenchmark ? 'meets' : 'below'
+      value: correctedCocReturn * 100,
+      target: ((criteria?.coc_minimum_min ?? 0.08) * 100),
+      status: cocMeetsBenchmark ? 'meets' : cocMeetsMinimum ? 'minimum' : 'below'
     },
     {
       name: 'Cap Rate',
-      value: analysis.capRate * 100,
-      target: ((criteria as any)?.minCapRate || 0) * 100,
-      status: analysis.capMeetsBenchmark ? 'meets' : 'below'
+      value: correctedCapRate * 100,
+      target: ((criteria?.cap_minimum ?? 0.05) * 100),
+      status: capMeetsBenchmark ? 'meets' : capMeetsMinimum ? 'minimum' : 'below'
     },
     {
       name: '1% Rule',
@@ -91,7 +123,8 @@ export function InteractiveCharts({ analysis, criteria, comparisonAnalyses = [] 
     
     const propertyValue = analysis.property.purchasePrice * Math.pow(1 + appreciationRate / 12, month);
     const monthlyRent = analysis.property.monthlyRent * Math.pow(1 + rentGrowthRate / 12, month);
-    const monthlyCashFlow = monthlyRent - (analysis.totalMonthlyExpenses || 0);
+    // Use corrected expenses for projections
+    const monthlyCashFlow = monthlyRent - correctedTotalMonthlyExpenses;
     const equity = propertyValue - (analysis.property.purchasePrice * 0.8); // Assuming 20% down
     const totalReturn = (monthlyCashFlow * month) + equity;
 

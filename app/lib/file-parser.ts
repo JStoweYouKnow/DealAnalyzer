@@ -1,4 +1,6 @@
 // TypeScript file parser to replace Python backend for Vercel deployment
+import { logger } from './logger';
+
 export interface ParsedProperty {
   address: string;
   city: string;
@@ -48,7 +50,7 @@ export function parseTextFile(content: string): ParsedProperty {
     /(?:Price|Cost)[:\s=]+\$?\s*([\d,]+(?:\.\d{2})?)/gi,
   ];
   
-  // PRIORITY 2: Price with context keywords
+  // PRIORITY 3: Price with context keywords
   const mediumPriorityPatterns = [
     /(?:For\s+Sale|Listed\s+at|Asking)[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
     /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)\s*(?:for|purchase|sale|listing|price)/gi,
@@ -126,29 +128,20 @@ export function parseTextFile(content: string): ParsedProperty {
   if (purchasePriceMatches.length > 0) {
     // Explicit "Purchase Price" label found - this is what we want
     purchasePrice = Math.min(...purchasePriceMatches);
-    console.log(`Found ${purchasePriceMatches.length} explicit "Purchase Price" matches: [${purchasePriceMatches.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
+    logger.debug(`Found ${purchasePriceMatches.length} explicit "Purchase Price" matches: [${purchasePriceMatches.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
   } else if (highPriorityPrices.length > 0) {
     // For other labeled prices, prefer the smaller one (purchase price is often less than appraised value)
     purchasePrice = Math.min(...highPriorityPrices);
-    console.log(`Found ${highPriorityPrices.length} high-priority prices: [${highPriorityPrices.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
+    logger.debug(`Found ${highPriorityPrices.length} high-priority prices: [${highPriorityPrices.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
   } else if (mediumPriorityPrices.length > 0) {
     purchasePrice = Math.min(...mediumPriorityPrices);
-    console.log(`Found ${mediumPriorityPrices.length} medium-priority prices: [${mediumPriorityPrices.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
+    logger.debug(`Found ${mediumPriorityPrices.length} medium-priority prices: [${mediumPriorityPrices.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
   } else if (lowPriorityPrices.length > 0) {
-    // For standalone prices, still prefer smaller ones but filter out obvious outliers
+    // For standalone prices, use the smallest price found
     const sortedPrices = [...lowPriorityPrices].sort((a, b) => a - b);
-    // If there's a clear cluster (prices within 20% of each other), use the smallest
-    // Otherwise, might be different types of prices, so be conservative
     const minPrice = sortedPrices[0];
-    const maxPrice = sortedPrices[sortedPrices.length - 1];
-    if (maxPrice / minPrice < 1.2) {
-      // Prices are close together, use the smallest
-      purchasePrice = minPrice;
-    } else {
-      // Prices are far apart, might be different metrics, use smallest reasonable one
-      purchasePrice = minPrice;
-    }
-    console.log(`Found ${lowPriorityPrices.length} low-priority prices: [${lowPriorityPrices.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
+    purchasePrice = minPrice;
+    logger.debug(`Found ${lowPriorityPrices.length} low-priority prices: [${lowPriorityPrices.map(p => `$${p.toLocaleString()}`).join(', ')}], using: $${purchasePrice.toLocaleString()}`);
   }
   
   property.purchase_price = purchasePrice;
@@ -235,6 +228,42 @@ export async function parseCSVFile(content: string): Promise<ParsedProperty> {
   return property;
 }
 
+/**
+ * Parse JSON file and map fields to ParsedProperty format
+ * Handles both camelCase and snake_case field names
+ */
+export function parseJSONFile(content: string): ParsedProperty {
+  try {
+    const data = JSON.parse(content);
+
+    const property: ParsedProperty = {
+      address: data.address || "",
+      city: data.city || "Unknown",
+      state: data.state || "Unknown",
+      zipCode: data.zipCode || data.zip_code || data.zip || "00000",
+      property_type: data.propertyType || data.property_type || "single-family",
+      purchase_price: data.purchasePrice || data.purchase_price || 0,
+      monthly_rent: data.monthlyRent || data.monthly_rent || 0,
+      bedrooms: data.bedrooms || data.beds || 0,
+      bathrooms: data.bathrooms || data.baths || 0,
+      square_footage: data.squareFootage || data.square_footage || data.sqft || 0,
+      year_built: data.yearBuilt || data.year_built || 0,
+      description: data.description || "",
+      listing_url: data.listingUrl || data.listing_url || "N/A",
+    };
+
+    logger.info('Parsed JSON file:', {
+      purchasePrice: property.purchase_price,
+      address: property.address,
+    });
+
+    return property;
+  } catch (error) {
+    logger.error('Failed to parse JSON, falling back to text parser:', error);
+    return parseTextFile(content);
+  }
+}
+
 export async function parseFileContent(
   fileContent: string,
   fileExtension: string,
@@ -245,6 +274,8 @@ export async function parseFileContent(
 
   if (fileExtension === '.csv') {
     property = await parseCSVFile(fileContent);
+  } else if (fileExtension === '.json') {
+    property = parseJSONFile(fileContent);
   } else {
     property = parseTextFile(fileContent);
   }

@@ -67,6 +67,7 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
   // Mortgage calculator state
   const [mortgageLoading, setMortgageLoading] = useState(false);
   const [mortgageResult, setMortgageResult] = useState<MortgageCalculatorResult | null>(null);
+  const [purchasePrice, setPurchasePrice] = useState("");
   const [loanAmount, setLoanAmount] = useState("");
   const [interestRate, setInterestRate] = useState("");
   const [durationYears, setDurationYears] = useState("30");
@@ -130,13 +131,24 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
 
       const propertyData = data.data;
 
+      // Validate that we have at least a purchase price
+      if (!propertyData.purchasePrice || propertyData.purchasePrice <= 0) {
+        toast({
+          title: "Missing Purchase Price",
+          description: "The property listing doesn't include a purchase price. Please enter the price manually or use a different listing.",
+          variant: "destructive",
+        });
+        setExtractingUrl(false);
+        return;
+      }
+
       // Create a JSON file from the extracted data
       const jsonContent = JSON.stringify({
         address: propertyData.address || '',
         city: propertyData.city || '',
         state: propertyData.state || '',
         zipCode: propertyData.zipCode || '',
-        purchasePrice: propertyData.purchasePrice || 0,
+        purchasePrice: propertyData.purchasePrice,
         bedrooms: propertyData.bedrooms || 0,
         bathrooms: propertyData.bathrooms || 0,
         squareFootage: propertyData.squareFootage || 0,
@@ -162,6 +174,23 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
 
       if (propertyData.hoa) {
         setMonthlyExpenses(prev => ({ ...prev, other: propertyData.hoa }));
+      }
+
+      // Auto-populate mortgage calculator with purchase price
+      if (propertyData.purchasePrice && propertyData.purchasePrice > 0) {
+        setPurchasePrice(propertyData.purchasePrice.toString());
+        // Auto-calculate loan amount based on funding source down payment percentage
+        const downPaymentPercentages: Record<FundingSource, number> = {
+          conventional: 5,
+          fha: 3.5,
+          va: 0,
+          dscr: 20,
+          cash: 100,
+        };
+        const downPercent = downPaymentPercentages[fundingSource] || 20;
+        const downPaymentAmount = propertyData.purchasePrice * (downPercent / 100);
+        const calculatedLoanAmount = propertyData.purchasePrice - downPaymentAmount;
+        setLoanAmount(calculatedLoanAmount.toFixed(2));
       }
 
       toast({
@@ -282,6 +311,7 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
   };
 
   const handleMortgageReset = () => {
+    setPurchasePrice("");
     setLoanAmount("");
     setInterestRate("");
     setDurationYears("30");
@@ -290,6 +320,48 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
     // Notify parent that mortgage calculator was reset
     if (onMortgageCalculated) {
       onMortgageCalculated(null);
+    }
+  };
+
+  // Auto-calculate loan amount when purchase price or funding source changes
+  const handlePurchasePriceChange = (value: string) => {
+    setPurchasePrice(value);
+    if (value && !isNaN(parseFloat(value))) {
+      const price = parseFloat(value);
+      if (price > 0) {
+        const downPaymentPercentages: Record<FundingSource, number> = {
+          conventional: 5,
+          fha: 3.5,
+          va: 0,
+          dscr: 20,
+          cash: 100,
+        };
+        const downPercent = downPaymentPercentages[fundingSource] || 20;
+        const downPaymentAmount = price * (downPercent / 100);
+        const calculatedLoanAmount = price - downPaymentAmount;
+        setLoanAmount(calculatedLoanAmount.toFixed(2));
+      }
+    }
+  };
+
+  // Recalculate loan amount when funding source changes
+  const handleFundingSourceChange = (value: FundingSource) => {
+    setFundingSource(value);
+    if (purchasePrice && !isNaN(parseFloat(purchasePrice))) {
+      const price = parseFloat(purchasePrice);
+      if (price > 0) {
+        const downPaymentPercentages: Record<FundingSource, number> = {
+          conventional: 5,
+          fha: 3.5,
+          va: 0,
+          dscr: 20,
+          cash: 100,
+        };
+        const downPercent = downPaymentPercentages[value] || 20;
+        const downPaymentAmount = price * (downPercent / 100);
+        const calculatedLoanAmount = price - downPaymentAmount;
+        setLoanAmount(calculatedLoanAmount.toFixed(2));
+      }
     }
   };
 
@@ -414,7 +486,7 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
               <Label htmlFor="funding-source" className="text-base font-semibold mb-3 block">Funding Source</Label>
               <Select
                 value={fundingSource}
-                onValueChange={(value) => setFundingSource(value as FundingSource)}
+                onValueChange={(value) => handleFundingSourceChange(value as FundingSource)}
               >
                 <SelectTrigger id="funding-source" className="h-10" data-testid="select-funding-source">
                   <SelectValue placeholder="Select funding source" />
@@ -465,17 +537,34 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
               <p className="text-sm text-muted-foreground mb-4">Optional - Calculate mortgage payment to use in property analysis</p>
               
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="purchase-price" className="text-sm font-medium">Purchase Price ($)</Label>
+                  <Input
+                    id="purchase-price"
+                    type="number"
+                    placeholder="e.g., 250000"
+                    value={purchasePrice}
+                    onChange={(e) => handlePurchasePriceChange(e.target.value)}
+                    min="0"
+                    step="1"
+                    className="h-10"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Loan amount will be auto-calculated based on funding source down payment percentage
+                  </p>
+                </div>
+                
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="loan-amount" className="text-sm font-medium">Loan Amount ($)</Label>
                     <Input
                       id="loan-amount"
                       type="number"
-                      placeholder="e.g., 200000"
+                      placeholder="Auto-calculated"
                       value={loanAmount}
                       onChange={(e) => setLoanAmount(e.target.value)}
                       min="0"
-                      step="1000"
+                      step="1"
                       className="h-10"
                     />
                   </div>

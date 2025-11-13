@@ -41,7 +41,7 @@ export default function InfoTooltip({
 
       <Modal
         visible={modalVisible}
-        transparent
+        transparent={true}
         animationType="fade"
         onRequestClose={() => setModalVisible(false)}
       >

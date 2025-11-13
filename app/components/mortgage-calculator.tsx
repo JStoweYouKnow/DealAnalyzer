@@ -224,7 +224,7 @@ export function MortgageCalculator({ onMortgageCalculated }: MortgageCalculatorP
                 value={purchasePrice}
                 onChange={(e) => handlePurchasePriceChange(e.target.value)}
                 min="0"
-                step="1000"
+                step="1"
               />
             </div>
 
@@ -266,7 +266,7 @@ export function MortgageCalculator({ onMortgageCalculated }: MortgageCalculatorP
               value={loanAmount}
               onChange={(e) => handleLoanAmountChange(e.target.value)}
               min="0"
-              step="1000"
+              step="1"
             />
           </div>
           

@@ -169,3 +169,4 @@ function extractDomain(email: string): string {
   return email.substring(atIndex + 1);
 }
 
+

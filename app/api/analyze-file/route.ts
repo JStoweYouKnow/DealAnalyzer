@@ -157,8 +157,13 @@ export async function POST(request: NextRequest) {
       
       // Validate purchasePrice is a positive number (needed to calculate loan amount for mortgage rate)
       if (typeof purchasePrice !== 'number' || !Number.isFinite(purchasePrice) || purchasePrice <= 0) {
+        console.error(`Invalid purchase price detected: ${purchasePrice} (type: ${typeof purchasePrice})`);
         return NextResponse.json(
-          { success: false, error: "Invalid purchase price. Please provide a positive number, or use the mortgage calculator to calculate purchase price from loan amount." },
+          {
+            success: false,
+            error: `Invalid purchase price: ${purchasePrice}. The uploaded file must contain a valid purchase price greater than $0. Please check the file content or enter the purchase price manually.`,
+            hint: "Make sure your file contains fields like 'Purchase Price', 'Price', 'List Price', or 'Sale Price' with a dollar amount."
+          },
           { status: 400 }
         );
       }

@@ -28,6 +28,51 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const { toast } = useToast();
 
+  // Calculate corrected cash flow and metrics to match Financial Breakdown
+  // Get actual mortgage payment from analysis if available
+  const analysisData = analysis as any;
+  const actualMortgagePayment = analysisData.monthlyMortgagePayment;
+  
+  // Calculate mortgage payment if not available from analysis
+  const loanAmount = analysis.property.purchasePrice - analysis.calculatedDownpayment;
+  const monthlyInterestRate = 0.07 / 12;
+  const numberOfPayments = 30 * 12;
+  const calculatedMortgagePayment = loanAmount * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, numberOfPayments)) / (Math.pow(1 + monthlyInterestRate, numberOfPayments) - 1);
+  const mortgagePayment = actualMortgagePayment ?? calculatedMortgagePayment;
+  
+  // Calculate expenses the same way as Financial Breakdown
+  const propertyTax = analysis.property.purchasePrice * 0.012 / 12;
+  const insurance = 100;
+  const vacancy = analysis.property.monthlyRent * 0.05;
+  const propertyManagement = analysis.property.monthlyRent * 0.10;
+  const utilities = (analysis.property as any).monthlyExpenses?.utilities || 0;
+  const cleaning = (analysis.property as any).monthlyExpenses?.cleaning || 0;
+  const supplies = (analysis.property as any).monthlyExpenses?.supplies || 0;
+  const other = (analysis.property as any).monthlyExpenses?.other || 0;
+  
+  const totalMonthlyExpenses = mortgagePayment + propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other;
+  
+  // Recalculate cash flow based on displayed expenses
+  const correctedCashFlow = analysis.property.monthlyRent - totalMonthlyExpenses;
+  const correctedCashFlowPositive = correctedCashFlow >= 0;
+  const correctedAnnualCashFlow = correctedCashFlow * 12;
+  
+  // Recalculate Cash-on-Cash Return
+  const correctedCocReturn = analysis.totalCashNeeded > 0 ? correctedAnnualCashFlow / analysis.totalCashNeeded : 0;
+  
+  // Recalculate Cap Rate (excluding mortgage)
+  const annualOperatingExpenses = (propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other) * 12;
+  const netOperatingIncome = (analysis.property.monthlyRent * 12) - annualOperatingExpenses;
+  const correctedCapRate = analysis.property.purchasePrice > 0 ? netOperatingIncome / analysis.property.purchasePrice : 0;
+  
+  // Check if metrics meet minimums (using same thresholds as Financial Breakdown)
+  const cocMeetsMinimum = correctedCocReturn >= 0.08;
+  const capMeetsMinimum = correctedCapRate >= 0.05;
+  
+  // Recalculate meetsCriteria based on corrected values
+  // Criteria typically requires: positive cash flow, CoC >= 8%, Cap >= 4%, and 1% rule
+  const correctedMeetsCriteria = correctedCashFlowPositive && cocMeetsMinimum && capMeetsMinimum && analysis.passes1PercentRule;
+
   // Sync local state with updated analysis data
   useEffect(() => {
     setEditableRent(property.monthlyRent);
@@ -429,12 +474,12 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
           </div>
           
           <Badge 
-            variant={analysis.meetsCriteria ? "default" : "destructive"}
+            variant={correctedMeetsCriteria ? "default" : "destructive"}
             className="metric-badge flex items-center space-x-2"
             data-testid="badge-criteria-status"
           >
-            <i className={`fas ${analysis.meetsCriteria ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
-            <span>{analysis.meetsCriteria ? 'MEETS CRITERIA' : 'DOES NOT MEET CRITERIA'}</span>
+            <i className={`fas ${correctedMeetsCriteria ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
+            <span>{correctedMeetsCriteria ? 'MEETS CRITERIA' : 'DOES NOT MEET CRITERIA'}</span>
           </Badge>
         </div>
       </CardHeader>
@@ -728,8 +773,8 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Monthly Cash Flow:</span>
-                <span className={`font-medium ${analysis.cashFlowPositive ? 'text-green-600' : 'text-red-600'}`} data-testid="text-cash-flow">
-                  {formatDecimal(analysis.cashFlow)}
+                <span className={`font-medium ${correctedCashFlowPositive ? 'text-green-600' : 'text-red-600'}`} data-testid="text-cash-flow">
+                  {formatDecimal(correctedCashFlow)}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -762,26 +807,26 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Cash Flow</span>
                 <Badge 
-                  variant={analysis.cashFlowPositive ? "default" : "destructive"}
+                  variant={correctedCashFlowPositive ? "default" : "destructive"}
                   className="metric-badge text-xs"
                   data-testid="badge-cash-flow"
                 >
-                  <i className={`fas ${analysis.cashFlowPositive ? 'fa-check' : 'fa-times'} mr-1`}></i>
-                  {analysis.cashFlowPositive ? 'POSITIVE' : 'NEGATIVE'}
+                  <i className={`fas ${correctedCashFlowPositive ? 'fa-check' : 'fa-times'} mr-1`}></i>
+                  {correctedCashFlowPositive ? 'POSITIVE' : 'NEGATIVE'}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">COC Return</span>
                 <div className="flex items-center space-x-2">
                   <span className="text-sm font-medium" data-testid="text-coc-return">
-                    {(analysis.cocReturn * 100).toFixed(2)}%
+                    {(correctedCocReturn * 100).toFixed(2)}%
                   </span>
                   <Badge 
-                    variant={analysis.cocMeetsBenchmark ? "default" : analysis.cocMeetsMinimum ? "secondary" : "destructive"}
+                    variant={correctedCocReturn >= 0.15 ? "default" : cocMeetsMinimum ? "secondary" : "destructive"}
                     className="metric-badge text-xs"
                     data-testid="badge-coc-status"
                   >
-                    {analysis.cocMeetsBenchmark ? 'BENCHMARK' : analysis.cocMeetsMinimum ? 'MINIMUM' : 'FAIL'}
+                    {correctedCocReturn >= 0.15 ? 'BENCHMARK' : cocMeetsMinimum ? 'MINIMUM' : 'FAIL'}
                   </Badge>
                 </div>
               </div>
@@ -789,14 +834,14 @@ export function PropertyOverview({ analysis, onAnalysisUpdate }: PropertyOvervie
                 <span className="text-sm text-muted-foreground">Cap Rate</span>
                 <div className="flex items-center space-x-2">
                   <span className="text-sm font-medium" data-testid="text-cap-rate">
-                    {(analysis.capRate * 100).toFixed(2)}%
+                    {(correctedCapRate * 100).toFixed(2)}%
                   </span>
                   <Badge 
-                    variant={analysis.capMeetsBenchmark ? "default" : analysis.capMeetsMinimum ? "secondary" : "destructive"}
+                    variant={correctedCapRate >= 0.12 ? "default" : capMeetsMinimum ? "secondary" : "destructive"}
                     className="metric-badge text-xs"
                     data-testid="badge-cap-status"
                   >
-                    {analysis.capMeetsBenchmark ? 'BENCHMARK' : analysis.capMeetsMinimum ? 'MINIMUM' : 'FAIL'}
+                    {correctedCapRate >= 0.12 ? 'BENCHMARK' : capMeetsMinimum ? 'MINIMUM' : 'FAIL'}
                   </Badge>
                 </div>
               </div>

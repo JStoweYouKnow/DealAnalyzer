@@ -94,6 +94,7 @@
     "csv-parse": "^6.1.0",
     "csv-writer": "^1.6.0",
     "date-fns": "^3.6.0",
+    "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.5",
     "drizzle-orm": "^0.39.1",
     "drizzle-zod": "^0.7.0",

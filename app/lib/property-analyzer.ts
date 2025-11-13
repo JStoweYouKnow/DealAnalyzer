@@ -268,6 +268,24 @@ export function analyzeProperty(
   const cashFlow = monthlyRent - totalMonthlyExpenses;
   const cashFlowPositive = cashFlow >= 0;
 
+  console.log('CASH FLOW CALCULATION:', {
+    monthlyRent,
+    totalMonthlyExpenses,
+    cashFlow,
+    breakdown: {
+      mortgage: monthlyMortgagePayment,
+      propertyTax: estimatedPropertyTax,
+      insurance: estimatedInsurance,
+      vacancy: estimatedVacancy,
+      maintenance: actualMaintenanceReserve,
+      management: estimatedPropertyManagement,
+      utilities: providedUtilities,
+      cleaning: providedCleaning,
+      supplies: providedSupplies,
+      other: providedOther
+    }
+  });
+
   // Cash-on-Cash Return
   const annualCashFlow = cashFlow * 12;
   const cocReturn = totalCashNeeded > 0 ? annualCashFlow / totalCashNeeded : 0;

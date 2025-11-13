@@ -28,6 +28,41 @@ export function RecentAnalyses({ analyses, onAddToComparison, isInComparison }: 
     return `${(value * 100).toFixed(1)}%`;
   };
 
+  // Helper function to recalculate corrected metrics for an analysis
+  const recalculateMetrics = (analysis: DealAnalysis) => {
+    const analysisData = analysis as any;
+    const actualMortgagePayment = analysisData.monthlyMortgagePayment;
+    
+    const loanAmount = analysis.property.purchasePrice - analysis.calculatedDownpayment;
+    const monthlyInterestRate = 0.07 / 12;
+    const numberOfPayments = 30 * 12;
+    const calculatedMortgagePayment = loanAmount * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, numberOfPayments)) / (Math.pow(1 + monthlyInterestRate, numberOfPayments) - 1);
+    const mortgagePayment = actualMortgagePayment ?? calculatedMortgagePayment;
+    
+    const propertyTax = analysis.property.purchasePrice * 0.012 / 12;
+    const insurance = 100;
+    const vacancy = analysis.property.monthlyRent * 0.05;
+    const propertyManagement = analysis.property.monthlyRent * 0.10;
+    const utilities = (analysis.property as any).monthlyExpenses?.utilities || 0;
+    const cleaning = (analysis.property as any).monthlyExpenses?.cleaning || 0;
+    const supplies = (analysis.property as any).monthlyExpenses?.supplies || 0;
+    const other = (analysis.property as any).monthlyExpenses?.other || 0;
+    
+    const correctedTotalMonthlyExpenses = mortgagePayment + propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other;
+    const correctedCashFlow = analysis.property.monthlyRent - correctedTotalMonthlyExpenses;
+    const correctedAnnualCashFlow = correctedCashFlow * 12;
+    const correctedCocReturn = analysis.totalCashNeeded > 0 ? correctedAnnualCashFlow / analysis.totalCashNeeded : 0;
+    const annualOperatingExpenses = (propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other) * 12;
+    const netOperatingIncome = (analysis.property.monthlyRent * 12) - annualOperatingExpenses;
+    const correctedCapRate = analysis.property.purchasePrice > 0 ? netOperatingIncome / analysis.property.purchasePrice : 0;
+    
+    return {
+      cashFlow: correctedCashFlow,
+      cocReturn: correctedCocReturn,
+      capRate: correctedCapRate
+    };
+  };
+
   return (
     <Card className="analysis-card">
       <CardHeader className="border-b border-border">
@@ -42,7 +77,9 @@ export function RecentAnalyses({ analyses, onAddToComparison, isInComparison }: 
 
       <CardContent className="p-6">
         <div className="space-y-4">
-          {analyses.map((analysis, index) => (
+          {analyses.map((analysis, index) => {
+            const corrected = recalculateMetrics(analysis);
+            return (
             <div key={analysis.propertyId} className="bg-muted/50 rounded-lg p-4 border border-border">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -69,17 +106,17 @@ export function RecentAnalyses({ analyses, onAddToComparison, isInComparison }: 
                     </div>
                     <div>
                       <span className="text-muted-foreground">Cash Flow:</span>
-                      <div className={`font-medium ${analysis.cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatCurrency(analysis.cashFlow)}
+                      <div className={`font-medium ${corrected.cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(corrected.cashFlow)}
                       </div>
                     </div>
                     <div>
                       <span className="text-muted-foreground">COC Return:</span>
-                      <div className="font-medium">{formatPercent(analysis.cocReturn)}</div>
+                      <div className="font-medium">{formatPercent(corrected.cocReturn)}</div>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Cap Rate:</span>
-                      <div className="font-medium">{formatPercent(analysis.capRate)}</div>
+                      <div className="font-medium">{formatPercent(corrected.capRate)}</div>
                     </div>
                   </div>
                 </div>
@@ -98,7 +135,8 @@ export function RecentAnalyses({ analyses, onAddToComparison, isInComparison }: 
                 </div>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
 
         {analyses.length >= 10 && (

@@ -1,8 +1,20 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization of OpenAI client to ensure environment variables are loaded first
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is not set. Please configure it in your .env file.');
+    }
+    openai = new OpenAI({
+      apiKey: apiKey,
+    });
+  }
+  return openai;
+}
 
 interface PhotoAnalysisRequest {
   image: string; // base64 encoded image with data URL prefix
@@ -27,7 +39,7 @@ interface PhotoAnalysisResult {
 export class AIAnalysisService {
   async analyzePropertyPhoto(request: PhotoAnalysisRequest): Promise<PhotoAnalysisResult> {
     try {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: "gpt-4o",
         messages: [
           {

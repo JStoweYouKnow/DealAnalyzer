@@ -291,7 +291,9 @@ async function makePDF(html: string): Promise<Buffer | null> {
 
 async function generateCSVBuffer(data: ReportData, options: ReportOptions): Promise<Buffer> {
   // Prepare CSV data
-  const csvData = data.analyses.map((analysis, index) => ({
+  const csvData = data.analyses.map((analysis, index) => {
+    const corrected = recalculateCorrectedMetrics(analysis);
+    return {
     'Property #': index + 1,
     'Address': analysis.property.address || 'Unknown Address',
     'City': analysis.property.city || 'N/A',
@@ -304,13 +306,14 @@ async function generateCSVBuffer(data: ReportData, options: ReportOptions): Prom
     'Square Footage': analysis.property.squareFootage || 'N/A',
     'Year Built': analysis.property.yearBuilt || 'N/A',
     'Total Cash Needed': analysis.totalCashNeeded || 0,
-    'Monthly Cash Flow': analysis.cashFlow || 0,
-    'Cash-on-Cash Return (%)': ((analysis.cocReturn || 0) * 100).toFixed(2),
-    'Cap Rate (%)': ((analysis.capRate || 0) * 100).toFixed(2),
+    'Monthly Cash Flow': corrected.cashFlow,
+    'Cash-on-Cash Return (%)': (corrected.cocReturn * 100).toFixed(2),
+    'Cap Rate (%)': (corrected.capRate * 100).toFixed(2),
     'Passes 1% Rule': analysis.passes1PercentRule ? 'Yes' : 'No',
     'Meets Criteria': analysis.meetsCriteria ? 'Yes' : 'No',
     'Analysis Date': analysis.analysisDate ? new Date(analysis.analysisDate).toLocaleDateString() : 'N/A'
-  }));
+  };
+  });
 
   // Generate CSV as string
   const headers = Object.keys(csvData[0] || {});
@@ -333,7 +336,9 @@ async function generateCSVReport(data: ReportData, options: ReportOptions, baseF
   }
 
   // Prepare CSV data
-  const csvData = data.analyses.map((analysis, index) => ({
+  const csvData = data.analyses.map((analysis, index) => {
+    const corrected = recalculateCorrectedMetrics(analysis);
+    return {
     'Property #': index + 1,
     'Address': analysis.property.address || 'Unknown Address',
     'City': analysis.property.city || 'N/A',
@@ -346,13 +351,14 @@ async function generateCSVReport(data: ReportData, options: ReportOptions, baseF
     'Square Footage': analysis.property.squareFootage || 'N/A',
     'Year Built': analysis.property.yearBuilt || 'N/A',
     'Total Cash Needed': analysis.totalCashNeeded || 0,
-    'Monthly Cash Flow': analysis.cashFlow || 0,
-    'Cash-on-Cash Return (%)': ((analysis.cocReturn || 0) * 100).toFixed(2),
-    'Cap Rate (%)': ((analysis.capRate || 0) * 100).toFixed(2),
+    'Monthly Cash Flow': corrected.cashFlow,
+    'Cash-on-Cash Return (%)': (corrected.cocReturn * 100).toFixed(2),
+    'Cap Rate (%)': (corrected.capRate * 100).toFixed(2),
     'Passes 1% Rule': analysis.passes1PercentRule ? 'Yes' : 'No',
     'Meets Criteria': analysis.meetsCriteria ? 'Yes' : 'No',
     'Analysis Date': analysis.analysisDate ? new Date(analysis.analysisDate).toLocaleDateString() : 'N/A'
-  }));
+  };
+  });
 
   // Create CSV writer
   const csvWriter = createObjectCsvWriter({
@@ -385,6 +391,41 @@ async function generateCSVReport(data: ReportData, options: ReportOptions, baseF
   return { filePath, fileName };
 }
 
+// Helper function to recalculate corrected metrics (matching frontend calculations)
+function recalculateCorrectedMetrics(analysis: any) {
+  const actualMortgagePayment = analysis.monthlyMortgagePayment;
+  
+  const loanAmount = analysis.property.purchasePrice - analysis.calculatedDownpayment;
+  const monthlyInterestRate = 0.07 / 12;
+  const numberOfPayments = 30 * 12;
+  const calculatedMortgagePayment = loanAmount * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, numberOfPayments)) / (Math.pow(1 + monthlyInterestRate, numberOfPayments) - 1);
+  const mortgagePayment = actualMortgagePayment ?? calculatedMortgagePayment;
+  
+  const propertyTax = analysis.property.purchasePrice * 0.012 / 12;
+  const insurance = 100;
+  const vacancy = analysis.property.monthlyRent * 0.05;
+  const propertyManagement = analysis.property.monthlyRent * 0.10;
+  const utilities = analysis.property?.monthlyExpenses?.utilities || 0;
+  const cleaning = analysis.property?.monthlyExpenses?.cleaning || 0;
+  const supplies = analysis.property?.monthlyExpenses?.supplies || 0;
+  const other = analysis.property?.monthlyExpenses?.other || 0;
+  
+  const correctedTotalMonthlyExpenses = mortgagePayment + propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other;
+  const correctedCashFlow = analysis.property.monthlyRent - correctedTotalMonthlyExpenses;
+  const correctedAnnualCashFlow = correctedCashFlow * 12;
+  const correctedCocReturn = analysis.totalCashNeeded > 0 ? correctedAnnualCashFlow / analysis.totalCashNeeded : 0;
+  const annualOperatingExpenses = (propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other) * 12;
+  const netOperatingIncome = (analysis.property.monthlyRent * 12) - annualOperatingExpenses;
+  const correctedCapRate = analysis.property.purchasePrice > 0 ? netOperatingIncome / analysis.property.purchasePrice : 0;
+  
+  return {
+    cashFlow: correctedCashFlow,
+    cocReturn: correctedCocReturn,
+    capRate: correctedCapRate,
+    cashFlowPositive: correctedCashFlow >= 0
+  };
+}
+
 function generateHTMLReport(data: ReportData, options: ReportOptions): string {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -399,7 +440,9 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
     return `${(value * 100).toFixed(1)}%`;
   };
 
-  const analysesHtml = data.analyses.map((analysis, index) => `
+  const analysesHtml = data.analyses.map((analysis, index) => {
+    const corrected = recalculateCorrectedMetrics(analysis);
+    return `
     <div class="mb-8 p-2 border-b border-gray-200">
       <p class="text-xs font-semibold leading-7 text-indigo-600">
         Property Analysis ${index + 1}
@@ -426,16 +469,17 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
           <h3 class="text-sm font-semibold text-indigo-600 mb-4">Financial Analysis</h3>
           <dl class="space-y-2 text-sm">
             <div class="flex justify-between"><dt class="font-medium">Total Cash Needed:</dt><dd class="font-semibold">${formatCurrency(analysis.totalCashNeeded || 0)}</dd></div>
-            <div class="flex justify-between"><dt class="font-medium">Monthly Cash Flow:</dt><dd class="font-semibold ${(analysis.cashFlow || 0) >= 0 ? 'text-green-600' : 'text-red-600'}">${formatCurrency(analysis.cashFlow || 0)}</dd></div>
-            <div class="flex justify-between"><dt class="font-medium">Cash-on-Cash Return:</dt><dd class="font-semibold">${formatPercent(analysis.cocReturn || 0)}</dd></div>
-            <div class="flex justify-between"><dt class="font-medium">Cap Rate:</dt><dd class="font-semibold">${formatPercent(analysis.capRate || 0)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Monthly Cash Flow:</dt><dd class="font-semibold ${corrected.cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}">${formatCurrency(corrected.cashFlow)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Cash-on-Cash Return:</dt><dd class="font-semibold">${formatPercent(corrected.cocReturn)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium">Cap Rate:</dt><dd class="font-semibold">${formatPercent(corrected.capRate)}</dd></div>
             <div class="flex justify-between"><dt class="font-medium">Passes 1% Rule:</dt><dd class="font-semibold ${analysis.passes1PercentRule ? 'text-green-600' : 'text-red-600'}">${analysis.passes1PercentRule ? 'Yes' : 'No'}</dd></div>
             <div class="flex justify-between"><dt class="font-medium">Meets Criteria:</dt><dd class="font-semibold ${analysis.meetsCriteria ? 'text-green-600' : 'text-red-600'}">${analysis.meetsCriteria ? 'Yes' : 'No'}</dd></div>
           </dl>
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   return `
     <!DOCTYPE html>
@@ -464,8 +508,8 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
         <dl class="space-y-2 text-sm">
           <div class="flex justify-between"><dt class="font-medium">Total Properties Analyzed:</dt><dd class="font-semibold">${data.analyses.length}</dd></div>
           <div class="flex justify-between"><dt class="font-medium">Properties Meeting Criteria:</dt><dd class="font-semibold text-green-600">${data.analyses.filter(a => a.meetsCriteria).length}</dd></div>
-          <div class="flex justify-between"><dt class="font-medium">Average Cash Flow:</dt><dd class="font-semibold">${data.analyses.length > 0 ? formatCurrency(data.analyses.reduce((sum, a) => sum + (a.cashFlow || 0), 0) / data.analyses.length) : formatCurrency(0)}</dd></div>
-          <div class="flex justify-between"><dt class="font-medium">Average COC Return:</dt><dd class="font-semibold">${data.analyses.length > 0 ? formatPercent(data.analyses.reduce((sum, a) => sum + (a.cocReturn || 0), 0) / data.analyses.length) : formatPercent(0)}</dd></div>
+          <div class="flex justify-between"><dt class="font-medium">Average Cash Flow:</dt><dd class="font-semibold">${data.analyses.length > 0 ? formatCurrency(data.analyses.reduce((sum, a) => sum + recalculateCorrectedMetrics(a).cashFlow, 0) / data.analyses.length) : formatCurrency(0)}</dd></div>
+          <div class="flex justify-between"><dt class="font-medium">Average COC Return:</dt><dd class="font-semibold">${data.analyses.length > 0 ? formatPercent(data.analyses.reduce((sum, a) => sum + recalculateCorrectedMetrics(a).cocReturn, 0) / data.analyses.length) : formatPercent(0)}</dd></div>
         </dl>
       </div>
     </body>

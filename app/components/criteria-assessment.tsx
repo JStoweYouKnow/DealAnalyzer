@@ -23,6 +23,39 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
     return `${(value * 100).toFixed(1)}%`;
   };
 
+  // Calculate corrected cash flow and metrics to match other components
+  const analysisData = analysis as any;
+  const actualMortgagePayment = analysisData.monthlyMortgagePayment;
+  
+  const loanAmount = analysis.property.purchasePrice - analysis.calculatedDownpayment;
+  const monthlyInterestRate = 0.07 / 12;
+  const numberOfPayments = 30 * 12;
+  const calculatedMortgagePayment = loanAmount * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, numberOfPayments)) / (Math.pow(1 + monthlyInterestRate, numberOfPayments) - 1);
+  const mortgagePayment = actualMortgagePayment ?? calculatedMortgagePayment;
+  
+  const propertyTax = analysis.property.purchasePrice * 0.012 / 12;
+  const insurance = 100;
+  const vacancy = analysis.property.monthlyRent * 0.05;
+  const propertyManagement = analysis.property.monthlyRent * 0.10;
+  const utilities = (analysis.property as any).monthlyExpenses?.utilities || 0;
+  const cleaning = (analysis.property as any).monthlyExpenses?.cleaning || 0;
+  const supplies = (analysis.property as any).monthlyExpenses?.supplies || 0;
+  const other = (analysis.property as any).monthlyExpenses?.other || 0;
+  
+  const correctedTotalMonthlyExpenses = mortgagePayment + propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other;
+  const correctedCashFlow = analysis.property.monthlyRent - correctedTotalMonthlyExpenses;
+  const correctedCashFlowPositive = correctedCashFlow >= 0;
+  const correctedAnnualCashFlow = correctedCashFlow * 12;
+  const correctedCocReturn = analysis.totalCashNeeded > 0 ? correctedAnnualCashFlow / analysis.totalCashNeeded : 0;
+  const annualOperatingExpenses = (propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other) * 12;
+  const netOperatingIncome = (analysis.property.monthlyRent * 12) - annualOperatingExpenses;
+  const correctedCapRate = analysis.property.purchasePrice > 0 ? netOperatingIncome / analysis.property.purchasePrice : 0;
+  
+  const cocMeetsMinimum = correctedCocReturn >= (criteria?.coc_minimum_min ?? 0.08);
+  const cocMeetsBenchmark = correctedCocReturn >= (criteria?.coc_benchmark_min ?? 0.15);
+  const capMeetsMinimum = correctedCapRate >= (criteria?.cap_minimum ?? 0.05);
+  const capMeetsBenchmark = correctedCapRate >= (criteria?.cap_benchmark_min ?? 0.12);
+
   // Calculate 1% rule percentage
   const onePercentRule = (property.monthlyRent / property.purchasePrice) * 100;
 
@@ -41,8 +74,8 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
     },
     {
       name: "Positive Cash Flow",
-      status: analysis.cashFlowPositive,
-      value: `${formatCurrency(analysis.cashFlow)}/mo`,
+      status: correctedCashFlowPositive,
+      value: `${formatCurrency(correctedCashFlow)}/mo`,
       testId: "criterion-cash-flow"
     }
   ];
@@ -50,14 +83,14 @@ export function CriteriaAssessment({ analysis, criteria }: CriteriaAssessmentPro
   const improvementAreas = [
     {
       name: "COC Return",
-      status: analysis.cocMeetsBenchmark ? "benchmark" : analysis.cocMeetsMinimum ? "minimum" : "fail",
-      value: `${formatPercent(analysis.cocReturn)} (Min: ${formatPercent(criteria?.coc_minimum_min ?? 0.05)}-${formatPercent(criteria?.coc_minimum_max ?? 0.07)})`,
+      status: cocMeetsBenchmark ? "benchmark" : cocMeetsMinimum ? "minimum" : "fail",
+      value: `${formatPercent(correctedCocReturn)} (Min: ${formatPercent(criteria?.coc_minimum_min ?? 0.08)})`,
       testId: "improvement-coc"
     },
     {
       name: "Cap Rate", 
-      status: analysis.capMeetsBenchmark ? "benchmark" : analysis.capMeetsMinimum ? "minimum" : "fail",
-      value: `${formatPercent(analysis.capRate)} (Min: ${formatPercent(criteria?.cap_minimum ?? 0.04)})`,
+      status: capMeetsBenchmark ? "benchmark" : capMeetsMinimum ? "minimum" : "fail",
+      value: `${formatPercent(correctedCapRate)} (Min: ${formatPercent(criteria?.cap_minimum ?? 0.05)})`,
       testId: "improvement-cap"
     }
   ];
