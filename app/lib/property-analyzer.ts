@@ -147,6 +147,7 @@ export function analyzeProperty(
   let monthlyRent = strMetrics?.monthlyRent || propertyData.monthly_rent || propertyData.monthlyRent || 0;
   
   // Normalize occupancy rate from strMetrics (convert percentage to decimal if needed)
+  // PRIORITY: Always use user-provided strMetrics.occupancyRate if it exists
   let strOccupancyRate = strMetrics?.occupancyRate;
   if (strOccupancyRate !== undefined && strOccupancyRate > 1) {
     strOccupancyRate = strOccupancyRate / 100;
@@ -161,12 +162,19 @@ export function analyzeProperty(
   
   // Also use ADR and occupancy from propertyData if available
   const adr = strMetrics?.adr || propertyData.adr || 0;
-  // Use normalized strOccupancyRate if available, otherwise get from propertyData
-  let occupancyRate = strOccupancyRate !== undefined ? strOccupancyRate : (propertyData.occupancyRate || propertyData.occupancy_rate || 0);
-  
-  // Convert occupancy rate from percentage to decimal if needed (if from propertyData)
-  if (occupancyRate > 1) {
-    occupancyRate = occupancyRate / 100;
+  // PRIORITY: Use strMetrics.occupancyRate if provided (user input), otherwise fall back to propertyData
+  // Only use propertyData if strMetrics.occupancyRate is explicitly undefined (not provided)
+  let occupancyRate: number;
+  if (strMetrics?.occupancyRate !== undefined) {
+    // User provided occupancy rate - use it (already normalized above)
+    occupancyRate = strOccupancyRate!;
+  } else {
+    // No user input - use propertyData if available
+    occupancyRate = propertyData.occupancyRate || propertyData.occupancy_rate || 0;
+    // Convert occupancy rate from percentage to decimal if needed (if from propertyData)
+    if (occupancyRate > 1) {
+      occupancyRate = occupancyRate / 100;
+    }
   }
   
   if (adr > 0 && occupancyRate > 0 && (!monthlyRent || monthlyRent === 0)) {
@@ -389,7 +397,8 @@ export function analyzeProperty(
       description: propertyData.description,
       listingUrl: propertyData.listing_url || propertyData.listingUrl,
       adr: adr || strMetrics?.adr || propertyData.adr,
-      occupancyRate: occupancyRate || strMetrics?.occupancyRate || propertyData.occupancyRate || propertyData.occupancy_rate,
+      // Use the occupancyRate we calculated above (prioritizes user input from strMetrics)
+      occupancyRate: occupancyRate,
     },
     calculatedDownpayment,
     calculatedClosingCosts,

@@ -41,6 +41,7 @@ const safePublicRoutes = [
   '/api/mortgage-calculator',  // Mortgage calculator - utility endpoint, safe for public use
   '/api/analyze',              // Property analysis from text - rate limited, safe for public use
   '/api/analyze-file',         // Property analysis from file - rate limited, safe for public use
+  '/api/geocode',              // Geocoding service - rate limited, safe for public use
 ];
 
 // Development-only: additional routes that are public in dev but protected in production
