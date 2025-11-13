@@ -2,14 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { withRateLimit, expensiveRateLimit } from '../../lib/rate-limit';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization of OpenAI client to ensure env vars are loaded
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY is not configured');
+    }
+    openaiClient = new OpenAI({
+      apiKey,
+    });
+  }
+  return openaiClient;
+}
 
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
-    const { url } = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid request body. Expected JSON.' },
+        { status: 400 }
+      );
+    }
+    
+    const { url } = requestBody;
 
     if (!url) {
       return NextResponse.json(
@@ -50,6 +72,7 @@ export async function POST(request: NextRequest) {
     const truncatedHtml = html.substring(0, 100000);
 
     // Use OpenAI to extract property information
+    const openai = getOpenAIClient();
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [

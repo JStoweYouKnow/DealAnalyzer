@@ -123,7 +123,21 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
         body: JSON.stringify({ url: propertyUrl.trim() }),
       });
 
-      const data = await response.json();
+      // Check if response has content before parsing
+      const contentType = response.headers.get('content-type');
+      const text = await response.text();
+      
+      if (!text || text.trim() === '') {
+        throw new Error('Empty response from server. Please try again.');
+      }
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', text);
+        throw new Error(`Invalid response from server: ${response.statusText || 'Unknown error'}`);
+      }
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to extract property data');
