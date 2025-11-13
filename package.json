@@ -83,6 +83,7 @@
     "@xmldom/xmldom": "^0.8.11",
     "async": "^3.2.6",
     "autoprefixer": "^10.4.20",
+    "axios": "^1.13.2",
     "caniuse-lite": "^1.0.30001751",
     "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.1",

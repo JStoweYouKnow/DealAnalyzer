@@ -19,7 +19,7 @@ const nextConfig = {
     // Optimize package imports
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
-  serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium-min"],
+  serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium-min", "axios"],
   // Ensure chromium-min package files (including brotli files) are included only for routes that use puppeteer
   outputFileTracingIncludes: {
     '/api/generate-report/**/*': [
