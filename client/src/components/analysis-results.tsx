@@ -4,7 +4,6 @@ import { STRMetrics } from "./str-metrics";
 import { CriteriaAssessment } from "./criteria-assessment";
 import { AIInsights } from "./ai-insights";
 import { InteractiveCharts } from "./interactive-charts";
-import { AIPhotoScoring } from "./ai-photo-scoring";
 import { MapIntegration } from "./map-integration";
 import { ConfettiCelebration } from "./confetti-celebration";
 import { Button } from "@/components/ui/button";
@@ -50,11 +49,6 @@ export function AnalysisResults({ analysis, criteria, onAnalysisUpdate, onAddToC
         analysis={analysis} 
         criteria={criteria}
         comparisonAnalyses={comparisonAnalyses}
-      />
-      <AIPhotoScoring 
-        key={`photos-${analysis.propertyId}-${analysis.analysisDate}`}
-        property={analysis.property}
-        existingPhotos={analysis.property.imageUrls}
       />
       <MapIntegration 
         key={`map-${analysis.propertyId}-${analysis.analysisDate}`}
