@@ -124,6 +124,7 @@ export function LeafletMap({
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(() => Date.now());
   const [isContainerReady, setIsContainerReady] = useState(false);
+  const [isLeafletReady, setIsLeafletReady] = useState(false);
   const prevPrimaryIdRef = useRef<string | undefined>(undefined);
 
   const safeCenter = sanitizeLatLng(mapCenter.lat, mapCenter.lng);
@@ -368,21 +369,31 @@ export function LeafletMap({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsMounted(true);
-      
+
       // Fix Leaflet icons after mount
       import('leaflet').then((L) => {
         try {
+          // Clear any existing icon configuration
           delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+          // Set up default icon URLs
           L.Icon.Default.mergeOptions({
-            iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
           });
+
+          console.log('LeafletMap: Icon configuration set successfully');
+          setIsLeafletReady(true);
         } catch (err) {
           console.warn('Failed to fix Leaflet icons:', err);
+          // Still mark as ready to allow map to render
+          setIsLeafletReady(true);
         }
       }).catch(err => {
         console.warn('Failed to load Leaflet for icon fix:', err);
+        // Still mark as ready to allow map to render
+        setIsLeafletReady(true);
       });
       
       // Fallback: Force container ready after a timeout to ensure map always initializes
@@ -433,19 +444,19 @@ export function LeafletMap({
     };
   }, []);
 
-  // Don't render until mounted (prevents SSR/hydration errors)
-  if (!isMounted || typeof window === 'undefined') {
+  // Don't render until mounted and Leaflet is ready (prevents SSR/hydration errors and icon errors)
+  if (!isMounted || !isLeafletReady || typeof window === 'undefined') {
     return <div className="w-full h-96 bg-gray-100 flex items-center justify-center rounded-lg">Loading map...</div>;
   }
 
   // Final safety check before rendering
-  // Render if mounted and container is ready (or will be ready soon)
+  // Render if mounted, Leaflet is ready, and container is ready (or will be ready soon)
   // We'll do a final check inside the render to prevent double initialization
   const container = containerRef.current;
   const hasLeafletInstance = container && (container as any)._leaflet_id;
-  // Simplified: render if mounted and we have a container (isContainerReady will be set by ref callback)
+  // Simplified: render if mounted, Leaflet ready, and we have a container (isContainerReady will be set by ref callback)
   // If container is ready OR we have a container ref, allow rendering
-  const shouldRenderMap = isMounted && (isContainerReady || container) && !hasLeafletInstance;
+  const shouldRenderMap = isMounted && isLeafletReady && (isContainerReady || container) && !hasLeafletInstance;
 
   // Render the map - use key on wrapper to force complete DOM recreation
   // This avoids the "Map container is already initialized" error
@@ -591,23 +602,67 @@ export function LeafletMap({
                   })}
 
                   {/* POI Markers */}
-                  {displayedPointsOfInterest.map((poi) => (
-                    <Marker
-                      key={poi.id}
-                      position={[poi.lat, poi.lng]}
-                    >
-                      <Popup>
-                        <div className="p-2">
-                          <h3 className="font-medium text-sm">{poi.name}</h3>
-                          <p className="text-xs text-gray-600 capitalize">{poi.type}</p>
-                          <p className="text-sm"><strong>Distance:</strong> {poi.distance} miles</p>
-                          {poi.rating && (
-                            <p className="text-sm"><strong>Rating:</strong> {poi.rating}/5 ⭐</p>
-                          )}
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ))}
+                  {displayedPointsOfInterest.map((poi) => {
+                    // Create custom icons for POIs using divIcon for better reliability
+                    let poiIcon: any = null;
+
+                    if (typeof window !== 'undefined') {
+                      const L = (window as any).L;
+                      if (L) {
+                        // Use emoji-based divIcon for POIs
+                        const emojiMap: Record<string, string> = {
+                          'school': '🏫',
+                          'shopping': '🛒',
+                          'transport': '🚇',
+                          'hospital': '🏥',
+                          'park': '🌳'
+                        };
+
+                        poiIcon = L.divIcon({
+                          className: 'custom-poi-marker',
+                          html: `<div style="
+                            background-color: #3b82f6;
+                            width: 28px;
+                            height: 28px;
+                            border-radius: 50% 50% 50% 0;
+                            transform: rotate(-45deg);
+                            border: 2px solid #ffffff;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                            position: relative;
+                          ">
+                            <div style="
+                              transform: rotate(45deg);
+                              font-size: 16px;
+                              line-height: 28px;
+                              text-align: center;
+                            ">${emojiMap[poi.type] || '📍'}</div>
+                          </div>`,
+                          iconSize: [28, 28],
+                          iconAnchor: [14, 14],
+                          popupAnchor: [0, -14]
+                        });
+                      }
+                    }
+
+                    return (
+                      <Marker
+                        key={poi.id}
+                        position={[poi.lat, poi.lng]}
+                        icon={poiIcon || undefined}
+                      >
+                        <Popup>
+                          <div className="p-2">
+                            <h3 className="font-medium text-sm">{poi.name}</h3>
+                            <p className="text-xs text-gray-600 capitalize">{poi.type}</p>
+                            <p className="text-sm"><strong>Distance:</strong> {poi.distance} miles</p>
+                            {poi.rating && (
+                              <p className="text-sm"><strong>Rating:</strong> {poi.rating}/5 ⭐</p>
+                            )}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    );
+                  })}
                 </MapContainer>
               );
             })()}
