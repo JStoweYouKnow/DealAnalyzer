@@ -179,7 +179,17 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
       
       // Add primary property
       if (analysis?.property.address) {
-        const currentAddress = analysis.property.address;
+        // Construct full address with city and state for better geocoding accuracy
+        let fullAddress = analysis.property.address;
+        if (analysis.property.city || analysis.property.state) {
+          const parts = [analysis.property.address];
+          if (analysis.property.city) parts.push(analysis.property.city);
+          if (analysis.property.state) parts.push(analysis.property.state);
+          if (analysis.property.zipCode) parts.push(analysis.property.zipCode);
+          fullAddress = parts.join(', ');
+        }
+        
+        const currentAddress = fullAddress;
         const isNewAnalysis = prevAnalysisAddressRef.current !== currentAddress;
         
         // If this is a new analysis (new document uploaded), reset manual search flag and always center
@@ -188,6 +198,13 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
           setHasManualSearch(false);
           prevAnalysisAddressRef.current = currentAddress;
         }
+        
+        console.log('[Map Init] Geocoding address:', { 
+          original: analysis.property.address, 
+          full: fullAddress,
+          city: analysis.property.city,
+          state: analysis.property.state 
+        });
         
         const coords = await geocodeAddress(currentAddress);
         if (coords) {

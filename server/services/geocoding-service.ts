@@ -8,6 +8,7 @@ interface GeocodeResult {
 
 export class GeocodingService {
   private fallbackCoordinates: { [key: string]: GeocodeResult } = {
+        'borrego springs': { lat: 33.2559, lng: -116.3750, formatted_address: 'Borrego Springs, CA, USA' },
         'lake isabella': { lat: 35.6383, lng: -118.4845, formatted_address: 'Lake Isabella, CA, USA' },
         'austin': { lat: 30.2672, lng: -97.7431, formatted_address: 'Austin, TX, USA' },
         'dallas': { lat: 32.7767, lng: -96.7970, formatted_address: 'Dallas, TX, USA' },
@@ -109,8 +110,9 @@ export class GeocodingService {
   private async geocodeWithNominatim(address: string): Promise<GeocodeResult | null> {
     try {
       // Use Nominatim geocoding service (OpenStreetMap)
+      // Increase limit to get multiple results and filter for best match
       const encodedAddress = encodeURIComponent(address);
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&addressdetails=1&countrycodes=us`;
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=5&addressdetails=1&countrycodes=us`;
 
       console.log(`[Nominatim] Requesting: ${url}`);
 
@@ -134,7 +136,14 @@ export class GeocodingService {
         return null;
       }
 
+      // If multiple results, prefer results that match the address components better
+      // For now, use the first result but log all options
       const result = data[0];
+      
+      if (data.length > 1) {
+        console.log(`[Nominatim] Multiple results found (${data.length}), using first: ${result.display_name}`);
+        console.log(`[Nominatim] All results:`, data.map((r: any) => r.display_name));
+      }
 
       console.log(`[Nominatim] Found result: ${result.display_name} at (${result.lat}, ${result.lon})`);
 

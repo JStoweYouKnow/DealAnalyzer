@@ -101,10 +101,10 @@ export async function POST(request: NextRequest) {
 
 Return ONLY a valid JSON object with these fields (use null for missing values):
 {
-  "address": "full street address",
-  "city": "city name",
-  "state": "state abbreviation (2 letters)",
-  "zipCode": "zip code",
+  "address": "full street address (e.g., '1725 Lazy Dr')",
+  "city": "city name (REQUIRED - extract from listing, e.g., 'Borrego Springs')",
+  "state": "state abbreviation (2 letters, REQUIRED - extract from listing, e.g., 'CA' for California)",
+  "zipCode": "zip code (if available)",
   "purchasePrice": number (REQUIRED - extract sale price, asking price, list price, or price - look for labels like "Price", "List Price", "Sale Price", "Asking Price", "$XXX,XXX"),
   "bedrooms": number,
   "bathrooms": number,
