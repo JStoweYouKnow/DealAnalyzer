@@ -11,7 +11,7 @@ import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
 
 const navItems = [
   { path: "/", icon: HomeIcon, label: "Analyzer", testId: "nav-home" },
-  { path: "/deals", icon: Mail, label: "Deals", testId: "nav-deals" },
+  { path: "/deals", icon: Mail, label: "Email Deal Finder", testId: "nav-deals" },
   { path: "/market", icon: TrendingUp, label: "Market Intelligence", testId: "nav-market" },
   { path: "/search", icon: Search, label: "Advanced Search", testId: "nav-search" },
 ];

@@ -16,10 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TrendingUp, TrendingDown, Home, MapPin, Calendar, X } from "lucide-react";
+import { TrendingUp, TrendingDown, Home, MapPin, Calendar, X, DollarSign } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useRouter } from "next/navigation";
 import { InfoTooltip } from "@/components/info-tooltip";
+import type { DealAnalysis } from "@shared/schema";
 
 type MarketStats = {
   totalProperties?: number;
@@ -191,7 +192,7 @@ export function MarketIntelligence() {
       const params = new URLSearchParams();
       return fetchTrends(params);
     },
-    enabled: selectedZipCodes.length === 0,
+    enabled: false, // Disabled by default - only fetch when ZIP codes are entered
   });
 
   const comparisonQueries = useQueries({
@@ -203,6 +204,16 @@ export function MarketIntelligence() {
         return fetchTrends(params);
       },
     })),
+  });
+
+  // Fetch analysis history for property cards
+  const { data: analysisHistory = [], isLoading: historyLoading } = useQuery<DealAnalysis[]>({
+    queryKey: ['/api/history'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/history');
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    },
   });
 
   const isComparing = selectedZipCodes.length > 0;
@@ -449,7 +460,15 @@ export function MarketIntelligence() {
           </div>
         </div>
 
-        {trendsLoading ? (
+        {selectedZipCodes.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-12 text-center">
+            <MapPin className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
+            <p className="text-lg font-medium text-muted-foreground mb-2">No ZIP Codes Selected</p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Enter one or more ZIP codes above to explore live market intelligence, neighborhood trends, and property insights for those specific areas.
+            </p>
+          </div>
+        ) : trendsLoading ? (
           <div className="text-center py-8">Loading neighborhood trends...</div>
         ) : trendsError ? (
           <div className="text-center py-8 text-red-600">
@@ -664,9 +683,40 @@ export function MarketIntelligence() {
                       </section>
                     )}
 
-                    {detailView === "properties" ? (
-                      <section className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-                        We couldn’t find live sample properties for this area yet. Try another ZIP code or check back soon.
+                    {detailView === "properties" && trend.sampleProperties && trend.sampleProperties.length > 0 ? (
+                      <section className="space-y-3">
+                        <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                          Sample Properties from This Area
+                        </h4>
+                        <div className="space-y-2">
+                          {trend.sampleProperties.slice(0, 3).map((property, propIndex) => (
+                            <div
+                              key={`${cardKey}-property-${propIndex}`}
+                              className="rounded-lg border border-border bg-muted/20 p-3 hover:bg-muted/40 cursor-pointer transition-colors"
+                              onClick={() => handlePropertySelect(trend, property)}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <p className="text-sm font-semibold">{property.address || 'Address unavailable'}</p>
+                                {property.lastSalePrice && (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    {formatCurrencyOptional(property.lastSalePrice)}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                                {property.beds !== undefined && (
+                                  <div><span className="font-medium">{property.beds}</span> beds</div>
+                                )}
+                                {property.baths !== undefined && (
+                                  <div><span className="font-medium">{property.baths}</span> baths</div>
+                                )}
+                                {property.buildingSize !== undefined && (
+                                  <div><span className="font-medium">{Math.round(property.buildingSize).toLocaleString()}</span> sqft</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </section>
                     ) : null}
 
@@ -746,6 +796,146 @@ export function MarketIntelligence() {
                 </Card>
               );
             })}
+          </div>
+        )}
+      </section>
+
+      {/* Property Cards from Past Searches */}
+      <section className="space-y-4 border-t pt-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Property Cards from Past Searches</h2>
+            <p className="text-sm text-muted-foreground">
+              Properties you've analyzed previously. Click on any card to view details and compare.
+            </p>
+          </div>
+        </div>
+
+        {historyLoading ? (
+          <div className="text-center py-8">Loading property history...</div>
+        ) : analysisHistory.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-8 text-center">
+            <Home className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
+            <p className="text-sm font-medium text-muted-foreground mb-1">No properties analyzed yet</p>
+            <p className="text-xs text-muted-foreground">
+              Upload and analyze property documents to see them here
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {analysisHistory.map((analysis) => (
+              <Card
+                key={analysis.id}
+                className="hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => {
+                  // Navigate to the analysis or open comparison dialog
+                  router.push(`/?analysisId=${analysis.id}`);
+                }}
+                data-testid={`property-card-${analysis.id}`}
+              >
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center justify-between gap-2">
+                    <span className="text-base truncate">
+                      {analysis.property.address || 'Address unavailable'}
+                    </span>
+                    <Badge
+                      className={
+                        analysis.meetsCriteria
+                          ? 'bg-green-100 text-green-800 border-green-200'
+                          : 'bg-red-100 text-red-800 border-red-200'
+                      }
+                    >
+                      {analysis.meetsCriteria ? '✓' : '✗'}
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {[analysis.property.city, analysis.property.state, analysis.property.zipCode]
+                      .filter(Boolean)
+                      .join(', ') || 'Location unavailable'}
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Purchase Price</p>
+                      <p className="font-semibold flex items-center gap-1">
+                        <DollarSign className="w-3 h-3" />
+                        {formatCurrencyOptional(analysis.property.purchasePrice)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Cash Flow</p>
+                      <p
+                        className={`font-semibold ${
+                          analysis.cashFlow > 0 ? 'text-green-600' : 'text-red-600'
+                        }`}
+                      >
+                        {formatCurrencyOptional(analysis.cashFlow)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="text-center p-2 rounded bg-muted/30">
+                      <p className="font-medium text-sm">
+                        {analysis.cocReturn !== undefined
+                          ? `${(analysis.cocReturn * 100).toFixed(1)}%`
+                          : 'N/A'}
+                      </p>
+                      <p className="text-muted-foreground">COC</p>
+                    </div>
+                    <div className="text-center p-2 rounded bg-muted/30">
+                      <p className="font-medium text-sm">
+                        {analysis.capRate !== undefined
+                          ? `${(analysis.capRate * 100).toFixed(1)}%`
+                          : 'N/A'}
+                      </p>
+                      <p className="text-muted-foreground">Cap Rate</p>
+                    </div>
+                    <div className="text-center p-2 rounded bg-muted/30">
+                      <p className="font-medium text-sm">
+                        {analysis.roi !== undefined
+                          ? `${(analysis.roi * 100).toFixed(1)}%`
+                          : 'N/A'}
+                      </p>
+                      <p className="text-muted-foreground">ROI</p>
+                    </div>
+                  </div>
+
+                  {analysis.property.beds !== undefined ||
+                  analysis.property.baths !== undefined ||
+                  analysis.property.squareFeet !== undefined ? (
+                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+                      {analysis.property.beds !== undefined && (
+                        <div>
+                          <span className="font-medium">{analysis.property.beds}</span> beds
+                        </div>
+                      )}
+                      {analysis.property.baths !== undefined && (
+                        <div>
+                          <span className="font-medium">{analysis.property.baths}</span> baths
+                        </div>
+                      )}
+                      {analysis.property.squareFeet !== undefined && (
+                        <div>
+                          <span className="font-medium">
+                            {Math.round(analysis.property.squareFeet).toLocaleString()}
+                          </span>{' '}
+                          sqft
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {analysis.analysisDate && (
+                    <div className="text-xs text-muted-foreground pt-2 border-t">
+                      Analyzed {formatDateOptional(analysis.analysisDate)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </section>
