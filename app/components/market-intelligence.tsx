@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueries } from "@tanstack/react-query";
+import { useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TrendingUp, TrendingDown, Home, MapPin, Calendar, X, DollarSign } from "lucide-react";
+import { TrendingUp, TrendingDown, Home, MapPin, Calendar, X, DollarSign, AlertCircle, RefreshCw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useRouter } from "next/navigation";
 import { InfoTooltip } from "@/components/info-tooltip";
+import { useToast } from "@/hooks/use-toast";
 import type { DealAnalysis } from "@shared/schema";
 
 type MarketStats = {
@@ -150,6 +151,8 @@ export function MarketIntelligence() {
   const [selectedProperty, setSelectedProperty] = useState<{ property: SampleProperty; trend: MarketTrend } | null>(null);
   const [isPropertyDialogOpen, setIsPropertyDialogOpen] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const MAX_COMPARISON_ZIPS = 4;
   const isZipValid = zipInput.trim().length === 5;
@@ -207,12 +210,18 @@ export function MarketIntelligence() {
   });
 
   // Fetch analysis history for property cards
-  const { data: analysisHistory = [], isLoading: historyLoading } = useQuery<DealAnalysis[]>({
+  const { data: analysisHistory = [], isLoading: historyLoading, isError: historyError, error: historyErrorObj } = useQuery<DealAnalysis[]>({
     queryKey: ['/api/history'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/history');
-      const data = await response.json();
-      return Array.isArray(data) ? data : [];
+      try {
+        const response = await apiRequest('GET', '/api/history');
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      } catch (err) {
+        // Optional logging
+        console.error('Failed to fetch analysis history:', err);
+        throw err; // Re-throw to let React Query handle the error state
+      }
     },
   });
 
@@ -813,6 +822,27 @@ export function MarketIntelligence() {
 
         {historyLoading ? (
           <div className="text-center py-8">Loading property history...</div>
+        ) : historyError && !historyLoading ? (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-3 text-destructive" />
+            <p className="text-sm font-medium text-foreground mb-2">Failed to load property history</p>
+            {historyErrorObj && historyErrorObj instanceof Error && (
+              <p className="text-xs text-muted-foreground mb-4">
+                {historyErrorObj.message || 'An error occurred while fetching your analysis history.'}
+              </p>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['/api/history'] });
+              }}
+              className="mt-2"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          </div>
         ) : analysisHistory.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border bg-muted/20 p-8 text-center">
             <Home className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
@@ -895,32 +925,32 @@ export function MarketIntelligence() {
                     </div>
                     <div className="text-center p-2 rounded bg-muted/30">
                       <p className="font-medium text-sm">
-                        {analysis.roi !== undefined
-                          ? `${(analysis.roi * 100).toFixed(1)}%`
+                        {analysis.cocReturn !== undefined
+                          ? `${(analysis.cocReturn * 100).toFixed(1)}%`
                           : 'N/A'}
                       </p>
                       <p className="text-muted-foreground">ROI</p>
                     </div>
                   </div>
 
-                  {analysis.property.beds !== undefined ||
-                  analysis.property.baths !== undefined ||
-                  analysis.property.squareFeet !== undefined ? (
+                  {analysis.property.bedrooms !== undefined ||
+                  analysis.property.bathrooms !== undefined ||
+                  analysis.property.squareFootage !== undefined ? (
                     <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-                      {analysis.property.beds !== undefined && (
+                      {analysis.property.bedrooms !== undefined && (
                         <div>
-                          <span className="font-medium">{analysis.property.beds}</span> beds
+                          <span className="font-medium">{analysis.property.bedrooms}</span> beds
                         </div>
                       )}
-                      {analysis.property.baths !== undefined && (
+                      {analysis.property.bathrooms !== undefined && (
                         <div>
-                          <span className="font-medium">{analysis.property.baths}</span> baths
+                          <span className="font-medium">{analysis.property.bathrooms}</span> baths
                         </div>
                       )}
-                      {analysis.property.squareFeet !== undefined && (
+                      {analysis.property.squareFootage !== undefined && (
                         <div>
                           <span className="font-medium">
-                            {Math.round(analysis.property.squareFeet).toLocaleString()}
+                            {Math.round(analysis.property.squareFootage).toLocaleString()}
                           </span>{' '}
                           sqft
                         </div>
