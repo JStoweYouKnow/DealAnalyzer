@@ -97,15 +97,29 @@ function MapInstanceHandler({
           }
           try {
             const existingMap = (container as any)._leaflet;
-            if (existingMap && existingMap.remove && existingMap !== map) {
-              existingMap.remove();
+            if (existingMap && existingMap !== map) {
+              // Check if map is still valid before trying to remove
+              const containerEl = existingMap.getContainer && existingMap.getContainer();
+              if (containerEl && containerEl === container) {
+                try {
+                  if (typeof existingMap.remove === 'function') {
+                    existingMap.remove();
+                  }
+                } catch (removeErr) {
+                  // Map might already be removed, just clear references
+                  logger.debug('LeafletMap: Map already removed during handler cleanup');
+                }
+              }
             }
-            // Clear old references
+            // Always clear old references even if removal fails
             delete (container as any)._leaflet_id;
             delete (container as any)._leaflet;
           } catch (err) {
             // Only log errors, not warnings for expected cleanup scenarios
             logger.error('LeafletMap: Error cleaning up existing instance:', err);
+            // Still clear references on error
+            delete (container as any)._leaflet_id;
+            delete (container as any)._leaflet;
           }
         }
       }
@@ -552,21 +566,31 @@ export function LeafletMap({
                   const L = (window as any).L;
                   if (L) {
                     const existingMap = (container as any)._leaflet;
-                    if (existingMap && typeof existingMap.remove === 'function') {
-                      try {
-                        existingMap.remove();
-                      } catch (removeErr) {
-                        // Ignore errors during removal - container might already be cleaned up
-                        logger.debug('LeafletMap: Error during map removal in render (expected):', removeErr);
+                    if (existingMap) {
+                      // Check if map is still valid before trying to remove
+                      const containerEl = existingMap.getContainer && existingMap.getContainer();
+                      if (containerEl && containerEl === container) {
+                        try {
+                          if (typeof existingMap.remove === 'function') {
+                            existingMap.remove();
+                          }
+                        } catch (removeErr) {
+                          // Map might already be removed, just clear references
+                          logger.debug('LeafletMap: Map already removed during render cleanup');
+                        }
                       }
                     }
                   }
+                  // Always clear references
                   delete (container as any)._leaflet_id;
                   delete (container as any)._leaflet;
                   // Force remount on next render
                   setTimeout(() => setMapKey(Date.now()), 0);
                 } catch (err) {
                   logger.error('LeafletMap: Error cleaning up during render:', err);
+                  // Still clear references on error
+                  delete (container as any)._leaflet_id;
+                  delete (container as any)._leaflet;
                 }
                 return null;
               }
@@ -600,14 +624,14 @@ export function LeafletMap({
 
                   {/* Property Markers */}
                   {validProperties.map((property) => {
-                    // Create custom green icon for primary property
+                    // Always create explicit icons - never rely on default icon
                     const isPrimary = property.type === 'primary';
                     let customIcon: any = null;
 
                     const L = (window as any).L;
-                    if (L) {
+                    if (L && L.divIcon) {
                       if (isPrimary) {
-                        // Create green marker icon for primary property using divIcon for better reliability
+                        // Create green marker icon for primary property using divIcon
                         customIcon = L.divIcon({
                           className: 'custom-green-marker',
                           html: `<div style="
@@ -634,30 +658,29 @@ export function LeafletMap({
                           popupAnchor: [0, -15]
                         });
                       } else {
-                        // For non-primary markers, ensure we have a valid default icon
-                        // Only use default icon if Icon.Default is properly initialized
-                        if (L.Icon && L.Icon.Default && L.Icon.Default.prototype.createIcon) {
-                          // Default icon will be used automatically
-                          customIcon = undefined;
-                        } else {
-                          // Fallback to divIcon if default icon isn't ready
-                          customIcon = L.divIcon({
-                            className: 'leaflet-marker-icon',
-                            html: `<div style="
-                              background-color: #3388ff;
-                              width: 25px;
-                              height: 25px;
-                              border-radius: 50% 50% 50% 0;
-                              transform: rotate(-45deg);
-                              border: 2px solid #ffffff;
-                              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                            "></div>`,
-                            iconSize: [25, 25],
-                            iconAnchor: [12, 12],
-                            popupAnchor: [0, -12]
-                          });
-                        }
+                        // Always use divIcon for non-primary markers to avoid default icon issues
+                        const color = property.type === 'comparison' ? '#f59e0b' : '#3b82f6';
+                        customIcon = L.divIcon({
+                          className: 'custom-marker',
+                          html: `<div style="
+                            background-color: ${color};
+                            width: 25px;
+                            height: 25px;
+                            border-radius: 50% 50% 50% 0;
+                            transform: rotate(-45deg);
+                            border: 2px solid #ffffff;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                          "></div>`,
+                          iconSize: [25, 25],
+                          iconAnchor: [12, 12],
+                          popupAnchor: [0, -12]
+                        });
                       }
+                    }
+                    
+                    // Don't render marker if icon creation failed
+                    if (!customIcon) {
+                      return null;
                     }
                     
                     return (
