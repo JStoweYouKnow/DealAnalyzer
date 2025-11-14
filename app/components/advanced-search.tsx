@@ -348,28 +348,66 @@ export function AdvancedSearch() {
     setIsExporting(true);
 
     try {
-      const response = await fetch('/api/generate-report', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          analysisIds: [selectedDeal.analysis.id],
-          format,
-          title: `${selectedDeal.extractedProperty?.address || 'Property'} Analysis Report`,
-          includeComparison: false
-        }),
+      const response = await apiRequest('POST', '/api/generate-report', {
+        analysisIds: [selectedDeal.analysis.id],
+        format,
+        title: `${selectedDeal.extractedProperty?.address || 'Property'} Analysis Report`,
+        includeComparison: false
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
       // Get the filename from the response headers
       const contentDisposition = response.headers.get('Content-Disposition');
-      const filename = contentDisposition
-        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
-        : `report.${format}`;
+      
+      // Robust filename extraction with RFC5987 support
+      let filename = `report.${format}`; // Safe fallback
+      
+      if (contentDisposition) {
+        // Split header by semicolons to parse parameters
+        const parts = contentDisposition.split(';').map(p => p.trim());
+        
+        // Parse parameters into key/value pairs
+        const params: Record<string, string> = {};
+        for (const part of parts) {
+          const match = part.match(/^([^=]+)=(.*)$/);
+          if (match) {
+            const key = match[1].trim().toLowerCase();
+            let value = match[2].trim();
+            params[key] = value;
+          }
+        }
+        
+        // Prefer filename* (RFC5987) over filename
+        if (params['filename*']) {
+          // RFC5987 format: filename*=charset'lang'encoded-value
+          // Example: filename*=UTF-8''encoded-name or filename*=UTF-8'en'encoded-name
+          const filenameStar = params['filename*'];
+          const match = filenameStar.match(/^[^']*'[^']*'(.*)$/);
+          if (match) {
+            try {
+              // Decode percent-encoding
+              filename = decodeURIComponent(match[1]);
+              // Strip surrounding quotes if present
+              filename = filename.replace(/^["']|["']$/g, '').trim();
+            } catch (e) {
+              // If decoding fails, try to use the raw value
+              filename = match[1].replace(/^["']|["']$/g, '').trim();
+            }
+          } else {
+            // Fallback: try to use the value as-is if it doesn't match the pattern
+            filename = filenameStar.replace(/^["']|["']$/g, '').trim();
+          }
+        } else if (params['filename']) {
+          // Fallback to regular filename parameter
+          filename = params['filename'];
+          // Strip surrounding quotes
+          filename = filename.replace(/^["']|["']$/g, '').trim();
+        }
+        
+        // Final safety check: ensure we have a valid filename
+        if (!filename || filename.length === 0) {
+          filename = `report.${format}`;
+        }
+      }
 
       // Create blob and download
       const blob = await response.blob();
@@ -388,9 +426,19 @@ export function AdvancedSearch() {
       });
     } catch (error) {
       console.error('Error generating report:', error);
+      // Extract safe error message, avoiding sensitive data exposure
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'string' 
+        ? error 
+        : String(error);
+      // Truncate to reasonable length for toast display
+      const truncatedMessage = errorMessage.length > 150 
+        ? errorMessage.substring(0, 150) + '...' 
+        : errorMessage;
       toast({
         title: "Export Failed",
-        description: "Failed to generate report. Please try again.",
+        description: `Failed to generate report. ${truncatedMessage}`,
         variant: "destructive",
       });
     } finally {
