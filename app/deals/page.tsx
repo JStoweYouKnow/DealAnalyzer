@@ -16,6 +16,7 @@ import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
 import type { EmailDeal, EmailMonitoringResponse, AnalyzePropertyResponse, FundingSource } from "@shared/schema";
 import { EmailForwardingSetup } from "@/components/email-forwarding-setup";
 import { InfoTooltip } from "@/components/info-tooltip";
+import { AdvancedSearch } from "@/components/advanced-search";
 
 interface MortgageValues {
   loanAmount: number;
@@ -988,6 +989,9 @@ export default function DealsPage() {
           </div>
         </CardHeader>
       </Card>
+
+      {/* Advanced Search Section */}
+      <AdvancedSearch />
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

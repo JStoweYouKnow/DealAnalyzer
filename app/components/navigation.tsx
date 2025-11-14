@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Home as HomeIcon, Mail, TrendingUp, Search } from "lucide-react";
+import { Home as HomeIcon, Mail, TrendingUp, User } from "lucide-react";
 import Image from "next/image";
 import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
 // Authentication disabled
@@ -13,7 +13,7 @@ const navItems = [
   { path: "/", icon: HomeIcon, label: "Analyzer", testId: "nav-home" },
   { path: "/deals", icon: Mail, label: "Email Deal Finder", testId: "nav-deals" },
   { path: "/market", icon: TrendingUp, label: "Market Intelligence", testId: "nav-market" },
-  { path: "/search", icon: Search, label: "Advanced Search", testId: "nav-search" },
+  { path: "/account", icon: User, label: "My Account", testId: "nav-account" },
 ];
 
 export function Navigation() {
