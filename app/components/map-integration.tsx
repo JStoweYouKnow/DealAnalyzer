@@ -62,6 +62,22 @@ interface PointOfInterest {
   rating?: number;
 }
 
+// Helper function to generate unique IDs with collision-resistant strategy
+// Uses crypto.randomUUID() where available, falls back to Date.now() + Math.random() + counter
+let idCounter = 0;
+function generateUniqueId(): string {
+  // Prefer crypto.randomUUID() if available (modern browsers)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `temp-${crypto.randomUUID()}`;
+  }
+  
+  // Fallback: combine Date.now(), Math.random(), and incrementing counter
+  // This ensures uniqueness even when multiple IDs are generated in the same millisecond
+  idCounter = (idCounter + 1) % 1000000; // Reset counter periodically to prevent overflow
+  const random = Math.random().toString(36).substring(2, 11); // 9 random chars
+  return `temp-${Date.now()}-${random}-${idCounter}`;
+}
+
 export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegrationProps) {
   const [mapCenter, setMapCenter] = useState({ lat: 39.8283, lng: -98.5795 }); // Center of US
   const [zoomLevel, setZoomLevel] = useState(10);
@@ -216,7 +232,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
         const coords = await geocodeAddress(currentAddress);
         if (coords) {
           properties.push({
-            id: analysis.propertyId || `temp-${Date.now()}`,
+            id: analysis.propertyId || generateUniqueId(),
             lat: coords.lat,
             lng: coords.lng,
             address: currentAddress,
@@ -252,7 +268,7 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
           const coords = await geocodeAddress(comp.property.address);
           if (coords) {
             return {
-              id: comp.propertyId || `temp-${Date.now()}`,
+              id: comp.propertyId || generateUniqueId(),
               lat: coords.lat,
               lng: coords.lng,
               address: comp.property.address,

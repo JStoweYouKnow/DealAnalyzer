@@ -18,6 +18,24 @@ interface AnalysisResultsProps {
   comparisonAnalyses?: DealAnalysis[];
 }
 
+// Module-scoped incremental counter for UUID fallback
+let uuidFallbackCounter = 0;
+
+/**
+ * Generates a unique identifier using crypto.randomUUID() when available,
+ * otherwise falls back to timestamp + incremental counter
+ */
+function generateUniqueId(): string {
+  // Prefer crypto.randomUUID() when available
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // Fallback: timestamp + incremental counter
+  uuidFallbackCounter += 1;
+  return `${Date.now()}-${uuidFallbackCounter}`;
+}
+
 export function AnalysisResults({ analysis, criteria, onAnalysisUpdate, onAddToComparison, isInComparison, comparisonAnalyses = [] }: AnalysisResultsProps) {
   // Safety check - ensure analysis and property exist
   if (!analysis || !analysis.property) {
@@ -29,7 +47,7 @@ export function AnalysisResults({ analysis, criteria, onAnalysisUpdate, onAddToC
   }
 
   // Generate unique keys with fallbacks
-  const propertyId = analysis.propertyId || `temp-${Date.now()}`;
+  const propertyId = analysis.propertyId || `temp-${generateUniqueId()}`;
   const analysisDate = analysis.analysisDate || new Date().toISOString();
   const uniqueKey = `${propertyId}-${analysisDate}`;
 
