@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Filter, Save, Trash2, Copy, Mail, MapPin, Home, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle } from "lucide-react";
+import { Search, Filter, Save, Trash2, Copy, Mail, MapPin, Home, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { EmailDeal, SavedFilter } from "@shared/schema";
@@ -45,6 +45,7 @@ export function AdvancedSearch() {
   const [searchText, setSearchText] = useState("");
   const [selectedDeal, setSelectedDeal] = useState<EmailDeal | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -331,6 +332,69 @@ export function AdvancedSearch() {
   const handleRunAnalysis = () => {
     if (selectedDeal) {
       analyzeDealMutation.mutate(selectedDeal);
+    }
+  };
+
+  const handleExportReport = async (format: 'pdf' | 'csv') => {
+    if (!selectedDeal?.analysis?.id) {
+      toast({
+        title: "Cannot Export",
+        description: "This property must be analyzed before exporting a report.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const response = await fetch('/api/generate-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          analysisIds: [selectedDeal.analysis.id],
+          format,
+          title: `${selectedDeal.extractedProperty?.address || 'Property'} Analysis Report`,
+          includeComparison: false
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Get the filename from the response headers
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filename = contentDisposition
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+        : `report.${format}`;
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Report Downloaded",
+        description: `${format.toUpperCase()} report has been downloaded successfully.`,
+      });
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to generate report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -1165,6 +1229,28 @@ export function AdvancedSearch() {
                   </div>
                 </div>
               </div>
+
+              {/* Export Buttons - Only show for analyzed properties */}
+              {selectedDeal.analysis && (
+                <div className="flex justify-end gap-2 border-t pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleExportReport('pdf')}
+                    disabled={isExporting}
+                  >
+                    <FileDown className="w-4 h-4 mr-2" />
+                    {isExporting ? 'Exporting...' : 'Download PDF'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleExportReport('csv')}
+                    disabled={isExporting}
+                  >
+                    <FileDown className="w-4 h-4 mr-2" />
+                    {isExporting ? 'Exporting...' : 'Download CSV'}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
