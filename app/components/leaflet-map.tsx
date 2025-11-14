@@ -448,6 +448,36 @@ export function LeafletMap({
     }
   }, [isMounted]);
 
+  // Set up global error handler and patch Leaflet's remove method
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Set up global error handler for Leaflet map errors
+      const originalErrorHandler = window.onerror;
+      window.onerror = (message, source, lineno, colno, error) => {
+        // Catch and suppress "Map container is being reused" errors
+        if (error && (
+          (error as Error).message?.includes('Map container is being reused') ||
+          (error as Error).message?.includes('being reused by another instance') ||
+          String(message).includes('Map container is being reused') ||
+          String(message).includes('being reused by another instance')
+        )) {
+          logger.debug('LeafletMap: Caught and suppressed "Map container is being reused" error');
+          return true; // Suppress the error
+        }
+        // Call original error handler for other errors
+        if (originalErrorHandler) {
+          return originalErrorHandler(message, source, lineno, colno, error);
+        }
+        return false;
+      };
+
+      return () => {
+        // Restore original error handler
+        window.onerror = originalErrorHandler;
+      };
+    }
+  }, []);
+
   // Ensure component is mounted on client side only
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -458,6 +488,40 @@ export function LeafletMap({
         try {
           // Store L in window for global access
           (window as any).L = L;
+          
+          // Patch Leaflet's Map.prototype.remove to catch "Map container is being reused" errors
+          if (L.Map && L.Map.prototype && L.Map.prototype.remove) {
+            const OriginalRemove = L.Map.prototype.remove;
+            L.Map.prototype.remove = function(this: any) {
+              try {
+                // Check if map is already removed or container is being reused
+                const container = this.getContainer && this.getContainer();
+                if (!container) {
+                  return this; // Already removed
+                }
+                
+                // Check if container is being used by another map
+                if (container && (container as any)._leaflet) {
+                  const containerMap = (container as any)._leaflet;
+                  if (containerMap !== this) {
+                    // Container is being used by a different map, don't remove
+                    logger.debug('LeafletMap: Container is being reused, skipping remove');
+                    return this;
+                  }
+                }
+                
+                return OriginalRemove.call(this);
+              } catch (err: any) {
+                const errorMessage = err?.message || err?.toString() || '';
+                if (errorMessage.includes('Map container is being reused') || 
+                    errorMessage.includes('being reused by another instance')) {
+                  logger.debug('LeafletMap: Caught "Map container is being reused" in patched remove');
+                  return this; // Return map instance to maintain chainability
+                }
+                throw err; // Re-throw other errors
+              }
+            };
+          }
           
           // Clear any existing icon configuration
           delete (L.Icon.Default.prototype as any)._getIconUrl;
