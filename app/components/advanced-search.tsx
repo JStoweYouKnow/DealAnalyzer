@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Filter, Save, Trash2, Copy, Mail, MapPin, Home } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, Filter, Save, Trash2, Copy, Mail, MapPin, Home, TrendingUp, TrendingDown, DollarSign, Calendar, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { EmailDeal, SavedFilter } from "@shared/schema";
@@ -42,6 +43,8 @@ export function AdvancedSearch() {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [newFilterName, setNewFilterName] = useState("");
   const [searchText, setSearchText] = useState("");
+  const [selectedDeal, setSelectedDeal] = useState<EmailDeal | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -63,6 +66,44 @@ export function AdvancedSearch() {
       const response = await apiRequest('GET', '/api/filters');
       const data = await response.json();
       return data.data || [];
+    }
+  });
+
+  // Analyze deal mutation
+  const analyzeDealMutation = useMutation({
+    mutationFn: async (deal: EmailDeal) => {
+      // Validate deal has required data
+      if (!deal.id) {
+        throw new Error('Deal ID is missing. Please refresh the deals list and try again.');
+      }
+      if (!deal.emailContent) {
+        throw new Error('Email content is missing. Cannot analyze this deal.');
+      }
+
+      const response = await apiRequest('POST', '/api/analyze-email-deal', {
+        dealId: deal.id,
+        emailContent: deal.emailContent,
+        extractedProperty: deal.extractedProperty,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/email-deals'] });
+      toast({
+        title: "Analysis Complete",
+        description: `Property analyzed successfully. ${data.analysis?.meetsCriteria ? 'Meets' : 'Does not meet'} investment criteria.`,
+      });
+      // Update selected deal with analysis
+      if (selectedDeal) {
+        setSelectedDeal({ ...selectedDeal, analysis: data.analysis, status: 'analyzed' });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Failed to analyze property",
+        variant: "destructive",
+      });
     }
   });
 
@@ -280,6 +321,17 @@ export function AdvancedSearch() {
       title: "Filters Cleared",
       description: "All search filters have been reset.",
     });
+  };
+
+  const handleCardClick = (deal: EmailDeal) => {
+    setSelectedDeal(deal);
+    setIsDialogOpen(true);
+  };
+
+  const handleRunAnalysis = () => {
+    if (selectedDeal) {
+      analyzeDealMutation.mutate(selectedDeal);
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -722,7 +774,7 @@ export function AdvancedSearch() {
                 const analysis = deal.analysis;
 
                 return (
-                  <Card key={deal.id} className="hover:shadow-lg transition-shadow" data-testid={`result-deal-${deal.id}`}>
+                  <Card key={deal.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleCardClick(deal)} data-testid={`result-deal-${deal.id}`}>
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <Badge className={getStatusColor(deal.status)} variant="outline">
@@ -737,10 +789,14 @@ export function AdvancedSearch() {
                       <CardTitle className="text-base line-clamp-2">
                         {property?.address || deal.subject}
                       </CardTitle>
-                      {property?.city && property?.state && (
+                      {(property?.city || analysis?.property?.city) && (property?.state || analysis?.property?.state) && (
                         <p className="text-sm text-muted-foreground flex items-center mt-1">
                           <MapPin className="w-3 h-3 mr-1" />
-                          {property.city}, {property.state}
+                          {[
+                            property?.city || analysis?.property?.city,
+                            property?.state || analysis?.property?.state,
+                            analysis?.property?.zipCode
+                          ].filter(Boolean).join(', ')}
                         </p>
                       )}
                     </CardHeader>
@@ -818,6 +874,301 @@ export function AdvancedSearch() {
           )}
         </CardContent>
       </Card>
+
+      {/* Property Details Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Property Details</DialogTitle>
+            <DialogDescription>
+              Detailed information about this property deal
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedDeal && (
+            <div className="space-y-6">
+              {/* Property Information */}
+              <div className="space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold">
+                      {selectedDeal.extractedProperty?.address || selectedDeal.subject}
+                    </h3>
+                    {(selectedDeal.extractedProperty?.city || selectedDeal.analysis?.property?.city) &&
+                     (selectedDeal.extractedProperty?.state || selectedDeal.analysis?.property?.state) && (
+                      <p className="text-sm text-muted-foreground flex items-center">
+                        <MapPin className="w-4 h-4 mr-1" />
+                        {[
+                          selectedDeal.extractedProperty?.city || selectedDeal.analysis?.property?.city,
+                          selectedDeal.extractedProperty?.state || selectedDeal.analysis?.property?.state,
+                          selectedDeal.analysis?.property?.zipCode
+                        ].filter(Boolean).join(', ')}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Badge className={getStatusColor(selectedDeal.status)} variant="outline">
+                      {selectedDeal.status}
+                    </Badge>
+                    {selectedDeal.analysis?.meetsCriteria && (
+                      <Badge className="bg-green-100 text-green-800 border-green-200">
+                        Meets Criteria
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Basic Property Details */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
+                  {(selectedDeal.analysis?.property?.purchasePrice || selectedDeal.extractedProperty?.price) && (
+                    <div className="space-y-1">
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <DollarSign className="w-4 h-4 mr-1" />
+                        <span>Purchase Price</span>
+                      </div>
+                      <p className="text-lg font-semibold">
+                        {formatCurrency(selectedDeal.analysis?.property?.purchasePrice || selectedDeal.extractedProperty?.price || 0)}
+                      </p>
+                    </div>
+                  )}
+                  {(selectedDeal.analysis?.property?.monthlyRent || selectedDeal.extractedProperty?.monthlyRent) && (
+                    <div className="space-y-1">
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Home className="w-4 h-4 mr-1" />
+                        <span>Monthly Rent</span>
+                      </div>
+                      <p className="text-lg font-semibold text-green-600">
+                        {formatCurrency(selectedDeal.analysis?.property?.monthlyRent || selectedDeal.extractedProperty?.monthlyRent || 0)}
+                      </p>
+                    </div>
+                  )}
+                  {selectedDeal.extractedProperty?.bedrooms && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Bedrooms</p>
+                      <p className="text-lg font-semibold">{selectedDeal.extractedProperty.bedrooms}</p>
+                    </div>
+                  )}
+                  {selectedDeal.extractedProperty?.bathrooms && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Bathrooms</p>
+                      <p className="text-lg font-semibold">{selectedDeal.extractedProperty.bathrooms}</p>
+                    </div>
+                  )}
+                  {selectedDeal.extractedProperty?.sqft && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Square Footage</p>
+                      <p className="text-lg font-semibold">{selectedDeal.extractedProperty.sqft.toLocaleString()} sq ft</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Analysis Section */}
+              {selectedDeal.analysis ? (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">Financial Analysis</h3>
+
+                  {/* Key Metrics */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="space-y-2">
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            {selectedDeal.analysis.cashFlow > 0 ? (
+                              <TrendingUp className="w-4 h-4 mr-1 text-green-600" />
+                            ) : (
+                              <TrendingDown className="w-4 h-4 mr-1 text-red-600" />
+                            )}
+                            <span>Monthly Cash Flow</span>
+                          </div>
+                          <p className={`text-2xl font-bold ${selectedDeal.analysis.cashFlow > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(selectedDeal.analysis.cashFlow)}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="space-y-2">
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <TrendingUp className="w-4 h-4 mr-1" />
+                            <span>Cash-on-Cash Return</span>
+                          </div>
+                          <p className="text-2xl font-bold">
+                            {(selectedDeal.analysis.cocReturn * 100).toFixed(2)}%
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="space-y-2">
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <TrendingUp className="w-4 h-4 mr-1" />
+                            <span>Cap Rate</span>
+                          </div>
+                          <p className="text-2xl font-bold">
+                            {(selectedDeal.analysis.capRate * 100).toFixed(2)}%
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Investment Criteria Checks */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium">Investment Criteria</h4>
+                    <div className="space-y-2">
+                      {selectedDeal.analysis.passes1PercentRule !== undefined && (
+                        <div className={`flex items-start p-3 rounded-lg ${selectedDeal.analysis.passes1PercentRule ? 'bg-green-50' : 'bg-red-50'}`}>
+                          <AlertCircle className={`w-5 h-5 mr-2 mt-0.5 ${selectedDeal.analysis.passes1PercentRule ? 'text-green-600' : 'text-red-600'}`} />
+                          <div className="flex-1">
+                            <p className="font-medium">1% Rule</p>
+                            <p className="text-sm text-muted-foreground">
+                              Monthly rent should be at least 1% of purchase price
+                            </p>
+                          </div>
+                          <Badge variant={selectedDeal.analysis.passes1PercentRule ? "default" : "destructive"}>
+                            {selectedDeal.analysis.passes1PercentRule ? 'Pass' : 'Fail'}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {selectedDeal.analysis.cashFlowPositive !== undefined && (
+                        <div className={`flex items-start p-3 rounded-lg ${selectedDeal.analysis.cashFlowPositive ? 'bg-green-50' : 'bg-red-50'}`}>
+                          <AlertCircle className={`w-5 h-5 mr-2 mt-0.5 ${selectedDeal.analysis.cashFlowPositive ? 'text-green-600' : 'text-red-600'}`} />
+                          <div className="flex-1">
+                            <p className="font-medium">Positive Cash Flow</p>
+                            <p className="text-sm text-muted-foreground">
+                              Monthly income should exceed monthly expenses
+                            </p>
+                          </div>
+                          <Badge variant={selectedDeal.analysis.cashFlowPositive ? "default" : "destructive"}>
+                            {selectedDeal.analysis.cashFlowPositive ? 'Pass' : 'Fail'}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {selectedDeal.analysis.cocMeetsBenchmark !== undefined && (
+                        <div className={`flex items-start p-3 rounded-lg ${selectedDeal.analysis.cocMeetsBenchmark ? 'bg-green-50' : 'bg-red-50'}`}>
+                          <AlertCircle className={`w-5 h-5 mr-2 mt-0.5 ${selectedDeal.analysis.cocMeetsBenchmark ? 'text-green-600' : 'text-red-600'}`} />
+                          <div className="flex-1">
+                            <p className="font-medium">COC Return Benchmark</p>
+                            <p className="text-sm text-muted-foreground">
+                              Cash-on-cash return should meet or exceed target
+                            </p>
+                          </div>
+                          <Badge variant={selectedDeal.analysis.cocMeetsBenchmark ? "default" : "destructive"}>
+                            {selectedDeal.analysis.cocMeetsBenchmark ? 'Pass' : 'Fail'}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {selectedDeal.analysis.capMeetsBenchmark !== undefined && (
+                        <div className={`flex items-start p-3 rounded-lg ${selectedDeal.analysis.capMeetsBenchmark ? 'bg-green-50' : 'bg-red-50'}`}>
+                          <AlertCircle className={`w-5 h-5 mr-2 mt-0.5 ${selectedDeal.analysis.capMeetsBenchmark ? 'text-green-600' : 'text-red-600'}`} />
+                          <div className="flex-1">
+                            <p className="font-medium">Cap Rate Benchmark</p>
+                            <p className="text-sm text-muted-foreground">
+                              Cap rate should meet or exceed target
+                            </p>
+                          </div>
+                          <Badge variant={selectedDeal.analysis.capMeetsBenchmark ? "default" : "destructive"}>
+                            {selectedDeal.analysis.capMeetsBenchmark ? 'Pass' : 'Fail'}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Financial Breakdown */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium">Financial Details</h4>
+                    <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
+                      {selectedDeal.analysis.calculatedDownpayment !== undefined && (
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Down Payment</p>
+                          <p className="font-semibold">{formatCurrency(selectedDeal.analysis.calculatedDownpayment)}</p>
+                        </div>
+                      )}
+                      {selectedDeal.analysis.calculatedClosingCosts !== undefined && (
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Closing Costs</p>
+                          <p className="font-semibold">{formatCurrency(selectedDeal.analysis.calculatedClosingCosts)}</p>
+                        </div>
+                      )}
+                      {selectedDeal.analysis.totalCashNeeded !== undefined && (
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Total Cash Needed</p>
+                          <p className="font-semibold text-lg">{formatCurrency(selectedDeal.analysis.totalCashNeeded)}</p>
+                        </div>
+                      )}
+                      {selectedDeal.analysis.totalMonthlyExpenses !== undefined && (
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Monthly Expenses</p>
+                          <p className="font-semibold">{formatCurrency(selectedDeal.analysis.totalMonthlyExpenses)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-center py-8 bg-muted/30 rounded-lg">
+                    <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Analysis Available</h3>
+                    <p className="text-muted-foreground mb-4">
+                      This property has not been analyzed yet. Run an analysis to see financial metrics and investment criteria.
+                    </p>
+                    <Button
+                      onClick={handleRunAnalysis}
+                      disabled={analyzeDealMutation.isPending || !selectedDeal.extractedProperty}
+                    >
+                      {analyzeDealMutation.isPending ? (
+                        <>Analyzing...</>
+                      ) : (
+                        <>Run Analysis</>
+                      )}
+                    </Button>
+                    {!selectedDeal.extractedProperty && (
+                      <p className="text-sm text-red-600 mt-2">
+                        Cannot analyze: Property data is missing
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Email Details */}
+              <div className="space-y-3 border-t pt-4">
+                <h4 className="font-medium">Email Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center">
+                    <Mail className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <div>
+                      <p className="text-muted-foreground">From</p>
+                      <p className="font-medium">{selectedDeal.sender}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <div>
+                      <p className="text-muted-foreground">Received</p>
+                      <p className="font-medium">{new Date(selectedDeal.receivedDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
