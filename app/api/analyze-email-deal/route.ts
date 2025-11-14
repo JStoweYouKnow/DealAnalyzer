@@ -8,7 +8,7 @@ import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
-    const { dealId, emailContent, fundingSource, mortgageValues } = await req.json();
+    const { dealId, emailContent, fundingSource, mortgageValues, monthlyExpenses } = await req.json();
     
     if (!dealId || !emailContent) {
       return NextResponse.json(
@@ -123,8 +123,8 @@ export async function POST(request: NextRequest) {
     // Fetch current investment criteria
     const criteria = await loadInvestmentCriteria();
     
-    // Run TypeScript analysis with optional mortgage values and criteria
-    const analysisData = analyzeProperty(propertyData, strMetrics, undefined, propertyFundingSource as any, mortgageRate, mortgageValues, criteria);
+    // Run TypeScript analysis with optional mortgage values, monthly expenses, and criteria
+    const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, propertyFundingSource as any, mortgageRate, mortgageValues, criteria);
 
     // Run AI analysis if available (lazy import to avoid build-time evaluation)
     let analysisWithAI = analysisData;

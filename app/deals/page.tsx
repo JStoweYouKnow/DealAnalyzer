@@ -718,11 +718,13 @@ export default function DealsPage() {
       }
       
       // Then run analysis with the updated property data, including funding source and mortgage values
+      // Note: monthlyExpenses are calculated from the analysis property data, same as main tab
       const analysisResponse = await apiRequest('POST', '/api/analyze-email-deal', { 
         dealId: dealId,
         emailContent: deal.emailContent,
         fundingSource: fundingSource,
-        mortgageValues: mortgageValues
+        mortgageValues: mortgageValues,
+        monthlyExpenses: undefined // Will be calculated from property data, same as main tab
       });
       return analysisResponse.json();
     },
@@ -1634,7 +1636,9 @@ export default function DealsPage() {
                                   const fundingSource = editValues[deal.id]?.fundingSource;
                                   const mortgageValues = editValues[deal.id]?.mortgageValues;
                                   
-                                  if (price && (rent || (adr && occupancyRate))) {
+                                  // Allow save if we have price and (rent OR adr+occupancy OR mortgageValues)
+                                  // This allows saving when only mortgage data is updated
+                                  if (price && (rent || (adr && occupancyRate) || mortgageValues)) {
                                     updatePropertyMutation.mutate({ 
                                       dealId: deal.id, 
                                       price, 
@@ -1646,10 +1650,16 @@ export default function DealsPage() {
                                       fundingSource,
                                       mortgageValues
                                     });
+                                  } else if (!price) {
+                                    toast({
+                                      title: "Price Required",
+                                      description: "Purchase price is required to save",
+                                      variant: "destructive",
+                                    });
                                   }
                                 }}
                                 disabled={updatePropertyMutation.isPending || 
-                                  (!editValues[deal.id]?.price && !editValues[deal.id]?.rent && !editValues[deal.id]?.adr)}
+                                  (!editValues[deal.id]?.price && !editValues[deal.id]?.rent && !editValues[deal.id]?.adr && !editValues[deal.id]?.mortgageValues)}
                                 data-testid={`button-save-${deal.id}`}
                               >
                                 <i className="fas fa-save mr-2"></i>
