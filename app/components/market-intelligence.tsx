@@ -20,7 +20,6 @@ import { TrendingUp, TrendingDown, Home, MapPin, Calendar, X, DollarSign, AlertC
 import { apiRequest } from "@/lib/queryClient";
 import { useRouter } from "next/navigation";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { useToast } from "@/hooks/use-toast";
 import type { DealAnalysis } from "@shared/schema";
 
 type MarketStats = {
@@ -152,7 +151,6 @@ export function MarketIntelligence() {
   const [isPropertyDialogOpen, setIsPropertyDialogOpen] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   const MAX_COMPARISON_ZIPS = 4;
   const isZipValid = zipInput.trim().length === 5;
@@ -906,7 +904,7 @@ export function MarketIntelligence() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="text-center p-2 rounded bg-muted/30">
                       <p className="font-medium text-sm">
                         {analysis.cocReturn !== undefined
@@ -922,14 +920,6 @@ export function MarketIntelligence() {
                           : 'N/A'}
                       </p>
                       <p className="text-muted-foreground">Cap Rate</p>
-                    </div>
-                    <div className="text-center p-2 rounded bg-muted/30">
-                      <p className="font-medium text-sm">
-                        {analysis.cocReturn !== undefined
-                          ? `${(analysis.cocReturn * 100).toFixed(1)}%`
-                          : 'N/A'}
-                      </p>
-                      <p className="text-muted-foreground">ROI</p>
                     </div>
                   </div>
 

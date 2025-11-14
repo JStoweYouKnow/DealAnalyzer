@@ -311,7 +311,19 @@ async function generateCSVBuffer(data: ReportData, options: ReportOptions): Prom
     'Cap Rate (%)': (corrected.capRate * 100).toFixed(2),
     'Passes 1% Rule': analysis.passes1PercentRule ? 'Yes' : 'No',
     'Meets Criteria': analysis.meetsCriteria ? 'Yes' : 'No',
-    'Analysis Date': analysis.analysisDate ? new Date(analysis.analysisDate).toLocaleDateString() : 'N/A'
+    'Analysis Date': analysis.analysisDate ? new Date(analysis.analysisDate).toLocaleDateString() : 'N/A',
+    // Expense Assumptions
+    'Mortgage Payment': corrected.expenses.mortgagePayment.toFixed(2),
+    'Property Tax': corrected.expenses.propertyTax.toFixed(2),
+    'Insurance': corrected.expenses.insurance.toFixed(2),
+    'Vacancy (5%)': corrected.expenses.vacancy.toFixed(2),
+    'Maintenance (5%)': corrected.expenses.maintenance.toFixed(2),
+    'Property Management (10%)': corrected.expenses.propertyManagement.toFixed(2),
+    'Utilities': corrected.expenses.utilities.toFixed(2),
+    'Cleaning': corrected.expenses.cleaning.toFixed(2),
+    'Supplies': corrected.expenses.supplies.toFixed(2),
+    'Other Expenses': corrected.expenses.other.toFixed(2),
+    'Total Monthly Expenses': corrected.expenses.total.toFixed(2)
   };
   });
 
@@ -322,7 +334,7 @@ async function generateCSVBuffer(data: ReportData, options: ReportOptions): Prom
     ...csvData.map(row => headers.map(header => JSON.stringify(row[header as keyof typeof row])).join(','))
   ];
   const csvContent = csvRows.join('\n');
-  
+
   return Buffer.from(csvContent, 'utf-8');
 }
 
@@ -356,7 +368,19 @@ async function generateCSVReport(data: ReportData, options: ReportOptions, baseF
     'Cap Rate (%)': (corrected.capRate * 100).toFixed(2),
     'Passes 1% Rule': analysis.passes1PercentRule ? 'Yes' : 'No',
     'Meets Criteria': analysis.meetsCriteria ? 'Yes' : 'No',
-    'Analysis Date': analysis.analysisDate ? new Date(analysis.analysisDate).toLocaleDateString() : 'N/A'
+    'Analysis Date': analysis.analysisDate ? new Date(analysis.analysisDate).toLocaleDateString() : 'N/A',
+    // Expense Assumptions
+    'Mortgage Payment': corrected.expenses.mortgagePayment.toFixed(2),
+    'Property Tax': corrected.expenses.propertyTax.toFixed(2),
+    'Insurance': corrected.expenses.insurance.toFixed(2),
+    'Vacancy (5%)': corrected.expenses.vacancy.toFixed(2),
+    'Maintenance (5%)': corrected.expenses.maintenance.toFixed(2),
+    'Property Management (10%)': corrected.expenses.propertyManagement.toFixed(2),
+    'Utilities': corrected.expenses.utilities.toFixed(2),
+    'Cleaning': corrected.expenses.cleaning.toFixed(2),
+    'Supplies': corrected.expenses.supplies.toFixed(2),
+    'Other Expenses': corrected.expenses.other.toFixed(2),
+    'Total Monthly Expenses': corrected.expenses.total.toFixed(2)
   };
   });
 
@@ -381,7 +405,19 @@ async function generateCSVReport(data: ReportData, options: ReportOptions, baseF
       { id: 'Cap Rate (%)', title: 'Cap Rate (%)' },
       { id: 'Passes 1% Rule', title: 'Passes 1% Rule' },
       { id: 'Meets Criteria', title: 'Meets Criteria' },
-      { id: 'Analysis Date', title: 'Analysis Date' }
+      { id: 'Analysis Date', title: 'Analysis Date' },
+      // Expense columns
+      { id: 'Mortgage Payment', title: 'Mortgage Payment ($)' },
+      { id: 'Property Tax', title: 'Property Tax ($)' },
+      { id: 'Insurance', title: 'Insurance ($)' },
+      { id: 'Vacancy (5%)', title: 'Vacancy (5%) ($)' },
+      { id: 'Maintenance (5%)', title: 'Maintenance (5%) ($)' },
+      { id: 'Property Management (10%)', title: 'Property Management (10%) ($)' },
+      { id: 'Utilities', title: 'Utilities ($)' },
+      { id: 'Cleaning', title: 'Cleaning ($)' },
+      { id: 'Supplies', title: 'Supplies ($)' },
+      { id: 'Other Expenses', title: 'Other Expenses ($)' },
+      { id: 'Total Monthly Expenses', title: 'Total Monthly Expenses ($)' }
     ]
   });
 
@@ -394,13 +430,13 @@ async function generateCSVReport(data: ReportData, options: ReportOptions, baseF
 // Helper function to recalculate corrected metrics (matching frontend calculations)
 function recalculateCorrectedMetrics(analysis: any) {
   const actualMortgagePayment = analysis.monthlyMortgagePayment;
-  
+
   const loanAmount = analysis.property.purchasePrice - analysis.calculatedDownpayment;
   const monthlyInterestRate = 0.07 / 12;
   const numberOfPayments = 30 * 12;
   const calculatedMortgagePayment = loanAmount * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, numberOfPayments)) / (Math.pow(1 + monthlyInterestRate, numberOfPayments) - 1);
   const mortgagePayment = actualMortgagePayment ?? calculatedMortgagePayment;
-  
+
   const propertyTax = analysis.property.purchasePrice * 0.012 / 12;
   const insurance = 100;
   const vacancy = analysis.property.monthlyRent * 0.05;
@@ -409,20 +445,35 @@ function recalculateCorrectedMetrics(analysis: any) {
   const cleaning = analysis.property?.monthlyExpenses?.cleaning || 0;
   const supplies = analysis.property?.monthlyExpenses?.supplies || 0;
   const other = analysis.property?.monthlyExpenses?.other || 0;
-  
-  const correctedTotalMonthlyExpenses = mortgagePayment + propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other;
+  const maintenance = analysis.estimatedMaintenanceReserve;
+
+  const correctedTotalMonthlyExpenses = mortgagePayment + propertyTax + insurance + vacancy + maintenance + propertyManagement + utilities + cleaning + supplies + other;
   const correctedCashFlow = analysis.property.monthlyRent - correctedTotalMonthlyExpenses;
   const correctedAnnualCashFlow = correctedCashFlow * 12;
   const correctedCocReturn = analysis.totalCashNeeded > 0 ? correctedAnnualCashFlow / analysis.totalCashNeeded : 0;
-  const annualOperatingExpenses = (propertyTax + insurance + vacancy + analysis.estimatedMaintenanceReserve + propertyManagement + utilities + cleaning + supplies + other) * 12;
+  const annualOperatingExpenses = (propertyTax + insurance + vacancy + maintenance + propertyManagement + utilities + cleaning + supplies + other) * 12;
   const netOperatingIncome = (analysis.property.monthlyRent * 12) - annualOperatingExpenses;
   const correctedCapRate = analysis.property.purchasePrice > 0 ? netOperatingIncome / analysis.property.purchasePrice : 0;
-  
+
   return {
     cashFlow: correctedCashFlow,
     cocReturn: correctedCocReturn,
     capRate: correctedCapRate,
-    cashFlowPositive: correctedCashFlow >= 0
+    cashFlowPositive: correctedCashFlow >= 0,
+    // Include expense breakdown for reporting
+    expenses: {
+      mortgagePayment,
+      propertyTax,
+      insurance,
+      vacancy,
+      maintenance,
+      propertyManagement,
+      utilities,
+      cleaning,
+      supplies,
+      other,
+      total: correctedTotalMonthlyExpenses
+    }
   };
 }
 
@@ -460,7 +511,7 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
         Property Analysis ${index + 1}
       </p>
       <h1 class="mt-2 text-3xl font-bold tracking-tight text-gray-900">${escapeHtml(analysis.property.address || 'Unknown Address')}</h1>
-      
+
       <div class="mt-6 grid grid-cols-2 gap-6">
         <div class="p-4 border border-gray-200 rounded-lg">
           <h3 class="text-sm font-semibold text-indigo-600 mb-4">Property Details</h3>
@@ -476,7 +527,7 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
             <div class="flex justify-between"><dt class="font-medium">Year Built:</dt><dd>${escapeHtml(analysis.property.yearBuilt || 'N/A')}</dd></div>
           </dl>
         </div>
-        
+
         <div class="p-4 border border-gray-200 rounded-lg">
           <h3 class="text-sm font-semibold text-indigo-600 mb-4">Financial Analysis</h3>
           <dl class="space-y-2 text-sm">
@@ -487,6 +538,32 @@ function generateHTMLReport(data: ReportData, options: ReportOptions): string {
             <div class="flex justify-between"><dt class="font-medium">Passes 1% Rule:</dt><dd class="font-semibold ${analysis.passes1PercentRule ? 'text-green-600' : 'text-red-600'}">${analysis.passes1PercentRule ? 'Yes' : 'No'}</dd></div>
             <div class="flex justify-between"><dt class="font-medium">Meets Criteria:</dt><dd class="font-semibold ${analysis.meetsCriteria ? 'text-green-600' : 'text-red-600'}">${analysis.meetsCriteria ? 'Yes' : 'No'}</dd></div>
           </dl>
+        </div>
+      </div>
+
+      <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <h3 class="text-sm font-semibold text-blue-900 mb-4">Monthly Expense Breakdown</h3>
+        <div class="grid grid-cols-2 gap-4">
+          <dl class="space-y-2 text-sm">
+            <div class="flex justify-between"><dt class="font-medium text-gray-700">Mortgage Payment:</dt><dd class="font-semibold">${formatCurrency(corrected.expenses.mortgagePayment)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium text-gray-700">Property Tax (1.2% annual):</dt><dd class="font-semibold">${formatCurrency(corrected.expenses.propertyTax)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium text-gray-700">Insurance:</dt><dd class="font-semibold">${formatCurrency(corrected.expenses.insurance)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium text-gray-700">Vacancy Reserve (5%):</dt><dd class="font-semibold">${formatCurrency(corrected.expenses.vacancy)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium text-gray-700">Maintenance (5%):</dt><dd class="font-semibold">${formatCurrency(corrected.expenses.maintenance)}</dd></div>
+          </dl>
+          <dl class="space-y-2 text-sm">
+            <div class="flex justify-between"><dt class="font-medium text-gray-700">Property Management (10%):</dt><dd class="font-semibold">${formatCurrency(corrected.expenses.propertyManagement)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium text-gray-700">Utilities:</dt><dd class="font-semibold">${formatCurrency(corrected.expenses.utilities)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium text-gray-700">Cleaning:</dt><dd class="font-semibold">${formatCurrency(corrected.expenses.cleaning)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium text-gray-700">Supplies:</dt><dd class="font-semibold">${formatCurrency(corrected.expenses.supplies)}</dd></div>
+            <div class="flex justify-between"><dt class="font-medium text-gray-700">Other:</dt><dd class="font-semibold">${formatCurrency(corrected.expenses.other)}</dd></div>
+          </dl>
+        </div>
+        <div class="mt-4 pt-4 border-t border-blue-300">
+          <div class="flex justify-between text-base"><dt class="font-bold text-blue-900">Total Monthly Expenses:</dt><dd class="font-bold text-blue-900">${formatCurrency(corrected.expenses.total)}</dd></div>
+        </div>
+        <div class="mt-3 p-3 bg-white rounded border border-blue-200">
+          <p class="text-xs text-gray-600"><strong>Note:</strong> Expenses are automatically calculated based on property data. Property tax is 1.2% annually, vacancy is 5% of rent, maintenance is 5% of rent, and property management is 10% of rent. These are industry-standard assumptions that can be customized.</p>
         </div>
       </div>
     </div>
