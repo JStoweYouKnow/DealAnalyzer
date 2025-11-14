@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 // Import Leaflet CSS - Safe because component is dynamically imported with ssr: false
 import 'leaflet/dist/leaflet.css';
 import type { Map as LeafletMapInstance } from 'leaflet';
+import { logger } from '@/lib/logger';
 
 interface MapProperty {
   id: string;
@@ -38,6 +39,14 @@ interface LeafletMapProps {
 }
 
 const DEFAULT_CENTER = { lat: 39.8283, lng: -98.5795 };
+
+const POI_EMOJI_MAP: Record<string, string> = {
+  'school': '🏫',
+  'shopping': '🛒',
+  'transport': '🚇',
+  'hospital': '🏥',
+  'park': '🌳'
+};
 
 const isFiniteNumber = (value?: number): value is number =>
   typeof value === 'number' && Number.isFinite(value);
@@ -125,6 +134,7 @@ export function LeafletMap({
   const [mapKey, setMapKey] = useState(() => Date.now());
   const [isContainerReady, setIsContainerReady] = useState(false);
   const [isLeafletReady, setIsLeafletReady] = useState(false);
+  const [leafletDegraded, setLeafletDegraded] = useState(false);
   const prevPrimaryIdRef = useRef<string | undefined>(undefined);
 
   const safeCenter = sanitizeLatLng(mapCenter.lat, mapCenter.lng);
@@ -386,14 +396,14 @@ export function LeafletMap({
           console.log('LeafletMap: Icon configuration set successfully');
           setIsLeafletReady(true);
         } catch (err) {
-          console.warn('Failed to fix Leaflet icons:', err);
-          // Still mark as ready to allow map to render
-          setIsLeafletReady(true);
+          logger.error('LeafletMap: Failed to configure Leaflet icons:', err);
+          setLeafletDegraded(true);
+          // Do not mark as ready - icons failed to load
         }
       }).catch(err => {
-        console.warn('Failed to load Leaflet for icon fix:', err);
-        // Still mark as ready to allow map to render
-        setIsLeafletReady(true);
+        logger.error('LeafletMap: Failed to load Leaflet library:', err);
+        setLeafletDegraded(true);
+        // Do not mark as ready - Leaflet failed to load
       });
       
       // Fallback: Force container ready after a timeout to ensure map always initializes
@@ -445,7 +455,28 @@ export function LeafletMap({
   }, []);
 
   // Don't render until mounted and Leaflet is ready (prevents SSR/hydration errors and icon errors)
-  if (!isMounted || !isLeafletReady || typeof window === 'undefined') {
+  if (!isMounted || !isLeafletReady) {
+    // Show degraded state warning if Leaflet failed to load
+    if (leafletDegraded) {
+      return (
+        <div className="w-full h-96 bg-yellow-50 border-2 border-yellow-400 flex flex-col items-center justify-center rounded-lg p-6">
+          <div className="text-center max-w-md">
+            <div className="text-yellow-800 font-bold text-lg mb-2">⚠️ Map Loading Failed</div>
+            <p className="text-yellow-700 text-sm mb-2">
+              The map could not be initialized properly. This may be due to:
+            </p>
+            <ul className="text-yellow-700 text-sm list-disc list-inside mb-4 space-y-1">
+              <li>Failed to load Leaflet library</li>
+              <li>Icon configuration errors</li>
+              <li>Network connectivity issues</li>
+            </ul>
+            <p className="text-yellow-600 text-xs">
+              Please refresh the page or check your network connection.
+            </p>
+          </div>
+        </div>
+      );
+    }
     return <div className="w-full h-96 bg-gray-100 flex items-center justify-center rounded-lg">Loading map...</div>;
   }
 
@@ -539,8 +570,8 @@ export function LeafletMap({
                     // Create custom green icon for primary property
                     const isPrimary = property.type === 'primary';
                     let customIcon: any = null;
-                    
-                    if (isPrimary && typeof window !== 'undefined') {
+
+                    if (isPrimary) {
                       const L = (window as any).L;
                       if (L) {
                         // Create green marker icon for primary property using divIcon for better reliability
@@ -610,14 +641,6 @@ export function LeafletMap({
                       const L = (window as any).L;
                       if (L) {
                         // Use emoji-based divIcon for POIs
-                        const emojiMap: Record<string, string> = {
-                          'school': '🏫',
-                          'shopping': '🛒',
-                          'transport': '🚇',
-                          'hospital': '🏥',
-                          'park': '🌳'
-                        };
-
                         poiIcon = L.divIcon({
                           className: 'custom-poi-marker',
                           html: `<div style="
@@ -635,7 +658,7 @@ export function LeafletMap({
                               font-size: 16px;
                               line-height: 28px;
                               text-align: center;
-                            ">${emojiMap[poi.type] || '📍'}</div>
+                            ">${POI_EMOJI_MAP[poi.type] || '📍'}</div>
                           </div>`,
                           iconSize: [28, 28],
                           iconAnchor: [14, 14],
