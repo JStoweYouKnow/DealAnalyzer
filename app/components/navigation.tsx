@@ -20,7 +20,7 @@ export function Navigation() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-white/10 bg-white/70 backdrop-blur-lg shadow-lg shadow-black/5 supports-[backdrop-filter]:bg-white/60">
+    <nav className="sticky top-0 z-[60] border-b border-white/10 bg-white/70 backdrop-blur-lg shadow-lg shadow-black/5 supports-[backdrop-filter]:bg-white/60">
       <div className="container mx-auto px-6">
         <div className="flex h-16 items-center justify-between">
           <Link href="/" className="group flex items-center space-x-3 transition-all duration-300 hover:scale-105" data-testid="nav-logo">
