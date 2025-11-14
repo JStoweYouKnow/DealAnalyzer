@@ -155,6 +155,8 @@ export function LeafletMap({
   const [isLeafletReady, setIsLeafletReady] = useState(false);
   const [leafletDegraded, setLeafletDegraded] = useState(false);
   const prevPrimaryIdRef = useRef<string | undefined>(undefined);
+  const needsRemountRef = useRef(false);
+  const remountTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const safeCenter = sanitizeLatLng(mapCenter.lat, mapCenter.lng);
   const validProperties = mapProperties.filter((property) =>
@@ -293,6 +295,28 @@ export function LeafletMap({
 
     return () => window.clearTimeout(timer);
   }, [isMounted, validProperties.length, displayedPointsOfInterest.length]);
+
+  // Handle remount requests with proper cleanup
+  useEffect(() => {
+    if (needsRemountRef.current && !remountTimeoutRef.current) {
+      const id = setTimeout(() => {
+        if (needsRemountRef.current) {
+          setMapKey(Date.now());
+          needsRemountRef.current = false;
+        }
+        remountTimeoutRef.current = null;
+      }, 0);
+
+      remountTimeoutRef.current = id;
+    }
+
+    return () => {
+      if (remountTimeoutRef.current) {
+        clearTimeout(remountTimeoutRef.current);
+        remountTimeoutRef.current = null;
+      }
+    };
+  });
 
   // Ref callback to set container reference
   const containerRefCallback = useCallback((node: HTMLDivElement | null) => {
@@ -584,8 +608,8 @@ export function LeafletMap({
                   // Always clear references
                   delete (container as any)._leaflet_id;
                   delete (container as any)._leaflet;
-                  // Force remount on next render
-                  setTimeout(() => setMapKey(Date.now()), 0);
+                  // Force remount on next render (handled by useEffect with cleanup)
+                  needsRemountRef.current = true;
                 } catch (err) {
                   logger.error('LeafletMap: Error cleaning up during render:', err);
                   // Still clear references on error
