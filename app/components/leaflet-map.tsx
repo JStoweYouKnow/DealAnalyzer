@@ -524,10 +524,48 @@ export function LeafletMap({
                   />
 
                   {/* Property Markers */}
-                  {validProperties.map((property) => (
+                  {validProperties.map((property) => {
+                    // Create custom green icon for primary property
+                    const isPrimary = property.type === 'primary';
+                    let customIcon: any = null;
+                    
+                    if (isPrimary && typeof window !== 'undefined') {
+                      const L = (window as any).L;
+                      if (L) {
+                        // Create green marker icon for primary property using divIcon for better reliability
+                        customIcon = L.divIcon({
+                          className: 'custom-green-marker',
+                          html: `<div style="
+                            background-color: #22c55e;
+                            width: 30px;
+                            height: 30px;
+                            border-radius: 50% 50% 50% 0;
+                            transform: rotate(-45deg);
+                            border: 3px solid #ffffff;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                            position: relative;
+                          ">
+                            <div style="
+                              transform: rotate(45deg);
+                              color: white;
+                              font-weight: bold;
+                              font-size: 18px;
+                              line-height: 30px;
+                              text-align: center;
+                            ">🏠</div>
+                          </div>`,
+                          iconSize: [30, 30],
+                          iconAnchor: [15, 15],
+                          popupAnchor: [0, -15]
+                        });
+                      }
+                    }
+                    
+                    return (
                     <Marker
                       key={property.id}
                       position={[property.lat, property.lng]}
+                      icon={customIcon || undefined}
                       eventHandlers={{
                         click: () => onPropertyClick(property),
                       }}
@@ -549,7 +587,8 @@ export function LeafletMap({
                         </div>
                       </Popup>
                     </Marker>
-                  ))}
+                    );
+                  })}
 
                   {/* POI Markers */}
                   {displayedPointsOfInterest.map((poi) => (
