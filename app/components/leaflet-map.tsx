@@ -291,7 +291,12 @@ export function LeafletMap({
           if (L) {
             const existingMap = (prevContainer as any)._leaflet;
             if (existingMap && typeof existingMap.remove === 'function') {
-              existingMap.remove();
+              try {
+                existingMap.remove();
+              } catch (removeErr) {
+                // Ignore errors during removal - container might already be cleaned up
+                logger.debug('LeafletMap: Error during map removal (expected):', removeErr);
+              }
             }
           }
           delete (prevContainer as any)._leaflet_id;
@@ -385,18 +390,28 @@ export function LeafletMap({
     if (typeof window !== 'undefined') {
       setIsMounted(true);
 
-      // Fix Leaflet icons after mount
+      // Fix Leaflet icons after mount - ensure this happens before any markers are rendered
       import('leaflet').then((L) => {
         try {
+          // Store L in window for global access
+          (window as any).L = L;
+          
           // Clear any existing icon configuration
           delete (L.Icon.Default.prototype as any)._getIconUrl;
 
-          // Set up default icon URLs
+          // Set up default icon URLs - this must happen before any Marker components are created
           L.Icon.Default.mergeOptions({
             iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
             iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
             shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
           });
+
+          // Ensure createIcon method exists
+          if (!L.Icon.Default.prototype.createIcon) {
+            L.Icon.Default.prototype.createIcon = function(oldIcon: any) {
+              return L.DomUtil.create('div', 'leaflet-marker-icon ' + (this.options.className || ''), oldIcon);
+            };
+          }
 
           logger.debug('LeafletMap: Icon configuration set successfully');
           setIsLeafletReady(true);
@@ -460,7 +475,9 @@ export function LeafletMap({
   }, []);
 
   // Don't render until mounted and Leaflet is ready (prevents SSR/hydration errors and icon errors)
-  if (!isMounted || !isLeafletReady) {
+  // Also ensure Leaflet is loaded in window before rendering
+  const isLeafletLoaded = typeof window !== 'undefined' && (window as any).L;
+  if (!isMounted || !isLeafletReady || !isLeafletLoaded || typeof window === 'undefined') {
     // Show degraded state warning if Leaflet failed to load
     if (leafletDegraded) {
       return (
@@ -492,7 +509,9 @@ export function LeafletMap({
   const hasLeafletInstance = container && (container as any)._leaflet_id;
   // Simplified: render if mounted, Leaflet ready, and we have a container (isContainerReady will be set by ref callback)
   // If container is ready OR we have a container ref, allow rendering
-  const shouldRenderMap = isMounted && isLeafletReady && (isContainerReady || container) && !hasLeafletInstance;
+  // Also ensure container doesn't already have an instance
+  // isLeafletLoaded is already checked in the render guard above
+  const shouldRenderMap = isMounted && isLeafletReady && isLeafletLoaded && (isContainerReady || container) && !hasLeafletInstance;
 
   // Render the map - use key on wrapper to force complete DOM recreation
   // This avoids the "Map container is already initialized" error
@@ -534,7 +553,12 @@ export function LeafletMap({
                   if (L) {
                     const existingMap = (container as any)._leaflet;
                     if (existingMap && typeof existingMap.remove === 'function') {
-                      existingMap.remove();
+                      try {
+                        existingMap.remove();
+                      } catch (removeErr) {
+                        // Ignore errors during removal - container might already be cleaned up
+                        logger.debug('LeafletMap: Error during map removal in render (expected):', removeErr);
+                      }
                     }
                   }
                   delete (container as any)._leaflet_id;
@@ -580,9 +604,9 @@ export function LeafletMap({
                     const isPrimary = property.type === 'primary';
                     let customIcon: any = null;
 
-                    if (isPrimary) {
-                      const L = (window as any).L;
-                      if (L) {
+                    const L = (window as any).L;
+                    if (L) {
+                      if (isPrimary) {
                         // Create green marker icon for primary property using divIcon for better reliability
                         customIcon = L.divIcon({
                           className: 'custom-green-marker',
@@ -609,6 +633,30 @@ export function LeafletMap({
                           iconAnchor: [15, 15],
                           popupAnchor: [0, -15]
                         });
+                      } else {
+                        // For non-primary markers, ensure we have a valid default icon
+                        // Only use default icon if Icon.Default is properly initialized
+                        if (L.Icon && L.Icon.Default && L.Icon.Default.prototype.createIcon) {
+                          // Default icon will be used automatically
+                          customIcon = undefined;
+                        } else {
+                          // Fallback to divIcon if default icon isn't ready
+                          customIcon = L.divIcon({
+                            className: 'leaflet-marker-icon',
+                            html: `<div style="
+                              background-color: #3388ff;
+                              width: 25px;
+                              height: 25px;
+                              border-radius: 50% 50% 50% 0;
+                              transform: rotate(-45deg);
+                              border: 2px solid #ffffff;
+                              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                            "></div>`,
+                            iconSize: [25, 25],
+                            iconAnchor: [12, 12],
+                            popupAnchor: [0, -12]
+                          });
+                        }
                       }
                     }
                     
@@ -616,7 +664,7 @@ export function LeafletMap({
                     <Marker
                       key={property.id}
                       position={[property.lat, property.lng]}
-                      icon={customIcon || undefined}
+                      icon={customIcon}
                       eventHandlers={{
                         click: () => onPropertyClick(property),
                       }}
