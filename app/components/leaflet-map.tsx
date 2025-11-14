@@ -56,6 +56,60 @@ const sanitizeLatLng = (lat?: number, lng?: number) => ({
   lng: isFiniteNumber(lng) ? lng : DEFAULT_CENTER.lng,
 });
 
+// Helper function to safely remove a Leaflet map instance
+// Prevents "Map container is being reused by another instance" errors
+const safeRemoveMap = (map: any, container?: HTMLElement | null): boolean => {
+  if (!map || typeof map.remove !== 'function') {
+    return false;
+  }
+
+  try {
+    // Check if map is still valid by verifying it has a container
+    const mapContainer = map.getContainer && map.getContainer();
+    if (!mapContainer) {
+      // Map is already removed or invalid
+      return false;
+    }
+
+    // If a specific container is provided, verify the map belongs to it
+    if (container && mapContainer !== container) {
+      // Map doesn't belong to this container, don't remove it
+      return false;
+    }
+
+    // Check if the container still references this map instance
+    if (mapContainer && (mapContainer as any)._leaflet) {
+      const containerMap = (mapContainer as any)._leaflet;
+      if (containerMap !== map) {
+        // Container is being used by a different map instance
+        return false;
+      }
+    }
+
+    // Check if map has already been removed by checking internal state
+    if ((map as any)._removed) {
+      return false;
+    }
+
+    // All checks passed, safe to remove
+    map.remove();
+    return true;
+  } catch (err: any) {
+    // Specifically catch the "Map container is being reused" error
+    const errorMessage = err?.message || err?.toString() || '';
+    if (errorMessage.includes('Map container is being reused') || 
+        errorMessage.includes('being reused by another instance') ||
+        errorMessage.includes('reused by another')) {
+      // This is expected in some cleanup scenarios, just clear references
+      logger.debug('LeafletMap: Map container already reused, skipping removal');
+      return false;
+    }
+    // For other errors, log but don't throw
+    logger.debug('LeafletMap: Error during safe map removal:', err);
+    return false;
+  }
+};
+
 // Component to handle map instance setup
 // This component is rendered inside MapContainer to access the map instance via useMap hook
 function MapInstanceHandler({
@@ -98,18 +152,8 @@ function MapInstanceHandler({
           try {
             const existingMap = (container as any)._leaflet;
             if (existingMap && existingMap !== map) {
-              // Check if map is still valid before trying to remove
-              const containerEl = existingMap.getContainer && existingMap.getContainer();
-              if (containerEl && containerEl === container) {
-                try {
-                  if (typeof existingMap.remove === 'function') {
-                    existingMap.remove();
-                  }
-                } catch (removeErr) {
-                  // Map might already be removed, just clear references
-                  logger.debug('LeafletMap: Map already removed during handler cleanup');
-                }
-              }
+              // Use safe removal to prevent "Map container is being reused" errors
+              safeRemoveMap(existingMap, container);
             }
             // Always clear old references even if removal fails
             delete (container as any)._leaflet_id;
@@ -177,11 +221,7 @@ export function LeafletMap({
       // Always destroy any existing instance first
       if (mapInstanceRef.current && mapInstanceRef.current !== map) {
         logger.debug('LeafletMap: Destroying existing map instance');
-        try {
-          mapInstanceRef.current.remove();
-        } catch (err) {
-          logger.warn('LeafletMap: Error destroying existing map', err);
-        }
+        safeRemoveMap(mapInstanceRef.current);
         mapInstanceRef.current = null;
       }
       
@@ -204,13 +244,9 @@ export function LeafletMap({
   useEffect(() => {
     return () => {
       if (mapInstanceRef.current) {
-        try {
-          logger.debug('LeafletMap: Cleaning up map instance on component unmount');
-          mapInstanceRef.current.remove();
-          mapInstanceRef.current = null;
-        } catch (err) {
-          logger.warn('LeafletMap: Error cleaning up map instance', err);
-        }
+        logger.debug('LeafletMap: Cleaning up map instance on component unmount');
+        safeRemoveMap(mapInstanceRef.current);
+        mapInstanceRef.current = null;
       }
     };
   }, []);
@@ -328,14 +364,7 @@ export function LeafletMap({
           const L = (window as any).L;
           if (L) {
             const existingMap = (prevContainer as any)._leaflet;
-            if (existingMap && typeof existingMap.remove === 'function') {
-              try {
-                existingMap.remove();
-              } catch (removeErr) {
-                // Ignore errors during removal - container might already be cleaned up
-                logger.debug('LeafletMap: Error during map removal (expected):', removeErr);
-              }
-            }
+            safeRemoveMap(existingMap, prevContainer);
           }
           delete (prevContainer as any)._leaflet_id;
           delete (prevContainer as any)._leaflet;
@@ -356,9 +385,7 @@ export function LeafletMap({
           const L = (window as any).L;
           if (L) {
             const existingMap = (node as any)._leaflet;
-            if (existingMap && typeof existingMap.remove === 'function') {
-              existingMap.remove();
-            }
+            safeRemoveMap(existingMap, node);
           }
           delete (node as any)._leaflet_id;
           delete (node as any)._leaflet;
@@ -398,9 +425,7 @@ export function LeafletMap({
           const L = (window as any).L;
           if (L) {
             const existingMap = (container as any)._leaflet;
-            if (existingMap && typeof existingMap.remove === 'function') {
-              existingMap.remove();
-            }
+            safeRemoveMap(existingMap, container);
           }
           delete (container as any)._leaflet_id;
           delete (container as any)._leaflet;
@@ -496,9 +521,7 @@ export function LeafletMap({
             const L = (window as any).L;
             if (L && L.Map) {
               const existingMap = (container as any)._leaflet;
-              if (existingMap && existingMap.remove) {
-                existingMap.remove();
-              }
+              safeRemoveMap(existingMap, container);
             }
             // Clear the leaflet ID
             delete (container as any)._leaflet_id;
@@ -591,18 +614,8 @@ export function LeafletMap({
                   if (L) {
                     const existingMap = (container as any)._leaflet;
                     if (existingMap) {
-                      // Check if map is still valid before trying to remove
-                      const containerEl = existingMap.getContainer && existingMap.getContainer();
-                      if (containerEl && containerEl === container) {
-                        try {
-                          if (typeof existingMap.remove === 'function') {
-                            existingMap.remove();
-                          }
-                        } catch (removeErr) {
-                          // Map might already be removed, just clear references
-                          logger.debug('LeafletMap: Map already removed during render cleanup');
-                        }
-                      }
+                      // Use safe removal to prevent "Map container is being reused" errors
+                      safeRemoveMap(existingMap, container);
                     }
                   }
                   // Always clear references
