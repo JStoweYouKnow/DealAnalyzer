@@ -75,7 +75,7 @@ function MapInstanceHandler({
       // Prevent double initialization
       const currentMapId = (map as any)._leaflet_id;
       if (mapIdRef.current === currentMapId) {
-        console.warn('LeafletMap: MapInstanceHandler already handled this map instance');
+        // Silently return if we've already handled this instance
         return;
       }
 
@@ -87,10 +87,14 @@ function MapInstanceHandler({
       if ((container as any)._leaflet_id) {
         // If container has a different instance, clean it up first
         if ((container as any)._leaflet_id !== (map as any)._leaflet_id) {
-          console.warn('LeafletMap: Container already has different Leaflet instance, cleaning up', {
-            containerId: (container as any)._leaflet_id,
-            mapId: (map as any)._leaflet_id
-          });
+          // Only log in development to avoid console noise in production
+          const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+          if (isDev) {
+            logger.debug('LeafletMap: Container already has different Leaflet instance, cleaning up', {
+              containerId: (container as any)._leaflet_id,
+              mapId: (map as any)._leaflet_id
+            });
+          }
           try {
             const existingMap = (container as any)._leaflet;
             if (existingMap && existingMap.remove && existingMap !== map) {
@@ -100,7 +104,8 @@ function MapInstanceHandler({
             delete (container as any)._leaflet_id;
             delete (container as any)._leaflet;
           } catch (err) {
-            console.warn('LeafletMap: Error cleaning up existing instance:', err);
+            // Only log errors, not warnings for expected cleanup scenarios
+            logger.error('LeafletMap: Error cleaning up existing instance:', err);
           }
         }
       }
@@ -153,18 +158,18 @@ export function LeafletMap({
 
   // Callback to handle map instance when it's ready
   const handleMapReady = useCallback((map: LeafletMapInstance) => {
-    // Always destroy any existing instance first
-    if (mapInstanceRef.current && mapInstanceRef.current !== map) {
-      console.warn('LeafletMap: Destroying existing map instance');
-      try {
-        mapInstanceRef.current.remove();
-      } catch (err) {
-        console.warn('LeafletMap: Error destroying existing map', err);
+      // Always destroy any existing instance first
+      if (mapInstanceRef.current && mapInstanceRef.current !== map) {
+        logger.debug('LeafletMap: Destroying existing map instance');
+        try {
+          mapInstanceRef.current.remove();
+        } catch (err) {
+          logger.warn('LeafletMap: Error destroying existing map', err);
+        }
+        mapInstanceRef.current = null;
       }
-      mapInstanceRef.current = null;
-    }
-    
-    console.log('LeafletMap: Map instance ready');
+      
+      logger.debug('LeafletMap: Map instance ready');
     mapInstanceRef.current = map;
     
     // Invalidate size after a brief delay
@@ -173,9 +178,9 @@ export function LeafletMap({
         if (mapInstanceRef.current) {
           mapInstanceRef.current.invalidateSize();
         }
-      } catch (err) {
-        console.warn('LeafletMap: Failed to invalidate size', err);
-      }
+        } catch (err) {
+          logger.warn('LeafletMap: Failed to invalidate size', err);
+        }
     }, 200);
   }, []);
 
@@ -184,11 +189,11 @@ export function LeafletMap({
     return () => {
       if (mapInstanceRef.current) {
         try {
-          console.log('LeafletMap: Cleaning up map instance on component unmount');
+          logger.debug('LeafletMap: Cleaning up map instance on component unmount');
           mapInstanceRef.current.remove();
           mapInstanceRef.current = null;
         } catch (err) {
-          console.warn('LeafletMap: Error cleaning up map instance', err);
+          logger.warn('LeafletMap: Error cleaning up map instance', err);
         }
       }
     };
@@ -200,7 +205,7 @@ export function LeafletMap({
     const primaryPropertyId = mapProperties.find(p => p.type === 'primary')?.id;
 
     if (primaryPropertyId && primaryPropertyId !== prevPrimaryIdRef.current) {
-      console.log('LeafletMap: Primary property changed', {
+      logger.debug('LeafletMap: Primary property changed', {
         old: prevPrimaryIdRef.current,
         new: primaryPropertyId
       });
@@ -225,7 +230,7 @@ export function LeafletMap({
               duration: 1.0
             });
           } catch (err) {
-            console.warn('LeafletMap: Error updating map view', err);
+            logger.warn('LeafletMap: Error updating map view', err);
           }
         }
       }
@@ -241,7 +246,7 @@ export function LeafletMap({
 
   // Debug: Log when props change
   useEffect(() => {
-    console.log('LeafletMap: Props updated', { mapCenter, zoomLevel });
+    logger.debug('LeafletMap: Props updated', { mapCenter, zoomLevel });
   }, [mapCenter.lat, mapCenter.lng, zoomLevel]);
 
   useEffect(() => {
@@ -255,9 +260,9 @@ export function LeafletMap({
         animate: true,
         duration: 0.5,
       });
-    } catch (err) {
-      console.warn('LeafletMap: Failed to update map view', err);
-    }
+      } catch (err) {
+        logger.warn('LeafletMap: Failed to update map view', err);
+      }
   }, [isMounted, mapCenter.lat, mapCenter.lng, zoomLevel]);
 
   useEffect(() => {
@@ -268,7 +273,7 @@ export function LeafletMap({
       try {
         mapInstanceRef.current?.invalidateSize();
       } catch (err) {
-        console.warn('LeafletMap: Failed to invalidate map size', err);
+        logger.warn('LeafletMap: Failed to invalidate map size', err);
       }
     }, 150);
 
@@ -292,9 +297,9 @@ export function LeafletMap({
           delete (prevContainer as any)._leaflet_id;
           delete (prevContainer as any)._leaflet;
         }
-      } catch (err) {
-        console.warn('LeafletMap: Error cleaning up previous container:', err);
-      }
+        } catch (err) {
+          logger.warn('LeafletMap: Error cleaning up previous container:', err);
+        }
     }
 
     containerRef.current = node;
@@ -315,7 +320,7 @@ export function LeafletMap({
           delete (node as any)._leaflet_id;
           delete (node as any)._leaflet;
         } catch (err) {
-          console.warn('LeafletMap: Error cleaning up orphaned instance:', err);
+          logger.warn('LeafletMap: Error cleaning up orphaned instance:', err);
         }
       }
       
@@ -366,7 +371,7 @@ export function LeafletMap({
             }
           }, 50);
         } catch (err) {
-          console.warn('LeafletMap: Error in cleanup effect:', err);
+          logger.warn('LeafletMap: Error in cleanup effect:', err);
           // Even if cleanup fails, allow rendering to proceed
           setIsContainerReady(true);
           cleanupDoneRef.current = true;
@@ -393,7 +398,7 @@ export function LeafletMap({
             shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
           });
 
-          console.log('LeafletMap: Icon configuration set successfully');
+          logger.debug('LeafletMap: Icon configuration set successfully');
           setIsLeafletReady(true);
         } catch (err) {
           logger.error('LeafletMap: Failed to configure Leaflet icons:', err);
@@ -410,7 +415,7 @@ export function LeafletMap({
       // Use shorter timeout and more aggressive fallback
       const fallbackTimer = setTimeout(() => {
         if (!isContainerReady) {
-          console.log('LeafletMap: Fallback - forcing container ready');
+          logger.debug('LeafletMap: Fallback - forcing container ready');
           setIsContainerReady(true);
           cleanupDoneRef.current = true;
         }
@@ -419,7 +424,7 @@ export function LeafletMap({
       // Additional fallback with longer timeout
       const longFallbackTimer = setTimeout(() => {
         if (!isContainerReady) {
-          console.log('LeafletMap: Long fallback - forcing container ready');
+          logger.debug('LeafletMap: Long fallback - forcing container ready');
           setIsContainerReady(true);
           cleanupDoneRef.current = true;
         }
@@ -447,7 +452,7 @@ export function LeafletMap({
             delete (container as any)._leaflet;
           }
         } catch (err) {
-          console.warn('LeafletMap: Error cleaning up container:', err);
+          logger.warn('LeafletMap: Error cleaning up container:', err);
         }
         }
       }
@@ -518,7 +523,11 @@ export function LeafletMap({
               
               // If container already has a Leaflet instance, don't render MapContainer
               if ((container as any)._leaflet_id) {
-                console.warn('LeafletMap: Container already has Leaflet ID, skipping render');
+                // Only log in development
+                const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+                if (isDev) {
+                  logger.debug('LeafletMap: Container already has Leaflet ID, skipping render');
+                }
                 // Try to clean it up and force remount
                 try {
                   const L = (window as any).L;
@@ -533,7 +542,7 @@ export function LeafletMap({
                   // Force remount on next render
                   setTimeout(() => setMapKey(Date.now()), 0);
                 } catch (err) {
-                  console.warn('LeafletMap: Error cleaning up during render:', err);
+                  logger.error('LeafletMap: Error cleaning up during render:', err);
                 }
                 return null;
               }
@@ -694,7 +703,7 @@ export function LeafletMap({
       </div>
     );
   } catch (error) {
-    console.error('Map rendering error:', error);
+    logger.error('Map rendering error:', error);
     return (
       <div className="w-full h-96 bg-red-50 flex items-center justify-center rounded-lg border border-red-200">
         <div className="text-center p-4">
