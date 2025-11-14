@@ -175,10 +175,17 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
   // Initialize map data with optimized geocoding
   useEffect(() => {
     const initializeMapData = async () => {
-      const properties: MapProperty[] = [];
-      
-      // Add primary property
-      if (analysis?.property.address) {
+      try {
+        const properties: MapProperty[] = [];
+        
+        // Safety check - ensure analysis and property exist
+        if (!analysis || !analysis.property) {
+          console.warn('[Map Init] Analysis or property is missing');
+          return;
+        }
+        
+        // Add primary property
+        if (analysis.property.address) {
         // Construct full address with city and state for better geocoding accuracy
         let fullAddress = analysis.property.address;
         if (analysis.property.city || analysis.property.state) {
@@ -209,11 +216,11 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
         const coords = await geocodeAddress(currentAddress);
         if (coords) {
           properties.push({
-            id: analysis.propertyId,
+            id: analysis.propertyId || `temp-${Date.now()}`,
             lat: coords.lat,
             lng: coords.lng,
             address: currentAddress,
-            price: analysis.property.purchasePrice,
+            price: analysis.property.purchasePrice || 0,
             type: 'primary',
             status: analysis.meetsCriteria ? 'meets_criteria' : 'does_not_meet',
             details: analysis
@@ -241,15 +248,15 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
 
       // Add comparison properties
       const compPromises = comparisonAnalyses.map(async (comp) => {
-        if (comp.property.address) {
+        if (comp?.property?.address) {
           const coords = await geocodeAddress(comp.property.address);
           if (coords) {
             return {
-              id: comp.propertyId,
+              id: comp.propertyId || `temp-${Date.now()}`,
               lat: coords.lat,
               lng: coords.lng,
               address: comp.property.address,
-              price: comp.property.purchasePrice,
+              price: comp.property.purchasePrice || 0,
               type: 'comparison' as const,
               status: comp.meetsCriteria ? 'meets_criteria' as const : 'does_not_meet' as const,
               details: comp
@@ -345,6 +352,12 @@ export function MapIntegration({ analysis, comparisonAnalyses = [] }: MapIntegra
           }
         ];
         setPointsOfInterest(pois);
+      }
+      } catch (error) {
+        console.error('[Map Init] Error initializing map data:', error);
+        // Set empty properties on error to prevent crash
+        setMapProperties([]);
+        setPointsOfInterest([]);
       }
     };
 

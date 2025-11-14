@@ -19,6 +19,20 @@ interface AnalysisResultsProps {
 }
 
 export function AnalysisResults({ analysis, criteria, onAnalysisUpdate, onAddToComparison, isInComparison, comparisonAnalyses = [] }: AnalysisResultsProps) {
+  // Safety check - ensure analysis and property exist
+  if (!analysis || !analysis.property) {
+    return (
+      <div className="bg-card rounded-lg border border-border shadow-sm p-8 text-center">
+        <div className="text-red-600">Error: Invalid analysis data</div>
+      </div>
+    );
+  }
+
+  // Generate unique keys with fallbacks
+  const propertyId = analysis.propertyId || `temp-${Date.now()}`;
+  const analysisDate = analysis.analysisDate || new Date().toISOString();
+  const uniqueKey = `${propertyId}-${analysisDate}`;
+
   return (
     <div className="space-y-6">
       <ConfettiCelebration 
@@ -42,21 +56,21 @@ export function AnalysisResults({ analysis, criteria, onAnalysisUpdate, onAddToC
       )}
       
       <PropertyOverview analysis={analysis} onAnalysisUpdate={onAnalysisUpdate} />
-      <FinancialBreakdown key={`financial-${analysis.propertyId}-${analysis.analysisDate}`} analysis={analysis} />
+      <FinancialBreakdown key={`financial-${uniqueKey}`} analysis={analysis} />
       <STRMetrics analysis={analysis} criteria={criteria} onAnalysisUpdate={onAnalysisUpdate} />
       <InteractiveCharts 
-        key={`charts-${analysis.propertyId}-${analysis.analysisDate}`}
+        key={`charts-${uniqueKey}`}
         analysis={analysis} 
         criteria={criteria}
         comparisonAnalyses={comparisonAnalyses}
       />
       <MapIntegration 
-        key={`map-${analysis.propertyId}-${analysis.analysisDate}`}
+        key={`map-${uniqueKey}`}
         analysis={analysis}
         comparisonAnalyses={comparisonAnalyses}
       />
-      {analysis.aiAnalysis && <AIInsights key={`ai-${analysis.propertyId}-${analysis.analysisDate}`} aiAnalysis={analysis.aiAnalysis} />}
-      <CriteriaAssessment key={`criteria-${analysis.propertyId}-${analysis.analysisDate}`} analysis={analysis} criteria={criteria} />
+      {analysis.aiAnalysis && <AIInsights key={`ai-${uniqueKey}`} aiAnalysis={analysis.aiAnalysis} />}
+      <CriteriaAssessment key={`criteria-${uniqueKey}`} analysis={analysis} criteria={criteria} />
     </div>
   );
 }
