@@ -29,7 +29,22 @@ import type { DealAnalysis, ComparableSale, NeighborhoodTrend } from "@shared/sc
 // Dynamically import map with SSR disabled and a loading placeholder
 // Note: leaflet.css is imported in leaflet-map.tsx using useEffect to prevent SSR issues
 const DynamicMap = dynamic(
-  () => import('./leaflet-map').then(mod => mod.LeafletMap),
+  () => import('./leaflet-map').then(mod => mod.LeafletMap).catch(err => {
+    console.error('Failed to load LeafletMap component:', err);
+    // Return a fallback component
+    return function ErrorMap() {
+      return (
+        <div className="w-full h-96 bg-yellow-50 border-2 border-yellow-400 flex flex-col items-center justify-center rounded-lg p-6">
+          <div className="text-center max-w-md">
+            <div className="text-yellow-800 font-bold text-lg mb-2">⚠️ Map Loading Failed</div>
+            <p className="text-yellow-700 text-sm">
+              The map component could not be loaded. Please refresh the page.
+            </p>
+          </div>
+        </div>
+      );
+    };
+  }),
   { 
     ssr: false,
     loading: () => <div className="w-full h-96 bg-gray-100 flex items-center justify-center">Loading map...</div>

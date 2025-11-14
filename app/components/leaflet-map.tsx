@@ -706,4 +706,6 @@ export function LeafletMap({
   }
 }
 
+// Default export for compatibility
+export default LeafletMap;
 

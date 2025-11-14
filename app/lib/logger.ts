@@ -1,8 +1,10 @@
 /**
  * Optimized logging - no-op in production for better performance
+ * Safe for client-side use in Next.js
  */
 
-const isDevelopment = process.env.NODE_ENV === 'development';
+// Safely check NODE_ENV - works in both server and client contexts
+const isDevelopment = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
 
 export const logger = {
   log: isDevelopment ? console.log : () => {},
