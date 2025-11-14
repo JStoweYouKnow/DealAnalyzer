@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,6 +46,7 @@ export function AdvancedSearch() {
   const [selectedDeal, setSelectedDeal] = useState<EmailDeal | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -226,6 +227,14 @@ export function AdvancedSearch() {
     });
   }, [emailDeals, searchFilters, searchText]);
 
+  // Track when a search has been executed
+  useEffect(() => {
+    const hasActiveSearch = searchText.trim().length > 0 || Object.keys(searchFilters).length > 0;
+    if (hasActiveSearch) {
+      setHasSearched(true);
+    }
+  }, [searchText, searchFilters]);
+
   // Get unique cities and states from email deals
   const availableLocations = useMemo(() => {
     const cities = new Set<string>();
@@ -309,6 +318,7 @@ export function AdvancedSearch() {
 
   const loadSavedFilter = (filter: SavedFilter) => {
     setSearchFilters(filter.filterCriteria);
+    setHasSearched(true);
     toast({
       title: "Filter Loaded",
       description: `Applied filter: ${filter.name}`,
@@ -318,6 +328,7 @@ export function AdvancedSearch() {
   const clearFilters = () => {
     setSearchFilters({});
     setSearchText("");
+    setHasSearched(false);
     toast({
       title: "Filters Cleared",
       description: "All search filters have been reset.",
@@ -851,35 +862,36 @@ export function AdvancedSearch() {
       </Tabs>
 
       {/* Search Results */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Search Results</span>
-            <Badge variant="outline">
-              {filteredDeals.length} of {emailDeals.length} deals
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {dealsLoading ? (
-            <div className="text-center py-8">Loading email deals...</div>
-          ) : emailDeals.length === 0 ? (
-            <div className="text-center py-8">
-              <Mail className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Email Deals Found</h3>
-              <p className="text-muted-foreground">
-                Connect your Gmail account and sync emails to see deals here.
-              </p>
-            </div>
-          ) : filteredDeals.length === 0 ? (
-            <div className="text-center py-8">
-              <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Matches Found</h3>
-              <p className="text-muted-foreground">
-                Try adjusting your search criteria or clearing filters.
-              </p>
-            </div>
-          ) : (
+      {hasSearched && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Search Results</span>
+              <Badge variant="outline">
+                {filteredDeals.length} of {emailDeals.length} deals
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {dealsLoading ? (
+              <div className="text-center py-8">Loading email deals...</div>
+            ) : emailDeals.length === 0 ? (
+              <div className="text-center py-8">
+                <Mail className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Email Deals Found</h3>
+                <p className="text-muted-foreground">
+                  Connect your Gmail account and sync emails to see deals here.
+                </p>
+              </div>
+            ) : filteredDeals.length === 0 ? (
+              <div className="text-center py-8">
+                <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Matches Found</h3>
+                <p className="text-muted-foreground">
+                  Try adjusting your search criteria or clearing filters.
+                </p>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredDeals.map((deal) => {
                 const property = deal.extractedProperty;
@@ -986,6 +998,7 @@ export function AdvancedSearch() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Property Details Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
