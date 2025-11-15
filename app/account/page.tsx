@@ -45,28 +45,9 @@ export default function AccountPage() {
     cocMinimumMin: 6,
     cocMinimumMax: 8,
     capBenchmarkMin: 6,
-  const handleSaveProfile = async () => {
-    try {
-      await apiRequest('PUT', '/api/user/profile', { 
-        body: JSON.stringify({ email: userEmail }) 
-      });
-      toast({
-        title: "Profile Updated",
-        description: "Your profile information has been saved successfully.",
-      });
-      setIsEditing(false);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update profile. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-    cocMinimum?: string;
-    capBenchmark?: string;
-    maxPrice?: string;
-  }>({});
+    capBenchmarkMax: 9,
+    capMinimum: 5,
+  });
 
   // Export Preferences state
   const [exportEditing, setExportEditing] = useState(false);
