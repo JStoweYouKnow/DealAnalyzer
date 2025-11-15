@@ -269,22 +269,41 @@ export default function AccountPage() {
         criteria: {
           price_min: 0, // Required by schema, minimum price
           price_max: values.maxPrice,
-          coc_return_min: values.cocMinimumMin, // Required: map cocMinimumMin to coc_return_min
-          coc_return_max: values.cocMinimumMax, // Required: map cocMinimumMax to coc_return_max
-          coc_benchmark_min: values.cocBenchmarkMin, // Optional
-          coc_benchmark_max: values.cocBenchmarkMax, // Optional
-          coc_minimum_min: values.cocMinimumMin, // Optional
-          coc_minimum_max: values.cocMinimumMax, // Optional
-          cap_rate_min: values.capMinimum, // Required: map capMinimum to cap_rate_min
-          cap_rate_max: values.capBenchmarkMax, // Required: map capBenchmarkMax to cap_rate_max
-          cap_benchmark_min: values.capBenchmarkMin, // Optional
-          cap_benchmark_max: values.capBenchmarkMax, // Optional
-          cap_minimum: values.capMinimum, // Optional
+          // Schema expects percentages (0-100), API route will convert to decimals
+          coc_return_min: values.cocMinimumMin, // Required: main COC return minimum (as percentage)
+          coc_return_max: values.cocMinimumMax, // Required: main COC return maximum (as percentage)
+          coc_benchmark_min: values.cocBenchmarkMin, // Optional: COC benchmark minimum (as percentage)
+          coc_benchmark_max: values.cocBenchmarkMax, // Optional: COC benchmark maximum (as percentage)
+          coc_minimum_min: values.cocMinimumMin, // Optional: minimum acceptable COC min (as percentage)
+          coc_minimum_max: values.cocMinimumMax, // Optional: minimum acceptable COC max (as percentage)
+          cap_rate_min: values.capBenchmarkMin, // Required: main cap rate minimum (as percentage)
+          cap_rate_max: values.capBenchmarkMax, // Required: main cap rate maximum (as percentage)
+          cap_benchmark_min: values.capBenchmarkMin, // Optional: cap benchmark minimum (as percentage)
+          cap_benchmark_max: values.capBenchmarkMax, // Optional: cap benchmark maximum (as percentage)
+          cap_minimum: values.capMinimum, // Optional: absolute minimum cap rate (as percentage)
         },
       });
-      return response.json();
+      const data = await response.json();
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Update the query cache with the new data if available
+      if (data?.data) {
+        queryClient.setQueryData(['/api/criteria'], data.data);
+        // Also update local state immediately for instant UI update
+        const updatedCriteria = data.data;
+        setCriteriaValues({
+          maxPrice: updatedCriteria.max_purchase_price || 500000,
+          cocBenchmarkMin: (updatedCriteria.coc_benchmark_min || 0.08) * 100,
+          cocBenchmarkMax: (updatedCriteria.coc_benchmark_max || 0.12) * 100,
+          cocMinimumMin: (updatedCriteria.coc_minimum_min || 0.06) * 100,
+          cocMinimumMax: (updatedCriteria.coc_minimum_max || 0.08) * 100,
+          capBenchmarkMin: (updatedCriteria.cap_benchmark_min || 0.06) * 100,
+          capBenchmarkMax: (updatedCriteria.cap_benchmark_max || 0.09) * 100,
+          capMinimum: (updatedCriteria.cap_minimum || 0.05) * 100,
+        });
+      }
+      // Also invalidate to trigger a refetch in case the response format differs
       queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
       toast({
         title: "Criteria Updated",
