@@ -62,6 +62,36 @@ export async function PUT(request: NextRequest) {
 
     const { criteria } = validation.data;
     
+    // Map form fields to API fields
+    // Form sends: coc_return_min/max (as percentages like 8.0, 15.0)
+    // API expects: coc_minimum_min/max (as decimals like 0.08, 0.15)
+    const coc_minimum_min = criteria.coc_return_min !== undefined 
+      ? criteria.coc_return_min / 100 
+      : (criteria.coc_minimum_min !== undefined ? criteria.coc_minimum_min / 100 : DEFAULT_CRITERIA.coc_minimum_min);
+    const coc_minimum_max = criteria.coc_return_max !== undefined 
+      ? criteria.coc_return_max / 100 
+      : (criteria.coc_minimum_max !== undefined ? criteria.coc_minimum_max / 100 : DEFAULT_CRITERIA.coc_minimum_max);
+    
+    // Use coc_return values for benchmark if provided, otherwise use defaults or explicit benchmark values
+    const coc_benchmark_min = criteria.coc_benchmark_min !== undefined 
+      ? criteria.coc_benchmark_min / 100 
+      : (criteria.coc_return_min !== undefined ? criteria.coc_return_min / 100 : DEFAULT_CRITERIA.coc_benchmark_min);
+    const coc_benchmark_max = criteria.coc_benchmark_max !== undefined 
+      ? criteria.coc_benchmark_max / 100 
+      : (criteria.coc_return_max !== undefined ? criteria.coc_return_max / 100 : DEFAULT_CRITERIA.coc_benchmark_max);
+    
+    // Form sends: cap_rate_min/max (as percentages like 4.0, 12.0)
+    // API expects: cap_minimum (as decimal like 0.04) and cap_benchmark_max (as decimal like 0.12)
+    const cap_minimum = criteria.cap_rate_min !== undefined 
+      ? criteria.cap_rate_min / 100 
+      : (criteria.cap_minimum !== undefined ? criteria.cap_minimum / 100 : DEFAULT_CRITERIA.cap_minimum);
+    const cap_benchmark_max = criteria.cap_rate_max !== undefined 
+      ? criteria.cap_rate_max / 100 
+      : (criteria.cap_benchmark_max !== undefined ? criteria.cap_benchmark_max / 100 : DEFAULT_CRITERIA.cap_benchmark_max);
+    const cap_benchmark_min = criteria.cap_benchmark_min !== undefined 
+      ? criteria.cap_benchmark_min / 100 
+      : (criteria.cap_rate_min !== undefined ? criteria.cap_rate_min / 100 : DEFAULT_CRITERIA.cap_benchmark_min);
+    
     // Build updated criteria structure from the request
     // Note: This is stored in-memory and doesn't persist across server restarts
     // In production, this should be stored in a database
@@ -75,13 +105,13 @@ export async function PUT(request: NextRequest) {
       closing_costs_percentage_max: DEFAULT_CRITERIA.closing_costs_percentage_max,
       initial_fixed_costs_percentage: DEFAULT_CRITERIA.initial_fixed_costs_percentage,
       maintenance_reserve_percentage: DEFAULT_CRITERIA.maintenance_reserve_percentage,
-      coc_benchmark_min: (criteria.coc_benchmark_min ?? (DEFAULT_CRITERIA.coc_benchmark_min * 100)) / 100,
-      coc_benchmark_max: (criteria.coc_benchmark_max ?? (DEFAULT_CRITERIA.coc_benchmark_max * 100)) / 100,
-      coc_minimum_min: (criteria.coc_minimum_min ?? (DEFAULT_CRITERIA.coc_minimum_min * 100)) / 100,
-      coc_minimum_max: (criteria.coc_minimum_max ?? (DEFAULT_CRITERIA.coc_minimum_max * 100)) / 100,
-      cap_benchmark_min: (criteria.cap_benchmark_min ?? (DEFAULT_CRITERIA.cap_benchmark_min * 100)) / 100,
-      cap_benchmark_max: (criteria.cap_benchmark_max ?? (DEFAULT_CRITERIA.cap_benchmark_max * 100)) / 100,
-      cap_minimum: (criteria.cap_minimum ?? (DEFAULT_CRITERIA.cap_minimum * 100)) / 100,
+      coc_benchmark_min,
+      coc_benchmark_max,
+      coc_minimum_min,
+      coc_minimum_max,
+      cap_benchmark_min,
+      cap_benchmark_max,
+      cap_minimum,
       str_adr_minimum: DEFAULT_CRITERIA.str_adr_minimum,
       str_occupancy_rate_minimum: DEFAULT_CRITERIA.str_occupancy_rate_minimum,
       str_gross_yield_minimum: DEFAULT_CRITERIA.str_gross_yield_minimum,
@@ -94,8 +124,8 @@ export async function PUT(request: NextRequest) {
       capMinimum: updatedCriteria.cap_minimum,
     });
     
-    // Invalidate cache so subsequent reads fetch fresh data
-    criteriaCache.del('investment-criteria');
+    // Update cache with new criteria so subsequent reads get the updated values
+    criteriaCache.set('investment-criteria', updatedCriteria, 3600); // Cache for 1 hour
     
     return NextResponse.json({
       success: true,
