@@ -316,7 +316,7 @@
   content: '';
   @apply absolute inset-0 rounded-[inherit] p-[1px] bg-gradient-to-r from-primary/50 via-primary to-primary/50;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
 }
 
