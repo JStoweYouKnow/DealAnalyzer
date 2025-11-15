@@ -64,7 +64,6 @@ const FUNDING_SOURCE_DOWN_PAYMENT_DEFAULTS: Record<FundingSource, number> = {
 
 export default function DealsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'reviewed' | 'analyzed' | 'archived'>('all');
-  const [searchTerm, setSearchTerm] = useState('');
   const [editingDeal, setEditingDeal] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{[key: string]: {price?: number, rent?: number, adr?: number, occupancyRate?: number, bedrooms?: number, bathrooms?: number, fundingSource?: FundingSource, mortgageValues?: MortgageValues | null}}>({});
   const [mortgageInputs, setMortgageInputs] = useState<Record<string, DealMortgageInputs>>({});
@@ -820,14 +819,9 @@ export default function DealsPage() {
     }
   });
 
-  // Filter deals based on status and search
+  // Filter deals based on status
   const filteredDeals = emailDeals.filter(deal => {
-    const matchesStatus = statusFilter === 'all' || deal.status === statusFilter;
-    const matchesSearch = !searchTerm || 
-      deal.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      deal.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      deal.extractedProperty?.address?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
+    return statusFilter === 'all' || deal.status === statusFilter;
   });
 
   const formatCurrency = (amount: number) => {
@@ -964,16 +958,10 @@ export default function DealsPage() {
             </div>
           </div>
           
-          {/* Filters and Search */}
+          {/* Filters */}
           <div className="flex items-center justify-between mt-6 pt-6 border-t border-border">
             <h2 className="text-lg font-semibold">Dashboard Controls</h2>
             <div className="flex items-center space-x-4">
-              <Input
-                placeholder="Search deals..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-64"
-              />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
