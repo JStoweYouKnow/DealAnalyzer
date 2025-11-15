@@ -174,44 +174,24 @@ export const criteriaResponseSchema = z.object({
   str_annual_revenue_minimum: z.number().optional(),
 });
 
-// Configurable criteria ranges schema for user input
+// Configurable criteria schema for user input (using single scalar values)
 export const configurableCriteriaSchema = z.object({
-  // Price range
+  // Price range (kept as range since it makes sense)
   price_min: z.number().min(0, "Minimum price must be positive"),
   price_max: z.number().min(0, "Maximum price must be positive"),
   
-  // COC Return range (as percentages, will be converted to decimals)
-  coc_return_min: z.number().min(0, "COC return minimum must be positive").max(100, "COC return cannot exceed 100%"),
-  coc_return_max: z.number().min(0, "COC return maximum must be positive").max(100, "COC return cannot exceed 100%"),
-  coc_benchmark_min: z.number().min(0, "COC benchmark minimum must be positive").max(100, "COC benchmark cannot exceed 100%").optional(),
-  coc_benchmark_max: z.number().min(0, "COC benchmark maximum must be positive").max(100, "COC benchmark cannot exceed 100%").optional(),
-  coc_minimum_min: z.number().min(0, "COC minimum minimum must be positive").max(100, "COC minimum cannot exceed 100%").optional(),
-  coc_minimum_max: z.number().min(0, "COC minimum maximum must be positive").max(100, "COC minimum cannot exceed 100%").optional(),
+  // COC Return (single scalar value as percentage, will be converted to decimal)
+  coc_return: z.number().min(0, "COC return must be positive").max(100, "COC return cannot exceed 100%"),
+  coc_benchmark: z.number().min(0, "COC benchmark must be positive").max(100, "COC benchmark cannot exceed 100%").optional(),
+  coc_minimum: z.number().min(0, "COC minimum must be positive").max(100, "COC minimum cannot exceed 100%").optional(),
   
-  // Cap Rate range (as percentages, will be converted to decimals)
-  cap_rate_min: z.number().min(0, "Cap rate minimum must be positive").max(100, "Cap rate cannot exceed 100%"),
-  cap_rate_max: z.number().min(0, "Cap rate maximum must be positive").max(100, "Cap rate cannot exceed 100%"),
-  cap_benchmark_min: z.number().min(0, "Cap benchmark minimum must be positive").max(100, "Cap benchmark cannot exceed 100%").optional(),
-  cap_benchmark_max: z.number().min(0, "Cap benchmark maximum must be positive").max(100, "Cap benchmark cannot exceed 100%").optional(),
+  // Cap Rate (single scalar value as percentage, will be converted to decimal)
+  cap_rate: z.number().min(0, "Cap rate must be positive").max(100, "Cap rate cannot exceed 100%"),
+  cap_benchmark: z.number().min(0, "Cap benchmark must be positive").max(100, "Cap benchmark cannot exceed 100%").optional(),
   cap_minimum: z.number().min(0, "Cap minimum must be positive").max(100, "Cap minimum cannot exceed 100%").optional(),
 }).refine(data => data.price_min <= data.price_max, {
   message: "Minimum price cannot be greater than maximum price",
   path: ["price_max"]
-}).refine(data => data.coc_return_min <= data.coc_return_max, {
-  message: "Minimum COC return cannot be greater than maximum COC return", 
-  path: ["coc_return_max"]
-}).refine(data => data.cap_rate_min <= data.cap_rate_max, {
-  message: "Minimum cap rate cannot be greater than maximum cap rate",
-  path: ["cap_rate_max"]
-}).refine(data => !data.coc_benchmark_min || !data.coc_benchmark_max || data.coc_benchmark_min <= data.coc_benchmark_max, {
-  message: "COC benchmark minimum cannot be greater than maximum",
-  path: ["coc_benchmark_max"]
-}).refine(data => !data.coc_minimum_min || !data.coc_minimum_max || data.coc_minimum_min <= data.coc_minimum_max, {
-  message: "COC minimum minimum cannot be greater than maximum",
-  path: ["coc_minimum_max"]
-}).refine(data => !data.cap_benchmark_min || !data.cap_benchmark_max || data.cap_benchmark_min <= data.cap_benchmark_max, {
-  message: "Cap benchmark minimum cannot be greater than maximum",
-  path: ["cap_benchmark_max"]
 });
 
 // Update criteria request schema

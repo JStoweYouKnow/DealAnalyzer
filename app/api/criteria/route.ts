@@ -14,12 +14,26 @@ async function getConvexClient() {
 }
 
 async function getConvexApi(): Promise<any> {
+  // Use dynamic import with try-catch to handle missing Convex generated files
+  // This prevents build errors when Convex files don't exist yet
+  if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
+    return null;
+  }
+
   try {
-    // @ts-ignore - Convex API types may not be generated yet, but this will work at runtime
-    const apiModule = await import('../../../../convex/_generated/api');
-    return apiModule.api;
-  } catch (error) {
-    console.error('Failed to import Convex API:', error);
+    // Use Function constructor to create a dynamic import that webpack can't analyze
+    // This prevents webpack from trying to resolve the module at build time
+    const importPath = '../../../../convex/_generated/api';
+    const dynamicImport = new Function('path', 'return import(path)');
+    // @ts-ignore - dynamic import path
+    const apiModule = await dynamicImport(importPath);
+    return apiModule?.api || null;
+  } catch (error: any) {
+    // Convex API not generated yet or not available - this is OK
+    // Only log if it's not a module not found error (which is expected)
+    if (error?.code !== 'MODULE_NOT_FOUND' && !error?.message?.includes('Cannot find module')) {
+      console.warn('Failed to import Convex API:', error?.message || error);
+    }
     return null;
   }
 }
@@ -131,35 +145,40 @@ export async function PUT(request: NextRequest) {
 
     const { criteria } = validation.data;
     
-    // Map form fields to API fields
-    // Form sends: coc_return_min/max (as percentages like 8.0, 15.0)
-    // API expects: coc_minimum_min/max (as decimals like 0.08, 0.15)
-    const coc_minimum_min = criteria.coc_return_min !== undefined 
-      ? criteria.coc_return_min / 100 
-      : (criteria.coc_minimum_min !== undefined ? criteria.coc_minimum_min / 100 : DEFAULT_CRITERIA.coc_minimum_min);
-    const coc_minimum_max = criteria.coc_return_max !== undefined 
-      ? criteria.coc_return_max / 100 
-      : (criteria.coc_minimum_max !== undefined ? criteria.coc_minimum_max / 100 : DEFAULT_CRITERIA.coc_minimum_max);
+    // Map single scalar values (as percentages) to decimals and create ranges for Convex
+    // Form sends: coc_return, coc_benchmark, coc_minimum, cap_rate, cap_benchmark, cap_minimum (as percentages)
+    // Convex expects: min/max pairs (as decimals)
     
-    // Use coc_return values for benchmark if provided, otherwise use defaults or explicit benchmark values
-    const coc_benchmark_min = criteria.coc_benchmark_min !== undefined 
-      ? criteria.coc_benchmark_min / 100 
-      : (criteria.coc_return_min !== undefined ? criteria.coc_return_min / 100 : DEFAULT_CRITERIA.coc_benchmark_min);
-    const coc_benchmark_max = criteria.coc_benchmark_max !== undefined 
-      ? criteria.coc_benchmark_max / 100 
-      : (criteria.coc_return_max !== undefined ? criteria.coc_return_max / 100 : DEFAULT_CRITERIA.coc_benchmark_max);
+    // Convert COC return from percentage to decimal and create a small range (±1%)
+    const cocReturnDecimal = (criteria.coc_return ?? DEFAULT_CRITERIA.coc_minimum_min * 100) / 100;
+    const coc_minimum_min = Math.max(0, cocReturnDecimal - 0.01); // 1% below target
+    const coc_minimum_max = Math.min(1, cocReturnDecimal + 0.01); // 1% above target
     
-    // Form sends: cap_rate_min/max (as percentages like 4.0, 12.0)
-    // API expects: cap_minimum (as decimal like 0.04) and cap_benchmark_max (as decimal like 0.12)
-    const cap_minimum = criteria.cap_rate_min !== undefined 
-      ? criteria.cap_rate_min / 100 
-      : (criteria.cap_minimum !== undefined ? criteria.cap_minimum / 100 : DEFAULT_CRITERIA.cap_minimum);
-    const cap_benchmark_max = criteria.cap_rate_max !== undefined 
-      ? criteria.cap_rate_max / 100 
-      : (criteria.cap_benchmark_max !== undefined ? criteria.cap_benchmark_max / 100 : DEFAULT_CRITERIA.cap_benchmark_max);
-    const cap_benchmark_min = criteria.cap_benchmark_min !== undefined 
-      ? criteria.cap_benchmark_min / 100 
-      : (criteria.cap_rate_min !== undefined ? criteria.cap_rate_min / 100 : DEFAULT_CRITERIA.cap_benchmark_min);
+    // Convert COC benchmark from percentage to decimal and create a small range (±1%)
+    const cocBenchmarkDecimal = criteria.coc_benchmark !== undefined 
+      ? criteria.coc_benchmark / 100 
+      : cocReturnDecimal; // Default to coc_return if not provided
+    const coc_benchmark_min = Math.max(0, cocBenchmarkDecimal - 0.01);
+    const coc_benchmark_max = Math.min(1, cocBenchmarkDecimal + 0.01);
+    
+    // Convert COC minimum from percentage to decimal (use as-is, no range needed for minimum)
+    const cocMinimumDecimal = criteria.coc_minimum !== undefined 
+      ? criteria.coc_minimum / 100 
+      : coc_minimum_min; // Default to coc_minimum_min if not provided
+    
+    // Convert cap rate from percentage to decimal and create a small range (±0.5%)
+    const capRateDecimal = (criteria.cap_rate ?? DEFAULT_CRITERIA.cap_minimum * 100) / 100;
+    const cap_benchmark_min = Math.max(0, capRateDecimal - 0.005); // 0.5% below target
+    const cap_benchmark_max = Math.min(1, capRateDecimal + 0.005); // 0.5% above target
+    
+    // Convert cap minimum from percentage to decimal (use as-is)
+    const cap_minimum = criteria.cap_minimum !== undefined 
+      ? criteria.cap_minimum / 100 
+      : (criteria.cap_benchmark !== undefined ? criteria.cap_benchmark / 100 : DEFAULT_CRITERIA.cap_minimum);
+    
+    // Use coc_minimum for the minimum range if provided, otherwise use coc_return range
+    const finalCocMinimumMin = criteria.coc_minimum !== undefined ? cocMinimumDecimal : coc_minimum_min;
+    const finalCocMinimumMax = criteria.coc_minimum !== undefined ? cocMinimumDecimal : coc_minimum_max;
     
     // Save to Convex database for persistence (only if userId is available)
     if (userId) {
@@ -171,8 +190,8 @@ export async function PUT(request: NextRequest) {
           await client.mutation((apiInstance as any).userCriteria.updateCriteria, {
             userId,
             max_purchase_price: criteria.price_max ?? DEFAULT_CRITERIA.max_purchase_price,
-            coc_minimum_min,
-            coc_minimum_max,
+            coc_minimum_min: finalCocMinimumMin,
+            coc_minimum_max: finalCocMinimumMax,
             coc_benchmark_min,
             coc_benchmark_max,
             cap_minimum,
@@ -219,8 +238,8 @@ export async function PUT(request: NextRequest) {
       maintenance_reserve_percentage: DEFAULT_CRITERIA.maintenance_reserve_percentage,
       coc_benchmark_min,
       coc_benchmark_max,
-      coc_minimum_min,
-      coc_minimum_max,
+      coc_minimum_min: finalCocMinimumMin,
+      coc_minimum_max: finalCocMinimumMax,
       cap_benchmark_min,
       cap_benchmark_max,
       cap_minimum,

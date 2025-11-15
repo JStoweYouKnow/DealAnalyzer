@@ -77,7 +77,7 @@ const nextConfig = {
       },
     ];
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => {
     // Fix for Leaflet in serverless environments
     // Only apply to client builds (not server-side)
     if (!isServer) {
@@ -90,6 +90,10 @@ const nextConfig = {
         crypto: false,
       };
     }
+    
+    // Note: Convex API imports are handled dynamically with Function constructor
+    // to prevent webpack from trying to resolve them at build time
+    
     return config;
   },
   // Path aliases are configured in tsconfig.json

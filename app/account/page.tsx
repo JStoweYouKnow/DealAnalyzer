@@ -267,20 +267,32 @@ export default function AccountPage() {
     mutationFn: async (values: typeof criteriaValues) => {
       const response = await apiRequest('PUT', '/api/criteria', {
         criteria: {
+          // Price range (required)
           price_min: 0, // Required by schema, minimum price
           price_max: values.maxPrice,
-          // Schema expects percentages (0-100), API route will convert to decimals
-          coc_return_min: values.cocMinimumMin, // Required: main COC return minimum (as percentage)
-          coc_return_max: values.cocMinimumMax, // Required: main COC return maximum (as percentage)
-          coc_benchmark_min: values.cocBenchmarkMin, // Optional: COC benchmark minimum (as percentage)
-          coc_benchmark_max: values.cocBenchmarkMax, // Optional: COC benchmark maximum (as percentage)
-          coc_minimum_min: values.cocMinimumMin, // Optional: minimum acceptable COC min (as percentage)
-          coc_minimum_max: values.cocMinimumMax, // Optional: minimum acceptable COC max (as percentage)
-          cap_rate_min: values.capBenchmarkMin, // Required: main cap rate minimum (as percentage)
-          cap_rate_max: values.capBenchmarkMax, // Required: main cap rate maximum (as percentage)
-          cap_benchmark_min: values.capBenchmarkMin, // Optional: cap benchmark minimum (as percentage)
-          cap_benchmark_max: values.capBenchmarkMax, // Optional: cap benchmark maximum (as percentage)
-          cap_minimum: values.capMinimum, // Optional: absolute minimum cap rate (as percentage)
+          
+          // COC Return (required) - single scalar value as percentage
+          // Using the average of min/max as the target return
+          coc_return: (values.cocMinimumMin + values.cocMinimumMax) / 2,
+          
+          // COC Benchmark (optional) - single scalar value as percentage
+          // Using the average of benchmark min/max as the target benchmark
+          coc_benchmark: (values.cocBenchmarkMin + values.cocBenchmarkMax) / 2,
+          
+          // COC Minimum (optional) - single scalar value as percentage
+          // Using the minimum value as the absolute minimum acceptable
+          coc_minimum: values.cocMinimumMin,
+          
+          // Cap Rate (required) - single scalar value as percentage
+          // Using the average of benchmark min/max as the target cap rate
+          cap_rate: (values.capBenchmarkMin + values.capBenchmarkMax) / 2,
+          
+          // Cap Benchmark (optional) - single scalar value as percentage
+          // Using the average of benchmark min/max
+          cap_benchmark: (values.capBenchmarkMin + values.capBenchmarkMax) / 2,
+          
+          // Cap Minimum (optional) - absolute minimum acceptable
+          cap_minimum: values.capMinimum,
         },
       });
       const data = await response.json();
