@@ -22,13 +22,29 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
   const queryClient = useQueryClient();
 
   // Convert current criteria to form format
+  // CriteriaResponse has min/max pairs, but we need single scalar values for the form
   const getDefaultValues = (): ConfigurableCriteria => ({
     price_min: 0,
     price_max: criteria?.max_purchase_price ?? 300000,
-    coc_return_min: (criteria?.coc_minimum_min ?? 0.08) * 100, // Convert to percentage
-    coc_return_max: (criteria?.coc_benchmark_max ?? 0.15) * 100,
-    cap_rate_min: (criteria?.cap_minimum ?? 0.04) * 100,
-    cap_rate_max: (criteria?.cap_benchmark_max ?? 0.12) * 100,
+    // Calculate average from min/max ranges for single scalar values
+    coc_return: criteria?.coc_minimum_min !== undefined && criteria?.coc_minimum_max !== undefined
+      ? ((criteria.coc_minimum_min + criteria.coc_minimum_max) / 2) * 100
+      : (criteria?.coc_minimum_min ?? 0.08) * 100, // Fallback to minimum if only one value
+    coc_benchmark: criteria?.coc_benchmark_min !== undefined && criteria?.coc_benchmark_max !== undefined
+      ? ((criteria.coc_benchmark_min + criteria.coc_benchmark_max) / 2) * 100
+      : undefined,
+    coc_minimum: criteria?.coc_minimum_min !== undefined
+      ? criteria.coc_minimum_min * 100
+      : undefined,
+    cap_rate: criteria?.cap_benchmark_min !== undefined && criteria?.cap_benchmark_max !== undefined
+      ? ((criteria.cap_benchmark_min + criteria.cap_benchmark_max) / 2) * 100
+      : (criteria?.cap_minimum ?? 0.04) * 100, // Fallback to minimum if only one value
+    cap_benchmark: criteria?.cap_benchmark_min !== undefined && criteria?.cap_benchmark_max !== undefined
+      ? ((criteria.cap_benchmark_min + criteria.cap_benchmark_max) / 2) * 100
+      : undefined,
+    cap_minimum: criteria?.cap_minimum !== undefined
+      ? criteria.cap_minimum * 100
+      : undefined,
   });
 
   const form = useForm<ConfigurableCriteria>({
@@ -116,22 +132,30 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
               </div>
             </div>
 
-            {/* COC Return Range */}
+            {/* COC Return */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">COC Return Range</Label>
+              <Label className="text-sm font-medium">COC Return</Label>
               <div className="flex flex-col space-y-1">
                 <Badge variant="outline" className="justify-center">
-                  {formatPercent((criteria?.coc_minimum_min ?? 0.08) * 100)} - {formatPercent((criteria?.coc_benchmark_max ?? 0.15) * 100)}
+                  {formatPercent(
+                    criteria?.coc_minimum_min !== undefined && criteria?.coc_minimum_max !== undefined
+                      ? ((criteria.coc_minimum_min + criteria.coc_minimum_max) / 2) * 100
+                      : (criteria?.coc_minimum_min ?? 0.08) * 100
+                  )}
                 </Badge>
               </div>
             </div>
 
-            {/* Cap Rate Range */}
+            {/* Cap Rate */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Cap Rate Range</Label>
+              <Label className="text-sm font-medium">Cap Rate</Label>
               <div className="flex flex-col space-y-1">
                 <Badge variant="outline" className="justify-center">
-                  {formatPercent((criteria?.cap_minimum ?? 0.04) * 100)} - {formatPercent((criteria?.cap_benchmark_max ?? 0.12) * 100)}
+                  {formatPercent(
+                    criteria?.cap_benchmark_min !== undefined && criteria?.cap_benchmark_max !== undefined
+                      ? ((criteria.cap_benchmark_min + criteria.cap_benchmark_max) / 2) * 100
+                      : (criteria?.cap_minimum ?? 0.04) * 100
+                  )}
                 </Badge>
               </div>
             </div>
@@ -186,71 +210,99 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
               </div>
             </div>
 
-            {/* COC Return Range */}
+            {/* COC Return */}
             <div className="space-y-4">
-              <Label className="text-sm font-medium">COC Return Range (%)</Label>
+              <Label className="text-sm font-medium">COC Return (%)</Label>
               <div className="space-y-2">
                 <div>
-                  <Label htmlFor="coc_return_min" className="text-xs text-muted-foreground">Minimum COC Return</Label>
+                  <Label htmlFor="coc_return" className="text-xs text-muted-foreground">Target COC Return</Label>
                   <Input
-                    id="coc_return_min"
+                    id="coc_return"
                     type="number"
                     step="0.1"
-                    placeholder="8.0"
-                    {...form.register('coc_return_min', { valueAsNumber: true })}
-                    data-testid="input-coc-min"
+                    placeholder="10.0"
+                    {...form.register('coc_return', { valueAsNumber: true })}
+                    data-testid="input-coc-return"
                   />
-                  {form.formState.errors.coc_return_min && (
-                    <p className="text-xs text-red-500">{form.formState.errors.coc_return_min.message}</p>
+                  {form.formState.errors.coc_return && (
+                    <p className="text-xs text-red-500">{form.formState.errors.coc_return.message}</p>
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="coc_return_max" className="text-xs text-muted-foreground">Maximum COC Return</Label>
+                  <Label htmlFor="coc_benchmark" className="text-xs text-muted-foreground">COC Benchmark (Optional)</Label>
                   <Input
-                    id="coc_return_max"
+                    id="coc_benchmark"
                     type="number"
                     step="0.1"
-                    placeholder="15.0"
-                    {...form.register('coc_return_max', { valueAsNumber: true })}
-                    data-testid="input-coc-max"
+                    placeholder="12.0"
+                    {...form.register('coc_benchmark', { valueAsNumber: true })}
+                    data-testid="input-coc-benchmark"
                   />
-                  {form.formState.errors.coc_return_max && (
-                    <p className="text-xs text-red-500">{form.formState.errors.coc_return_max.message}</p>
+                  {form.formState.errors.coc_benchmark && (
+                    <p className="text-xs text-red-500">{form.formState.errors.coc_benchmark.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="coc_minimum" className="text-xs text-muted-foreground">COC Minimum (Optional)</Label>
+                  <Input
+                    id="coc_minimum"
+                    type="number"
+                    step="0.1"
+                    placeholder="8.0"
+                    {...form.register('coc_minimum', { valueAsNumber: true })}
+                    data-testid="input-coc-minimum"
+                  />
+                  {form.formState.errors.coc_minimum && (
+                    <p className="text-xs text-red-500">{form.formState.errors.coc_minimum.message}</p>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Cap Rate Range */}
+            {/* Cap Rate */}
             <div className="space-y-4">
-              <Label className="text-sm font-medium">Cap Rate Range (%)</Label>
+              <Label className="text-sm font-medium">Cap Rate (%)</Label>
               <div className="space-y-2">
                 <div>
-                  <Label htmlFor="cap_rate_min" className="text-xs text-muted-foreground">Minimum Cap Rate</Label>
+                  <Label htmlFor="cap_rate" className="text-xs text-muted-foreground">Target Cap Rate</Label>
                   <Input
-                    id="cap_rate_min"
+                    id="cap_rate"
                     type="number"
                     step="0.1"
-                    placeholder="4.0"
-                    {...form.register('cap_rate_min', { valueAsNumber: true })}
-                    data-testid="input-cap-min"
+                    placeholder="8.0"
+                    {...form.register('cap_rate', { valueAsNumber: true })}
+                    data-testid="input-cap-rate"
                   />
-                  {form.formState.errors.cap_rate_min && (
-                    <p className="text-xs text-red-500">{form.formState.errors.cap_rate_min.message}</p>
+                  {form.formState.errors.cap_rate && (
+                    <p className="text-xs text-red-500">{form.formState.errors.cap_rate.message}</p>
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="cap_rate_max" className="text-xs text-muted-foreground">Maximum Cap Rate</Label>
+                  <Label htmlFor="cap_benchmark" className="text-xs text-muted-foreground">Cap Benchmark (Optional)</Label>
                   <Input
-                    id="cap_rate_max"
+                    id="cap_benchmark"
                     type="number"
                     step="0.1"
-                    placeholder="12.0"
-                    {...form.register('cap_rate_max', { valueAsNumber: true })}
-                    data-testid="input-cap-max"
+                    placeholder="9.0"
+                    {...form.register('cap_benchmark', { valueAsNumber: true })}
+                    data-testid="input-cap-benchmark"
                   />
-                  {form.formState.errors.cap_rate_max && (
-                    <p className="text-xs text-red-500">{form.formState.errors.cap_rate_max.message}</p>
+                  {form.formState.errors.cap_benchmark && (
+                    <p className="text-xs text-red-500">{form.formState.errors.cap_benchmark.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="cap_minimum" className="text-xs text-muted-foreground">Cap Minimum (Optional)</Label>
+                  <Input
+                    id="cap_minimum"
+                    type="number"
+                    step="0.1"
+                    placeholder="6.0"
+                    {...form.register('cap_minimum', { valueAsNumber: true })}
+                    data-testid="input-cap-minimum"
+                  />
+                  {form.formState.errors.cap_minimum && (
+                    <p className="text-xs text-red-500">{form.formState.errors.cap_minimum.message}</p>
                   )}
                 </div>
               </div>
