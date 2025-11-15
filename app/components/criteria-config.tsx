@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -25,7 +25,8 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
 
   // Convert current criteria to form format
   // CriteriaResponse has min/max pairs, but we need single scalar values for the form
-  const getDefaultValues = (): ConfigurableCriteria => ({
+  // Memoize to prevent unnecessary recalculations and ensure stable reference
+  const defaultValues = useMemo((): ConfigurableCriteria => ({
     price_min: 0,
     price_max: criteria?.max_purchase_price ?? 300000,
     // Calculate average from min/max ranges for single scalar values
@@ -47,17 +48,28 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
     cap_minimum: criteria?.cap_minimum !== undefined
       ? criteria.cap_minimum * 100
       : undefined,
-  });
+  }), [
+    criteria?.max_purchase_price,
+    criteria?.coc_minimum_min,
+    criteria?.coc_minimum_max,
+    criteria?.coc_benchmark_min,
+    criteria?.coc_benchmark_max,
+    criteria?.cap_benchmark_min,
+    criteria?.cap_benchmark_max,
+    criteria?.cap_minimum,
+  ]);
 
   const form = useForm<ConfigurableCriteria>({
     resolver: zodResolver(configurableCriteriaSchema),
-    defaultValues: getDefaultValues(),
+    defaultValues,
   });
 
   // Update form when criteria changes
   useEffect(() => {
-    form.reset(getDefaultValues());
-  }, [criteria]);
+    if (criteria) {
+      form.reset(defaultValues);
+    }
+  }, [criteria, defaultValues, form]);
 
   const updateCriteriaMutation = useMutation({
     mutationFn: async (data: ConfigurableCriteria) => {
@@ -67,19 +79,30 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
       const result = await response.json();
       return result;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       // Update the query cache immediately with the new data if available
+      // This ensures instant UI updates without waiting for refetch
       if (data?.data) {
+        // The GET endpoint returns CriteriaResponse directly, so set it as-is
         queryClient.setQueryData(['/api/criteria'], data.data);
+        console.log('Updated criteria cache:', data.data);
+      } else {
+        console.warn('No data in response:', data);
       }
-      // Also invalidate to trigger a refetch in case the response format differs
-      queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
       
       toast({
         title: "Criteria Updated",
         description: "Investment criteria have been successfully updated.",
       });
+      
+      // Close edit mode immediately so user sees the updated display
       setIsEditing(false);
+      
+      // Invalidate and refetch in the background to ensure consistency
+      // This ensures all components get the latest data from the server
+      queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
+      queryClient.refetchQueries({ queryKey: ['/api/criteria'] });
+      
       onUpdate?.();
     },
     onError: (error) => {
