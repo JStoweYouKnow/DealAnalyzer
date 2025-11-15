@@ -20,7 +20,7 @@ async function getConvexClient() {
 async function getConvexApi() {
   try {
     const apiModule = await import('../../../../convex/_generated/api');
-    return apiModule.api;
+    return apiModule.api as any; // Use 'any' to handle cases where types aren't generated yet
   } catch (error) {
     console.error('Failed to import Convex API:', error);
     return null;
@@ -37,8 +37,8 @@ export async function GET() {
     const client = await getConvexClient();
     const api = await getConvexApi();
 
-    if (!client || !api) {
-      // Return defaults if Convex is not available
+    if (!client || !api || !api.userPreferences) {
+      // Return defaults if Convex is not available or userPreferences not generated yet
       return NextResponse.json({
         notifyOnNewDeals: false,
         notifyOnAnalysisComplete: false,
@@ -80,7 +80,7 @@ export async function PUT(request: NextRequest) {
     const client = await getConvexClient();
     const api = await getConvexApi();
 
-    if (!client || !api) {
+    if (!client || !api || !api.userPreferences) {
       return NextResponse.json(
         { error: "Database not available" },
         { status: 503 }
