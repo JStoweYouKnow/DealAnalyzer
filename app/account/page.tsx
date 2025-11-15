@@ -267,14 +267,19 @@ export default function AccountPage() {
     mutationFn: async (values: typeof criteriaValues) => {
       const response = await apiRequest('PUT', '/api/criteria', {
         criteria: {
+          price_min: 0, // Required by schema, minimum price
           price_max: values.maxPrice,
-          coc_benchmark_min: values.cocBenchmarkMin,
-          coc_benchmark_max: values.cocBenchmarkMax,
-          coc_minimum_min: values.cocMinimumMin,
-          coc_minimum_max: values.cocMinimumMax,
-          cap_benchmark_min: values.capBenchmarkMin,
-          cap_benchmark_max: values.capBenchmarkMax,
-          cap_minimum: values.capMinimum,
+          coc_return_min: values.cocMinimumMin, // Required: map cocMinimumMin to coc_return_min
+          coc_return_max: values.cocMinimumMax, // Required: map cocMinimumMax to coc_return_max
+          coc_benchmark_min: values.cocBenchmarkMin, // Optional
+          coc_benchmark_max: values.cocBenchmarkMax, // Optional
+          coc_minimum_min: values.cocMinimumMin, // Optional
+          coc_minimum_max: values.cocMinimumMax, // Optional
+          cap_rate_min: values.capMinimum, // Required: map capMinimum to cap_rate_min
+          cap_rate_max: values.capBenchmarkMax, // Required: map capBenchmarkMax to cap_rate_max
+          cap_benchmark_min: values.capBenchmarkMin, // Optional
+          cap_benchmark_max: values.capBenchmarkMax, // Optional
+          cap_minimum: values.capMinimum, // Optional
         },
       });
       return response.json();
