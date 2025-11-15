@@ -1,6 +1,19 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization of Resend client to avoid errors during build
+let resendInstance: Resend | null = null;
+
+function getResendClient(): Resend | null {
+  if (!process.env.RESEND_API_KEY) {
+    return null;
+  }
+  
+  if (!resendInstance) {
+    resendInstance = new Resend(process.env.RESEND_API_KEY);
+  }
+  
+  return resendInstance;
+}
 
 export interface EmailData {
   to: string;
@@ -10,7 +23,9 @@ export interface EmailData {
 }
 
 export async function sendNotificationEmail(emailData: EmailData) {
-  if (!process.env.RESEND_API_KEY) {
+  const resend = getResendClient();
+  
+  if (!resend) {
     console.warn('RESEND_API_KEY not configured, skipping email send');
     return;
   }
