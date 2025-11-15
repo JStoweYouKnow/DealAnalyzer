@@ -834,8 +834,8 @@ export default function DealsPage() {
     }
   });
 
-  // Show all deals (filtering handled by AdvancedSearch component)
-  const filteredDeals = emailDeals;
+  // Filter out archived deals from dashboard (archived deals are hidden)
+  const filteredDeals = emailDeals.filter(deal => deal.status !== 'archived');
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
