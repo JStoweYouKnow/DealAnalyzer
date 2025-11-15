@@ -74,6 +74,7 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
   const [durationYears, setDurationYears] = useState("30");
 
   // Notify parent when form values change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (onFormValuesChange) {
       onFormValuesChange({
@@ -84,7 +85,7 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
         file: selectedFile || undefined,
       });
     }
-  }, [strMetrics, ltrMetrics, monthlyExpenses, fundingSource, selectedFile, onFormValuesChange]);
+  }, [strMetrics, ltrMetrics, monthlyExpenses, fundingSource, selectedFile]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
