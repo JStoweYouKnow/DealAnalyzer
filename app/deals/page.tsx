@@ -501,14 +501,14 @@ export default function DealsPage() {
   // Update deal status mutation
   const updateStatusMutation = useMutation({
     mutationFn: async ({ dealId, status }: { dealId: string; status: EmailDeal['status'] }) => {
+      console.log('Updating deal status:', { dealId, status });
       const response = await apiRequest('PUT', `/api/email-deals/${dealId}/status`, { status });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to update status: ${response.status}`);
-      }
-      return response.json();
+      const data = await response.json();
+      console.log('Status update response:', data);
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Status update successful:', data);
       queryClient.invalidateQueries({ queryKey: ['/api/email-deals'] });
       toast({
         title: "Status Updated",
@@ -1881,13 +1881,26 @@ export default function DealsPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => updateStatusMutation.mutate({ 
-                          dealId: deal.id, 
-                          status: deal.status === 'archived' ? 'new' : 'archived' 
-                        })}
+                        onClick={() => {
+                          console.log('Archive button clicked for deal:', deal.id, 'current status:', deal.status);
+                          updateStatusMutation.mutate({ 
+                            dealId: deal.id, 
+                            status: deal.status === 'archived' ? 'new' : 'archived' 
+                          });
+                        }}
+                        disabled={updateStatusMutation.isPending}
                       >
-                        <i className={`fas ${deal.status === 'archived' ? 'fa-undo' : 'fa-archive'} mr-2`}></i>
-                        {deal.status === 'archived' ? 'Restore' : 'Archive'}
+                        {updateStatusMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <i className={`fas ${deal.status === 'archived' ? 'fa-undo' : 'fa-archive'} mr-2`}></i>
+                            {deal.status === 'archived' ? 'Restore' : 'Archive'}
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
