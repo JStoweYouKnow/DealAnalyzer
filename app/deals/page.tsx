@@ -63,7 +63,6 @@ const FUNDING_SOURCE_DOWN_PAYMENT_DEFAULTS: Record<FundingSource, number> = {
 };
 
 export default function DealsPage() {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'reviewed' | 'analyzed' | 'archived'>('all');
   const [editingDeal, setEditingDeal] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{[key: string]: {price?: number, rent?: number, adr?: number, occupancyRate?: number, bedrooms?: number, bathrooms?: number, fundingSource?: FundingSource, mortgageValues?: MortgageValues | null}}>({});
   const [mortgageInputs, setMortgageInputs] = useState<Record<string, DealMortgageInputs>>({});
@@ -819,10 +818,8 @@ export default function DealsPage() {
     }
   });
 
-  // Filter deals based on status
-  const filteredDeals = emailDeals.filter(deal => {
-    return statusFilter === 'all' || deal.status === statusFilter;
-  });
+  // Show all deals (filtering handled by AdvancedSearch component)
+  const filteredDeals = emailDeals;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -955,24 +952,6 @@ export default function DealsPage() {
                 <i className="fas fa-refresh mr-2"></i>
                 Refresh Status
               </Button>
-            </div>
-          </div>
-          
-          {/* Filters */}
-          <div className="flex items-center justify-between mt-6 pt-6 border-t border-border">
-            <h2 className="text-lg font-semibold">Dashboard Controls</h2>
-            <div className="flex items-center space-x-4">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="border rounded px-3 py-2"
-              >
-                <option value="all">All Status</option>
-                <option value="new">New</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="analyzed">Analyzed</option>
-                <option value="archived">Archived</option>
-              </select>
             </div>
           </div>
         </CardHeader>
