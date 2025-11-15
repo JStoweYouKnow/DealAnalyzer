@@ -189,6 +189,7 @@ export async function PUT(request: NextRequest) {
         if (client && apiInstance && (apiInstance as any).userCriteria) {
           await client.mutation((apiInstance as any).userCriteria.updateCriteria, {
             userId,
+            min_purchase_price: criteria.price_min ?? DEFAULT_CRITERIA.min_purchase_price,
             max_purchase_price: criteria.price_max ?? DEFAULT_CRITERIA.max_purchase_price,
             coc_minimum_min: finalCocMinimumMin,
             coc_minimum_max: finalCocMinimumMax,
@@ -229,6 +230,7 @@ export async function PUT(request: NextRequest) {
     const updatedCriteria: CriteriaResponse = {
       property_types: DEFAULT_CRITERIA.property_types,
       location: DEFAULT_CRITERIA.location,
+      min_purchase_price: criteria.price_min ?? DEFAULT_CRITERIA.min_purchase_price,
       max_purchase_price: criteria.price_max ?? DEFAULT_CRITERIA.max_purchase_price,
       downpayment_percentage_min: DEFAULT_CRITERIA.downpayment_percentage_min,
       downpayment_percentage_max: DEFAULT_CRITERIA.downpayment_percentage_max,

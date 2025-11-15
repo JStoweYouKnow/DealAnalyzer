@@ -7,6 +7,7 @@ import type { CriteriaResponse } from "@shared/schema";
 export const DEFAULT_CRITERIA: CriteriaResponse = {
   property_types: ["Single Family", "Multi-Family", "Condo"],
   location: "Any",
+  min_purchase_price: 0,
   max_purchase_price: 500000,
   downpayment_percentage_min: 0.20,
   downpayment_percentage_max: 0.25,

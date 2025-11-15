@@ -27,7 +27,7 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
   // CriteriaResponse has min/max pairs, but we need single scalar values for the form
   // Memoize to prevent unnecessary recalculations and ensure stable reference
   const defaultValues = useMemo((): ConfigurableCriteria => ({
-    price_min: 0,
+    price_min: criteria?.min_purchase_price ?? 0,
     price_max: criteria?.max_purchase_price ?? 300000,
     // Calculate average from min/max ranges for single scalar values
     coc_return: criteria?.coc_minimum_min !== undefined && criteria?.coc_minimum_max !== undefined
@@ -49,6 +49,7 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
       ? criteria.cap_minimum * 100
       : undefined,
   }), [
+    criteria?.min_purchase_price,
     criteria?.max_purchase_price,
     criteria?.coc_minimum_min,
     criteria?.coc_minimum_max,
@@ -80,17 +81,24 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
       return result;
     },
     onSuccess: async (data) => {
-      // Invalidate the cache to mark it as stale
+      // If we got the updated data in the response, use it immediately
+      if (data?.data) {
+        // Directly update the cache with the new data
+        // This ensures instant UI updates without waiting for refetch
+        queryClient.setQueryData(['/api/criteria'], data.data);
+        console.log('Criteria cache updated with response data:', data.data);
+      }
+
+      // Invalidate to mark as stale and trigger background refetch
       queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
 
-      // Await refetch to ensure we have the latest data before closing edit mode
-      // This prevents showing stale data in the display view
+      // Refetch to ensure all components get the latest data
+      // This is important for components that might be unmounted/remounted
       await queryClient.refetchQueries({
-        queryKey: ['/api/criteria'],
-        type: 'active' // Only refetch queries that are currently being used
+        queryKey: ['/api/criteria']
       });
 
-      console.log('Criteria updated and refetched:', data?.data);
+      console.log('Criteria refetch complete');
 
       // Show success toast
       toast({
@@ -98,7 +106,7 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
         description: "Investment criteria have been successfully updated.",
       });
 
-      // Close edit mode after refetch completes
+      // Close edit mode after cache is updated
       // This ensures the display view shows the updated values
       setIsEditing(false);
 
@@ -141,13 +149,15 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
   const displayValues = useMemo(() => {
     if (!criteria) {
       return {
+        priceMin: 0,
         priceMax: 300000,
         cocReturn: 8.0,
         capRate: 4.0,
       };
     }
-    
+
     return {
+      priceMin: criteria.min_purchase_price ?? 0,
       priceMax: criteria.max_purchase_price ?? 300000,
       cocReturn: criteria.coc_minimum_min !== undefined && criteria.coc_minimum_max !== undefined
         ? ((criteria.coc_minimum_min + criteria.coc_minimum_max) / 2) * 100
@@ -157,6 +167,7 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
         : (criteria.cap_minimum ?? 0.04) * 100,
     };
   }, [
+    criteria?.min_purchase_price,
     criteria?.max_purchase_price,
     criteria?.coc_minimum_min,
     criteria?.coc_minimum_max,
@@ -203,7 +214,7 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
               <Label className="text-sm font-medium">Purchase Price Range</Label>
               <div className="flex flex-col space-y-1">
                 <Badge variant="outline" className="justify-center">
-                  {formatCurrency(0)} - {formatCurrency(displayValues.priceMax)}
+                  {formatCurrency(displayValues.priceMin)} - {formatCurrency(displayValues.priceMax)}
                 </Badge>
               </div>
             </div>

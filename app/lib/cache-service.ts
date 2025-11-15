@@ -4,7 +4,7 @@ import NodeCache from 'node-cache';
 export const criteriaCache = new NodeCache({
   stdTTL: 7200, // 2 hours - criteria doesn't change often
   checkperiod: 600, // Check for expired keys every 10 minutes
-  useClones: false, // Better performance for large objects
+  useClones: true, // MUST clone to ensure React detects object changes
 });
 
 export const mortgageRateCache = new NodeCache({

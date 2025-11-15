@@ -153,6 +153,7 @@ export const analyzePropertyResponseSchema = z.object({
 export const criteriaResponseSchema = z.object({
   property_types: z.array(z.string()),
   location: z.string(),
+  min_purchase_price: z.number(),
   max_purchase_price: z.number(),
   downpayment_percentage_min: z.number(),
   downpayment_percentage_max: z.number(),
