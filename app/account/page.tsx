@@ -1409,14 +1409,12 @@ export default function AccountPage() {
                   <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
                     <div>
                       <h3 className="font-semibold">Data & Privacy</h3>
-                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
                       <p className="text-sm text-muted-foreground">
                         Manage your data, privacy settings, and account deletion
                       </p>
                     </div>
                     <Badge variant="outline">Coming Soon</Badge>
                   </div>
-                </div>
 
                 <div className="border-t pt-6">
                   <h3 className="text-lg font-semibold mb-4">About</h3>
