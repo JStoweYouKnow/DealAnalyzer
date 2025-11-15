@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { AnalyzerForm } from "@/components/analyzer-form";
 import { AnalysisResults } from "@/components/analysis-results";
@@ -24,6 +24,7 @@ export default function HomePage() {
   const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(null);
   const [recentAnalyses, setRecentAnalyses] = useState<DealAnalysis[]>([]);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { 
     comparisonList, 
@@ -36,6 +37,10 @@ export default function HomePage() {
   // Get investment criteria
   const { data: criteria } = useQuery<CriteriaResponse>({
     queryKey: ["/api/criteria"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/criteria');
+      return response.json();
+    },
   });
 
   // Analysis mutation
@@ -151,8 +156,8 @@ export default function HomePage() {
         <CriteriaConfig 
           criteria={criteria}
           onUpdate={() => {
-            // Invalidate criteria cache to refresh
-            window.location.reload();
+            // Invalidate criteria cache to refresh both dashboard and account page
+            queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
           }}
         />
       </div>

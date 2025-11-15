@@ -64,15 +64,22 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
       const response = await apiRequest("PUT", "/api/criteria", {
         criteria: data
       });
-      return response.json();
+      const result = await response.json();
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Update the query cache immediately with the new data if available
+      if (data?.data) {
+        queryClient.setQueryData(['/api/criteria'], data.data);
+      }
+      // Also invalidate to trigger a refetch in case the response format differs
+      queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
+      
       toast({
         title: "Criteria Updated",
         description: "Investment criteria have been successfully updated.",
       });
       setIsEditing(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
       onUpdate?.();
     },
     onError: (error) => {
