@@ -80,34 +80,29 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
       return result;
     },
     onSuccess: async (data) => {
-      // Update the query cache immediately with the new data if available
-      // This ensures instant UI updates without waiting for refetch
-      if (data?.data) {
-        // The GET endpoint returns CriteriaResponse directly, so set it as-is
-        // Use setQueryData with a function to ensure React Query detects the change
-        queryClient.setQueryData(['/api/criteria'], (oldData: CriteriaResponse | undefined) => {
-          // Return new data to trigger re-render
-          return data.data;
-        });
-        console.log('Updated criteria cache:', data.data);
-      } else {
-        console.warn('No data in response:', data);
-        // If no data in response, still invalidate to trigger refetch
-        queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
-      }
-      
+      // Invalidate the cache to mark it as stale
+      queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
+
+      // Await refetch to ensure we have the latest data before closing edit mode
+      // This prevents showing stale data in the display view
+      await queryClient.refetchQueries({
+        queryKey: ['/api/criteria'],
+        type: 'active' // Only refetch queries that are currently being used
+      });
+
+      console.log('Criteria updated and refetched:', data?.data);
+
+      // Show success toast
       toast({
         title: "Criteria Updated",
         description: "Investment criteria have been successfully updated.",
       });
-      
-      // Close edit mode immediately so user sees the updated display
+
+      // Close edit mode after refetch completes
+      // This ensures the display view shows the updated values
       setIsEditing(false);
-      
-      // Force a refetch to ensure all components get the latest data
-      // This is important for components that might not have re-rendered yet
-      await queryClient.refetchQueries({ queryKey: ['/api/criteria'] });
-      
+
+      // Call the onUpdate callback to notify parent components
       onUpdate?.();
     },
     onError: (error) => {
