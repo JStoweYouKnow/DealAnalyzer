@@ -36,18 +36,16 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
     coc_benchmark: criteria?.coc_benchmark_min !== undefined && criteria?.coc_benchmark_max !== undefined
       ? ((criteria.coc_benchmark_min + criteria.coc_benchmark_max) / 2) * 100
       : undefined,
-    coc_minimum: criteria?.coc_minimum_min !== undefined
-      ? criteria.coc_minimum_min * 100
-      : undefined,
+    // Don't pre-fill optional coc_minimum - let user explicitly set it if needed
+    coc_minimum: undefined,
     cap_rate: criteria?.cap_benchmark_min !== undefined && criteria?.cap_benchmark_max !== undefined
       ? ((criteria.cap_benchmark_min + criteria.cap_benchmark_max) / 2) * 100
       : (criteria?.cap_minimum ?? 0.04) * 100, // Fallback to minimum if only one value
     cap_benchmark: criteria?.cap_benchmark_min !== undefined && criteria?.cap_benchmark_max !== undefined
       ? ((criteria.cap_benchmark_min + criteria.cap_benchmark_max) / 2) * 100
       : undefined,
-    cap_minimum: criteria?.cap_minimum !== undefined
-      ? criteria.cap_minimum * 100
-      : undefined,
+    // Don't pre-fill optional cap_minimum - let user explicitly set it if needed
+    cap_minimum: undefined,
   }), [
     criteria?.min_purchase_price,
     criteria?.max_purchase_price,
@@ -81,24 +79,14 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
       return result;
     },
     onSuccess: async (data) => {
-      // If we got the updated data in the response, use it immediately
-      if (data?.data) {
-        // Directly update the cache with the new data
-        // This ensures instant UI updates without waiting for refetch
-        queryClient.setQueryData(['/api/criteria'], data.data);
-        console.log('Criteria cache updated with response data:', data.data);
-      }
-
-      // Invalidate to mark as stale and trigger background refetch
+      // Invalidate to mark cache as stale
       queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
 
-      // Refetch to ensure all components get the latest data
-      // This is important for components that might be unmounted/remounted
+      // Refetch to get fresh data from server
+      // This ensures we have the latest data from the backend
       await queryClient.refetchQueries({
         queryKey: ['/api/criteria']
       });
-
-      console.log('Criteria refetch complete');
 
       // Show success toast
       toast({
