@@ -39,12 +39,21 @@ export async function GET(request: NextRequest) {
     // If user is authenticated, try to get their custom criteria from Convex
     if (userId) {
       try {
+        // Check cache first with user-scoped key
+        const cacheKey = `investment-criteria:${userId}`;
+        const cachedCriteria = criteriaCache.get(cacheKey);
+        if (cachedCriteria) {
+          return NextResponse.json(cachedCriteria);
+        }
+
         const client = await getConvexClient();
         const apiInstance = await getConvexApi();
         
         if (client && apiInstance && (apiInstance as any).userCriteria) {
           const userCriteria = await client.query((apiInstance as any).userCriteria.getCriteria, { userId });
           if (userCriteria) {
+            // Cache user-specific criteria with user-scoped key
+            criteriaCache.set(cacheKey, userCriteria, 3600);
             return NextResponse.json(userCriteria);
           }
         }
@@ -74,11 +83,14 @@ export async function PUT(request: NextRequest) {
       process.env.NODE_ENV !== 'production' && 
       process.env.DISABLE_AUTH === 'true';
     
+    let userId: string | null = null;
+    
     if (!shouldSkipAuth) {
       try {
         const { auth } = await import("@clerk/nextjs/server");
         const authResult = await auth();
-        if (!authResult?.userId) {
+        userId = authResult?.userId || null;
+        if (!userId) {
           console.warn("Authentication failed: missing userId");
           return NextResponse.json(
             { error: "Unauthorized" },
@@ -92,6 +104,15 @@ export async function PUT(request: NextRequest) {
           { error: "Unauthorized" },
           { status: 401 }
         );
+      }
+    } else {
+      // In dev mode with DISABLE_AUTH=true, still try to get userId if available
+      try {
+        const { auth } = await import("@clerk/nextjs/server");
+        const authResult = await auth();
+        userId = authResult?.userId || null;
+      } catch (error) {
+        // Auth not available, userId remains null
       }
     }
 
@@ -140,58 +161,49 @@ export async function PUT(request: NextRequest) {
       ? criteria.cap_benchmark_min / 100 
       : (criteria.cap_rate_min !== undefined ? criteria.cap_rate_min / 100 : DEFAULT_CRITERIA.cap_benchmark_min);
     
-    // Get user ID for saving to Convex
-    const { auth } = await import("@clerk/nextjs/server");
-    const authResult = await auth();
-    const userId = authResult?.userId;
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // Save to Convex database for persistence
-    try {
-      const client = await getConvexClient();
-      const apiInstance = await getConvexApi();
-      
-      if (client && apiInstance && (apiInstance as any).userCriteria) {
-        await client.mutation((apiInstance as any).userCriteria.updateCriteria, {
-          userId,
-          max_purchase_price: criteria.price_max ?? DEFAULT_CRITERIA.max_purchase_price,
-          coc_minimum_min,
-          coc_minimum_max,
-          coc_benchmark_min,
-          coc_benchmark_max,
-          cap_minimum,
-          cap_benchmark_min,
-          cap_benchmark_max,
-        });
-
-        // Load the updated criteria from Convex
-        const updatedCriteria = await client.query((apiInstance as any).userCriteria.getCriteria, { userId });
+    // Save to Convex database for persistence (only if userId is available)
+    if (userId) {
+      try {
+        const client = await getConvexClient();
+        const apiInstance = await getConvexApi();
         
-        if (updatedCriteria) {
-          // Also update cache for faster subsequent reads
-          criteriaCache.set('investment-criteria', updatedCriteria, 3600);
-          
-          console.log('Updated criteria in Convex:', {
-            maxPurchasePrice: updatedCriteria.max_purchase_price,
-            cocMinimum: updatedCriteria.coc_minimum_min,
-            capMinimum: updatedCriteria.cap_minimum,
+        if (client && apiInstance && (apiInstance as any).userCriteria) {
+          await client.mutation((apiInstance as any).userCriteria.updateCriteria, {
+            userId,
+            max_purchase_price: criteria.price_max ?? DEFAULT_CRITERIA.max_purchase_price,
+            coc_minimum_min,
+            coc_minimum_max,
+            coc_benchmark_min,
+            coc_benchmark_max,
+            cap_minimum,
+            cap_benchmark_min,
+            cap_benchmark_max,
           });
 
-          return NextResponse.json({
-            success: true,
-            data: updatedCriteria
-          });
+          // Load the updated criteria from Convex
+          const updatedCriteria = await client.query((apiInstance as any).userCriteria.getCriteria, { userId });
+          
+          if (updatedCriteria) {
+            // Also update cache for faster subsequent reads with user-scoped key
+            const cacheKey = `investment-criteria:${userId}`;
+            criteriaCache.set(cacheKey, updatedCriteria, 3600);
+            
+            console.log('Updated criteria in Convex:', {
+              maxPurchasePrice: updatedCriteria.max_purchase_price,
+              cocMinimum: updatedCriteria.coc_minimum_min,
+              capMinimum: updatedCriteria.cap_minimum,
+            });
+
+            return NextResponse.json({
+              success: true,
+              data: updatedCriteria
+            });
+          }
         }
+      } catch (error) {
+        console.error("Error saving criteria to Convex:", error);
+        // Continue with fallback to cache
       }
-    } catch (error) {
-      console.error("Error saving criteria to Convex:", error);
-      // Continue with fallback to cache
     }
 
     // Fallback: Build updated criteria structure and cache it (in-memory only, won't persist)
@@ -224,8 +236,9 @@ export async function PUT(request: NextRequest) {
       capMinimum: updatedCriteria.cap_minimum,
     });
     
-    // Update cache with new criteria (fallback if Convex not available)
-    criteriaCache.set('investment-criteria', updatedCriteria, 3600);
+    // Update cache with new criteria (fallback if Convex not available) with user-scoped key
+    const cacheKey = userId ? `investment-criteria:${userId}` : 'investment-criteria';
+    criteriaCache.set(cacheKey, updatedCriteria, 3600);
     
     return NextResponse.json({
       success: true,

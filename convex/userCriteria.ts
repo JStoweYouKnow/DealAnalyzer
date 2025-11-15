@@ -43,7 +43,7 @@ export const getCriteria = query({
 
     // Convert to CriteriaResponse format
     return {
-      property_types: DEFAULT_CRITERIA.property_types,
+      property_types: [...DEFAULT_CRITERIA.property_types],
       location: DEFAULT_CRITERIA.location,
       max_purchase_price: userCriteria.max_purchase_price,
       downpayment_percentage_min: DEFAULT_CRITERIA.downpayment_percentage_min,
