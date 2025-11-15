@@ -2471,20 +2471,34 @@ async function updateInvestmentCriteria(criteria: ConfigurableCriteria): Promise
   return new Promise((resolve) => {
     const pythonPath = path.join(process.cwd(), "python_modules");
     
+    // Build criteria data object for Python
+    const criteriaData: Record<string, number> = {
+      price_min: criteria.price_min,
+      price_max: criteria.price_max,
+      coc_return: criteria.coc_return / 100,
+      cap_rate: criteria.cap_rate / 100,
+    };
+    
+    if (criteria.coc_benchmark !== undefined) {
+      criteriaData.coc_benchmark = criteria.coc_benchmark / 100;
+    }
+    if (criteria.coc_minimum !== undefined) {
+      criteriaData.coc_minimum = criteria.coc_minimum / 100;
+    }
+    if (criteria.cap_benchmark !== undefined) {
+      criteriaData.cap_benchmark = criteria.cap_benchmark / 100;
+    }
+    if (criteria.cap_minimum !== undefined) {
+      criteriaData.cap_minimum = criteria.cap_minimum / 100;
+    }
+    
     const python = spawn("python3", ["-c", `
 import sys
 sys.path.append('${pythonPath}')
 from criteria_manager import update_investment_criteria
 import json
 
-criteria_data = {
-    'price_min': ${criteria.price_min},
-    'price_max': ${criteria.price_max},
-    'coc_return_min': ${criteria.coc_return_min / 100},
-    'coc_return_max': ${criteria.coc_return_max / 100},
-    'cap_rate_min': ${criteria.cap_rate_min / 100},
-    'cap_rate_max': ${criteria.cap_rate_max / 100}
-}
+criteria_data = ${JSON.stringify(criteriaData)}
 
 result = update_investment_criteria('${path.join(pythonPath, 'investment_criteria.md')}', criteria_data)
 print(json.dumps(result))
