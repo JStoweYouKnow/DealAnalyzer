@@ -472,14 +472,14 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
             <div>
               <Label htmlFor="file-upload" className="text-base font-semibold mb-3 block">Upload Property Data File</Label>
               <div className="space-y-5">
-                <div className="relative">
+                <div className="relative overflow-visible">
                   <Input
                     ref={fileInputRef}
                     id="file-upload"
                     type="file"
                     accept=".pdf,.csv,.txt,.xlsx,.xls,.json"
                     onChange={handleFileChange}
-                    className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                    className="file:mr-4 file:py-2.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 overflow-visible"
                     data-testid="input-file-upload"
                   />
                 </div>
