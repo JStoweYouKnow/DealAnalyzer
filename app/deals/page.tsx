@@ -502,10 +502,26 @@ export default function DealsPage() {
   const updateStatusMutation = useMutation({
     mutationFn: async ({ dealId, status }: { dealId: string; status: EmailDeal['status'] }) => {
       const response = await apiRequest('PUT', `/api/email-deals/${dealId}/status`, { status });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to update status: ${response.status}`);
+      }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/email-deals'] });
+      toast({
+        title: "Status Updated",
+        description: "Deal status has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      console.error('Error updating deal status:', error);
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update deal status. Please try again.",
+        variant: "destructive",
+      });
     }
   });
 

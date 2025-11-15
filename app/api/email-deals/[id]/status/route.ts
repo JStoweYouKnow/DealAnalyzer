@@ -16,8 +16,8 @@ export async function PUT(
       );
     }
     
-    // Validate status values
-    const validStatuses = ['pending', 'analyzed', 'interested', 'not_interested', 'archived'];
+    // Validate status values - must match emailDealStatus schema
+    const validStatuses = ['new', 'reviewed', 'analyzed', 'archived'];
     if (!validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
