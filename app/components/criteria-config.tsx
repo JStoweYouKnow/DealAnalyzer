@@ -84,10 +84,16 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
       // This ensures instant UI updates without waiting for refetch
       if (data?.data) {
         // The GET endpoint returns CriteriaResponse directly, so set it as-is
-        queryClient.setQueryData(['/api/criteria'], data.data);
+        // Use setQueryData with a function to ensure React Query detects the change
+        queryClient.setQueryData(['/api/criteria'], (oldData: CriteriaResponse | undefined) => {
+          // Return new data to trigger re-render
+          return data.data;
+        });
         console.log('Updated criteria cache:', data.data);
       } else {
         console.warn('No data in response:', data);
+        // If no data in response, still invalidate to trigger refetch
+        queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
       }
       
       toast({
@@ -98,10 +104,9 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
       // Close edit mode immediately so user sees the updated display
       setIsEditing(false);
       
-      // Invalidate and refetch in the background to ensure consistency
-      // This ensures all components get the latest data from the server
-      queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
-      queryClient.refetchQueries({ queryKey: ['/api/criteria'] });
+      // Force a refetch to ensure all components get the latest data
+      // This is important for components that might not have re-rendered yet
+      await queryClient.refetchQueries({ queryKey: ['/api/criteria'] });
       
       onUpdate?.();
     },
@@ -136,6 +141,34 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
   const formatPercent = (value: number) => {
     return `${value.toFixed(1)}%`;
   };
+
+  // Memoize display values to ensure they update when criteria changes
+  const displayValues = useMemo(() => {
+    if (!criteria) {
+      return {
+        priceMax: 300000,
+        cocReturn: 8.0,
+        capRate: 4.0,
+      };
+    }
+    
+    return {
+      priceMax: criteria.max_purchase_price ?? 300000,
+      cocReturn: criteria.coc_minimum_min !== undefined && criteria.coc_minimum_max !== undefined
+        ? ((criteria.coc_minimum_min + criteria.coc_minimum_max) / 2) * 100
+        : (criteria.coc_minimum_min ?? 0.08) * 100,
+      capRate: criteria.cap_benchmark_min !== undefined && criteria.cap_benchmark_max !== undefined
+        ? ((criteria.cap_benchmark_min + criteria.cap_benchmark_max) / 2) * 100
+        : (criteria.cap_minimum ?? 0.04) * 100,
+    };
+  }, [
+    criteria?.max_purchase_price,
+    criteria?.coc_minimum_min,
+    criteria?.coc_minimum_max,
+    criteria?.cap_benchmark_min,
+    criteria?.cap_benchmark_max,
+    criteria?.cap_minimum,
+  ]);
 
   if (!isEditing) {
     return (
@@ -175,7 +208,7 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
               <Label className="text-sm font-medium">Purchase Price Range</Label>
               <div className="flex flex-col space-y-1">
                 <Badge variant="outline" className="justify-center">
-                  {formatCurrency(0)} - {formatCurrency(criteria?.max_purchase_price ?? 300000)}
+                  {formatCurrency(0)} - {formatCurrency(displayValues.priceMax)}
                 </Badge>
               </div>
             </div>
@@ -185,11 +218,7 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
               <Label className="text-sm font-medium">COC Return</Label>
               <div className="flex flex-col space-y-1">
                 <Badge variant="outline" className="justify-center">
-                  {formatPercent(
-                    criteria?.coc_minimum_min !== undefined && criteria?.coc_minimum_max !== undefined
-                      ? ((criteria.coc_minimum_min + criteria.coc_minimum_max) / 2) * 100
-                      : (criteria?.coc_minimum_min ?? 0.08) * 100
-                  )}
+                  {formatPercent(displayValues.cocReturn)}
                 </Badge>
               </div>
             </div>
@@ -199,11 +228,7 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
               <Label className="text-sm font-medium">Cap Rate</Label>
               <div className="flex flex-col space-y-1">
                 <Badge variant="outline" className="justify-center">
-                  {formatPercent(
-                    criteria?.cap_benchmark_min !== undefined && criteria?.cap_benchmark_max !== undefined
-                      ? ((criteria.cap_benchmark_min + criteria.cap_benchmark_max) / 2) * 100
-                      : (criteria?.cap_minimum ?? 0.04) * 100
-                  )}
+                  {formatPercent(displayValues.capRate)}
                 </Badge>
               </div>
             </div>
