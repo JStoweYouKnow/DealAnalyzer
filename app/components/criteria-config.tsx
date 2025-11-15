@@ -60,9 +60,15 @@ export function CriteriaConfig({ criteria, onUpdate }: CriteriaConfigProps) {
       onUpdate?.();
     },
     onError: (error) => {
+      console.error("Criteria update error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to update criteria";
       toast({
         title: "Update Failed",
-        description: "Failed to update criteria. Please try again.",
+        description: errorMessage.includes("401") 
+          ? "You must be signed in to save criteria. Please sign in and try again."
+          : errorMessage.includes("Unauthorized")
+          ? "You must be signed in to save criteria. Please sign in and try again."
+          : errorMessage,
         variant: "destructive",
       });
     }

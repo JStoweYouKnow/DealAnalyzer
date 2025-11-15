@@ -335,4 +335,18 @@ export default defineSchema({
     email: v.string(),
   })
     .index("by_user_id", ["userId"]),
+
+  userCriteria: defineTable({
+    userId: v.string(),
+    max_purchase_price: v.number(),
+    coc_minimum_min: v.number(),
+    coc_minimum_max: v.number(),
+    coc_benchmark_min: v.number(),
+    coc_benchmark_max: v.number(),
+    cap_minimum: v.number(),
+    cap_benchmark_min: v.number(),
+    cap_benchmark_max: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_id", ["userId"]),
 });

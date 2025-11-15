@@ -3,9 +3,57 @@ import { loadInvestmentCriteria, DEFAULT_CRITERIA } from "../../../server/servic
 import { updateCriteriaRequestSchema } from "../../../shared/schema";
 import type { CriteriaResponse } from "../../../shared/schema";
 import { criteriaCache } from "../../lib/cache-service";
+import { ConvexHttpClient } from 'convex/browser';
 
-export async function GET() {
+async function getConvexClient() {
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!convexUrl) {
+    return null;
+  }
+  return new ConvexHttpClient(convexUrl);
+}
+
+async function getConvexApi(): Promise<any> {
   try {
+    // @ts-ignore - Convex API types may not be generated yet, but this will work at runtime
+    const apiModule = await import('../../../../convex/_generated/api');
+    return apiModule.api;
+  } catch (error) {
+    console.error('Failed to import Convex API:', error);
+    return null;
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    // Try to get user ID for personalized criteria
+    let userId: string | null = null;
+    try {
+      const { auth } = await import("@clerk/nextjs/server");
+      const authResult = await auth();
+      userId = authResult?.userId || null;
+    } catch (error) {
+      // Auth not available, use default criteria
+    }
+
+    // If user is authenticated, try to get their custom criteria from Convex
+    if (userId) {
+      try {
+        const client = await getConvexClient();
+        const apiInstance = await getConvexApi();
+        
+        if (client && apiInstance && (apiInstance as any).userCriteria) {
+          const userCriteria = await client.query((apiInstance as any).userCriteria.getCriteria, { userId });
+          if (userCriteria) {
+            return NextResponse.json(userCriteria);
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to load user criteria from Convex, falling back to default:", error);
+      }
+    }
+
+    // Fall back to default criteria (cached or default)
     const criteria = await loadInvestmentCriteria();
     return NextResponse.json(criteria);
   } catch (error) {
@@ -92,9 +140,61 @@ export async function PUT(request: NextRequest) {
       ? criteria.cap_benchmark_min / 100 
       : (criteria.cap_rate_min !== undefined ? criteria.cap_rate_min / 100 : DEFAULT_CRITERIA.cap_benchmark_min);
     
-    // Build updated criteria structure from the request
-    // Note: This is stored in-memory and doesn't persist across server restarts
-    // In production, this should be stored in a database
+    // Get user ID for saving to Convex
+    const { auth } = await import("@clerk/nextjs/server");
+    const authResult = await auth();
+    const userId = authResult?.userId;
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // Save to Convex database for persistence
+    try {
+      const client = await getConvexClient();
+      const apiInstance = await getConvexApi();
+      
+      if (client && apiInstance && (apiInstance as any).userCriteria) {
+        await client.mutation((apiInstance as any).userCriteria.updateCriteria, {
+          userId,
+          max_purchase_price: criteria.price_max ?? DEFAULT_CRITERIA.max_purchase_price,
+          coc_minimum_min,
+          coc_minimum_max,
+          coc_benchmark_min,
+          coc_benchmark_max,
+          cap_minimum,
+          cap_benchmark_min,
+          cap_benchmark_max,
+        });
+
+        // Load the updated criteria from Convex
+        const updatedCriteria = await client.query((apiInstance as any).userCriteria.getCriteria, { userId });
+        
+        if (updatedCriteria) {
+          // Also update cache for faster subsequent reads
+          criteriaCache.set('investment-criteria', updatedCriteria, 3600);
+          
+          console.log('Updated criteria in Convex:', {
+            maxPurchasePrice: updatedCriteria.max_purchase_price,
+            cocMinimum: updatedCriteria.coc_minimum_min,
+            capMinimum: updatedCriteria.cap_minimum,
+          });
+
+          return NextResponse.json({
+            success: true,
+            data: updatedCriteria
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error saving criteria to Convex:", error);
+      // Continue with fallback to cache
+    }
+
+    // Fallback: Build updated criteria structure and cache it (in-memory only, won't persist)
     const updatedCriteria: CriteriaResponse = {
       property_types: DEFAULT_CRITERIA.property_types,
       location: DEFAULT_CRITERIA.location,
@@ -118,18 +218,19 @@ export async function PUT(request: NextRequest) {
       str_annual_revenue_minimum: DEFAULT_CRITERIA.str_annual_revenue_minimum,
     };
     
-    console.log('Updated criteria:', {
+    console.log('Updated criteria (cache only - will not persist):', {
       maxPurchasePrice: updatedCriteria.max_purchase_price,
       cocMinimum: updatedCriteria.coc_minimum_min,
       capMinimum: updatedCriteria.cap_minimum,
     });
     
-    // Update cache with new criteria so subsequent reads get the updated values
-    criteriaCache.set('investment-criteria', updatedCriteria, 3600); // Cache for 1 hour
+    // Update cache with new criteria (fallback if Convex not available)
+    criteriaCache.set('investment-criteria', updatedCriteria, 3600);
     
     return NextResponse.json({
       success: true,
-      data: updatedCriteria
+      data: updatedCriteria,
+      warning: "Criteria saved to cache only. For persistence, ensure Convex is configured."
     });
   } catch (error) {
     console.error("Error updating criteria:", error);
