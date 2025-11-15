@@ -27,6 +27,23 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React and core libraries
+          'react-vendor': ['react', 'react-dom', 'react/jsx-runtime'],
+          // React Query
+          'query-vendor': ['@tanstack/react-query'],
+          // UI components
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-tabs', '@radix-ui/react-checkbox'],
+          // Icons
+          'icon-vendor': ['lucide-react'],
+          // Charts and maps (if used)
+          'chart-vendor': ['recharts', 'leaflet', 'react-leaflet'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
   },
   server: {
     fs: {

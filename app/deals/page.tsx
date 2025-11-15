@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,9 @@ import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
 import type { EmailDeal, EmailMonitoringResponse, AnalyzePropertyResponse, FundingSource } from "@shared/schema";
 import { EmailForwardingSetup } from "@/components/email-forwarding-setup";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { AdvancedSearch } from "@/components/advanced-search";
+
+// Lazy load AdvancedSearch component for better code-splitting
+const AdvancedSearch = lazy(() => import("@/components/advanced-search").then(module => ({ default: module.AdvancedSearch })));
 
 interface MortgageValues {
   loanAmount: number;
@@ -974,7 +976,18 @@ export default function DealsPage() {
       </Card>
 
       {/* Advanced Search Section */}
-      <AdvancedSearch />
+      <Suspense fallback={
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-primary mr-3" />
+              <span className="text-muted-foreground">Loading Advanced Search...</span>
+            </div>
+          </CardContent>
+        </Card>
+      }>
+        <AdvancedSearch />
+      </Suspense>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

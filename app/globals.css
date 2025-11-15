@@ -82,19 +82,45 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
+/* Professional Section Divider */
 .section-divider {
-  @apply my-8 border-t border-border/50;
+  @apply relative my-12 border-t border-border/50;
 }
 
+.section-divider::after {
+  content: '';
+  @apply absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 w-16 h-0.5 bg-gradient-to-r from-primary/50 via-primary to-primary/50;
+}
+
+/* Enhanced Analysis Card with Professional Styling */
 .analysis-card {
-  @apply bg-card rounded-lg border border-border shadow-sm;
+  @apply bg-card/80 backdrop-blur-sm rounded-xl border border-border/60 shadow-lg shadow-black/5
+         transition-all duration-300 hover:shadow-xl hover:shadow-black/10 hover:border-border/80;
+}
+
+/* Professional Card Variants */
+.card-gradient {
+  @apply bg-gradient-to-br from-card via-card to-card/95 backdrop-blur-sm;
+}
+
+.card-elevated {
+  @apply shadow-2xl shadow-black/10 ring-1 ring-border/50;
+}
+
+.card-interactive {
+  @apply cursor-pointer hover:scale-[1.02] hover:-translate-y-1 transition-all duration-300;
 }
 
 /* Enhanced background texture utilities */
 .bg-texture {
-  background-image: 
+  background-image:
     radial-gradient(circle at 2px 2px, hsl(var(--primary) / 0.1) 1px, transparent 0),
     linear-gradient(hsl(var(--border) / 0.2) 1px, transparent 1px),
     linear-gradient(90deg, hsl(var(--border) / 0.2) 1px, transparent 1px);
@@ -103,9 +129,274 @@
 
 /* Dark mode texture adjustments */
 .dark .bg-texture {
-  background-image: 
+  background-image:
     radial-gradient(circle at 2px 2px, hsl(var(--primary) / 0.15) 1px, transparent 0),
     linear-gradient(hsl(var(--border) / 0.3) 1px, transparent 1px),
     linear-gradient(90deg, hsl(var(--border) / 0.3) 1px, transparent 1px);
+}
+
+/* Professional Typography */
+.heading-gradient {
+  @apply bg-gradient-to-r from-foreground via-foreground/90 to-foreground/80 bg-clip-text text-transparent;
+}
+
+.heading-primary {
+  @apply text-3xl md:text-4xl font-bold tracking-tight heading-gradient;
+}
+
+.heading-secondary {
+  @apply text-2xl md:text-3xl font-semibold tracking-tight;
+}
+
+.text-gradient-primary {
+  @apply bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent;
+}
+
+.text-gradient-success {
+  @apply bg-gradient-to-r from-green-600 via-green-500 to-emerald-500 bg-clip-text text-transparent;
+}
+
+.text-gradient-warning {
+  @apply bg-gradient-to-r from-amber-600 via-yellow-500 to-orange-500 bg-clip-text text-transparent;
+}
+
+/* Professional Buttons */
+.btn-primary {
+  @apply bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary
+         shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/35
+         transition-all duration-300 hover:scale-105;
+}
+
+.btn-secondary {
+  @apply bg-gradient-to-r from-secondary to-secondary/95 hover:from-secondary/95 hover:to-secondary
+         shadow-md shadow-black/5 hover:shadow-lg hover:shadow-black/10
+         transition-all duration-300 hover:scale-105;
+}
+
+/* Professional Input Fields */
+.input-enhanced {
+  @apply border-2 border-border/60 focus:border-primary/50 focus:ring-4 focus:ring-primary/10
+         transition-all duration-200 bg-card/50 backdrop-blur-sm;
+}
+
+/* Badge Enhancements */
+.badge-success {
+  @apply bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md shadow-green-500/25
+         ring-2 ring-green-500/20;
+}
+
+.badge-warning {
+  @apply bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/25
+         ring-2 ring-amber-500/20;
+}
+
+.badge-error {
+  @apply bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md shadow-red-500/25
+         ring-2 ring-red-500/20;
+}
+
+.badge-info {
+  @apply bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md shadow-blue-500/25
+         ring-2 ring-blue-500/20;
+}
+
+/* Professional Stats/Metrics Cards */
+.stat-card {
+  @apply p-6 rounded-xl bg-gradient-to-br from-card via-card/95 to-card/90
+         border border-border/60 shadow-lg shadow-black/5
+         hover:shadow-xl hover:shadow-black/10 transition-all duration-300
+         relative overflow-hidden group;
+}
+
+.stat-card::before {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5
+         opacity-0 group-hover:opacity-100 transition-opacity duration-300;
+}
+
+.stat-value {
+  @apply text-3xl md:text-4xl font-bold tracking-tight;
+}
+
+.stat-label {
+  @apply text-sm font-medium text-muted-foreground uppercase tracking-wider;
+}
+
+/* Professional Loading States */
+.loading-shimmer {
+  @apply animate-pulse bg-gradient-to-r from-muted via-muted/60 to-muted;
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Professional Skeleton Loaders */
+.skeleton {
+  @apply relative overflow-hidden rounded-lg bg-muted/50;
+}
+
+.skeleton::after {
+  content: '';
+  @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-card/50 to-transparent;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Professional Tooltips */
+.tooltip-content {
+  @apply bg-card/95 backdrop-blur-md border border-border/60 shadow-xl shadow-black/20
+         rounded-lg p-3 text-sm font-medium;
+}
+
+/* Professional Form Sections */
+.form-section {
+  @apply p-6 rounded-xl bg-gradient-to-br from-card/60 via-card/70 to-card/60
+         backdrop-blur-sm border border-border/40 shadow-md shadow-black/5;
+}
+
+/* Smooth Transitions */
+.transition-smooth {
+  @apply transition-all duration-300 ease-in-out;
+}
+
+.transition-fast {
+  @apply transition-all duration-150 ease-in-out;
+}
+
+/* Focus Rings */
+.focus-ring {
+  @apply focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary/50;
+}
+
+/* Glassmorphism Effect */
+.glass {
+  @apply bg-card/30 backdrop-blur-xl border border-border/40 shadow-2xl shadow-black/10;
+}
+
+.glass-strong {
+  @apply bg-card/60 backdrop-blur-2xl border border-border/60 shadow-2xl shadow-black/15;
+}
+
+/* Professional Hover Effects */
+.hover-lift {
+  @apply hover:-translate-y-1 hover:shadow-lg transition-all duration-300;
+}
+
+.hover-glow {
+  @apply hover:shadow-lg hover:shadow-primary/20 transition-all duration-300;
+}
+
+/* Professional Grid Patterns */
+.grid-dots {
+  background-image: radial-gradient(circle, hsl(var(--border) / 0.3) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.grid-lines {
+  background-image:
+    linear-gradient(hsl(var(--border) / 0.2) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--border) / 0.2) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Professional Accent Borders */
+.border-gradient {
+  @apply relative;
+}
+
+.border-gradient::before {
+  content: '';
+  @apply absolute inset-0 rounded-[inherit] p-[1px] bg-gradient-to-r from-primary/50 via-primary to-primary/50;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Professional Status Indicators */
+.status-dot {
+  @apply relative inline-flex h-3 w-3 rounded-full;
+}
+
+.status-dot::after {
+  content: '';
+  @apply absolute inline-flex h-full w-full rounded-full animate-ping opacity-75;
+}
+
+.status-success {
+  @apply bg-green-500;
+}
+
+.status-success::after {
+  @apply bg-green-500;
+}
+
+.status-warning {
+  @apply bg-amber-500;
+}
+
+.status-warning::after {
+  @apply bg-amber-500;
+}
+
+.status-error {
+  @apply bg-red-500;
+}
+
+.status-error::after {
+  @apply bg-red-500;
+}
+
+/* Professional Animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s ease-out;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out;
 }
 
