@@ -23,6 +23,9 @@ interface MortgageValues {
 export default function HomePage() {
   const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(null);
   const [recentAnalyses, setRecentAnalyses] = useState<DealAnalysis[]>([]);
+  const [mortgageValues, setMortgageValues] = useState<MortgageValues | null>(null);
+  const [lastAnalysisData, setLastAnalysisData] = useState<{ emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any; } | null>(null);
+  const [currentFormValues, setCurrentFormValues] = useState<{ strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any; file?: File } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -127,7 +130,24 @@ export default function HomePage() {
   });
 
   const handleAnalyze = (data: { emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any; mortgageValues?: MortgageValues }) => {
+    // Store the analysis data for re-analysis
+    setLastAnalysisData(data);
     analysisMutation.mutate(data);
+  };
+
+  const handleReAnalyze = () => {
+    if (lastAnalysisData && currentFormValues) {
+      // Re-run analysis with stored file/email but current form values and mortgage values
+      analysisMutation.mutate({
+        file: currentFormValues.file || lastAnalysisData.file,
+        emailContent: lastAnalysisData.emailContent,
+        strMetrics: currentFormValues.strMetrics,
+        ltrMetrics: currentFormValues.ltrMetrics,
+        monthlyExpenses: currentFormValues.monthlyExpenses,
+        fundingSource: currentFormValues.fundingSource,
+        mortgageValues: mortgageValues || undefined,
+      });
+    }
   };
 
   const handleAnalysisUpdate = (updatedAnalysis: DealAnalysis) => {
@@ -168,9 +188,12 @@ export default function HomePage() {
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
         {/* Left Panel - File Upload & Tools */}
         <div className="xl:col-span-2 space-y-6">
-          <AnalyzerForm 
+          <AnalyzerForm
             onAnalyze={handleAnalyze}
             isLoading={analysisMutation.isPending}
+            mortgageValues={mortgageValues}
+            onMortgageCalculated={setMortgageValues}
+            onFormValuesChange={setCurrentFormValues}
             data-testid="analyzer-form"
           />
         </div>
@@ -178,16 +201,32 @@ export default function HomePage() {
         {/* Right Panel - Analysis Results */}
         <div className="xl:col-span-3">
           {analysisMutation.isPending && <LoadingState data-testid="loading-state" />}
-          
+
           {analysisResult && !analysisMutation.isPending && (
-            <AnalysisResults 
-              analysis={analysisResult} 
-              criteria={criteria}
-              onAnalysisUpdate={handleAnalysisUpdate}
-              onAddToComparison={addToComparison}
-              isInComparison={isInComparison(analysisResult.propertyId)}
-              data-testid="analysis-results"
-            />
+            <>
+              {lastAnalysisData && (
+                <div className="mb-4 flex justify-end">
+                  <Button
+                    onClick={handleReAnalyze}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    data-testid="button-reanalyze"
+                  >
+                    <i className="fas fa-sync-alt"></i>
+                    Re-analyze with Current Values
+                  </Button>
+                </div>
+              )}
+              <AnalysisResults
+                analysis={analysisResult}
+                criteria={criteria}
+                onAnalysisUpdate={handleAnalysisUpdate}
+                onAddToComparison={addToComparison}
+                isInComparison={isInComparison(analysisResult.propertyId)}
+                data-testid="analysis-results"
+              />
+            </>
           )}
           
           {!analysisResult && !analysisMutation.isPending && (

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +41,7 @@ interface AnalyzerFormProps {
   isLoading: boolean;
   mortgageValues?: MortgageValues | null;
   onMortgageCalculated?: (values: MortgageValues | null) => void;
+  onFormValuesChange?: (values: { strMetrics: STRMetrics; ltrMetrics: LTRMetrics; monthlyExpenses: MonthlyExpenses; fundingSource: FundingSource; file?: File }) => void;
 }
 
 interface MortgageCalculatorResult {
@@ -51,7 +52,7 @@ interface MortgageCalculatorResult {
   payback_period_months?: number;
 }
 
-export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageCalculated }: AnalyzerFormProps) {
+export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageCalculated, onFormValuesChange }: AnalyzerFormProps) {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [strMetrics, setSTRMetrics] = useState<STRMetrics>({});
@@ -71,6 +72,19 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
   const [loanAmount, setLoanAmount] = useState("");
   const [interestRate, setInterestRate] = useState("");
   const [durationYears, setDurationYears] = useState("30");
+
+  // Notify parent when form values change
+  useEffect(() => {
+    if (onFormValuesChange) {
+      onFormValuesChange({
+        strMetrics,
+        ltrMetrics,
+        monthlyExpenses,
+        fundingSource,
+        file: selectedFile || undefined,
+      });
+    }
+  }, [strMetrics, ltrMetrics, monthlyExpenses, fundingSource, selectedFile, onFormValuesChange]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
