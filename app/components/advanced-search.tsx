@@ -230,9 +230,7 @@ export function AdvancedSearch() {
   // Track when a search has been executed
   useEffect(() => {
     const hasActiveSearch = searchText.trim().length > 0 || Object.keys(searchFilters).length > 0;
-    if (hasActiveSearch) {
-      setHasSearched(true);
-    }
+    setHasSearched(hasActiveSearch);
   }, [searchText, searchFilters]);
 
   // Get unique cities and states from email deals

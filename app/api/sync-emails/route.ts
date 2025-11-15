@@ -4,6 +4,7 @@ import { storage } from "../../../server/storage";
 import { cookies, headers } from "next/headers";
 import { google } from "googleapis";
 import type { EmailMonitoringResponse } from "../../../shared/schema";
+import { sendNotificationIfEnabled } from "../../../server/services/notification-helper";
 
 // Increase timeout for this route (Vercel Pro allows up to 60s, Hobby is 10s)
 export const maxDuration = 60; // 60 seconds
@@ -265,6 +266,38 @@ export async function POST() {
           const storedDeal = await storage.createEmailDeal(dealWithHash);
           console.log(`Stored deal with final ID: ${storedDeal.id}`);
           storedDeals.push(storedDeal);
+
+          // Send email notification for new deal if enabled
+          if (userId) {
+            try {
+              // Get user email from Clerk as fallback
+              let userEmail: string | undefined;
+              try {
+                const { currentUser } = await import("@clerk/nextjs/server");
+                const user = await currentUser();
+                userEmail = user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress;
+              } catch (error) {
+                // Ignore - will use preferences email only
+              }
+
+              await sendNotificationIfEnabled(
+                userId,
+                'new_deal',
+                {
+                  subject: 'New Property Deal Added',
+                  data: {
+                    id: storedDeal.id,
+                    address: deal.extractedProperty?.address || deal.subject,
+                    price: deal.extractedProperty?.price || 0,
+                  },
+                },
+                userEmail
+              );
+            } catch (error) {
+              // Don't fail the sync if notification fails
+              console.error('Failed to send new deal notification:', error);
+            }
+          }
         } else {
           console.log(`Skipping duplicate deal: ${deal.id}`);
         }

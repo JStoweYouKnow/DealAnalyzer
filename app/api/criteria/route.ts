@@ -21,19 +21,30 @@ export async function PUT(request: NextRequest) {
   try {
     // Check authentication for PUT requests (write operation)
     // GET is public, but PUT requires authentication
-    try {
-      const { auth } = await import("@clerk/nextjs/server");
-      const authResult = await auth();
-      if (!authResult?.userId) {
+    // Only skip auth in non-production development mode with explicit opt-in
+    const shouldSkipAuth = 
+      process.env.NODE_ENV !== 'production' && 
+      process.env.DISABLE_AUTH === 'true';
+    
+    if (!shouldSkipAuth) {
+      try {
+        const { auth } = await import("@clerk/nextjs/server");
+        const authResult = await auth();
+        if (!authResult?.userId) {
+          console.warn("Authentication failed: missing userId");
+          return NextResponse.json(
+            { error: "Unauthorized" },
+            { status: 401 }
+          );
+        }
+      } catch (error) {
+        // Fail-closed: log auth failure and return 401
+        console.error("Authentication error:", error);
         return NextResponse.json(
           { error: "Unauthorized" },
           { status: 401 }
         );
       }
-    } catch (error) {
-      // If Clerk is not available or not configured, allow the request through
-      // This handles development environments where Clerk might not be set up
-      console.warn("Clerk authentication check failed, allowing request:", error);
     }
 
     const body = await request.json();

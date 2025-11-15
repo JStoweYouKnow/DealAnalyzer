@@ -505,6 +505,20 @@ export default function DealsPage() {
     mutationFn: async ({ dealId, status }: { dealId: string; status: EmailDeal['status'] }) => {
       console.log('Updating deal status:', { dealId, status });
       const response = await apiRequest('PUT', `/api/email-deals/${dealId}/status`, { status });
+      
+      // Check if response is OK
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Failed to update deal status: ${response.status}`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
       const data = await response.json();
       console.log('Status update response:', data);
       return data;

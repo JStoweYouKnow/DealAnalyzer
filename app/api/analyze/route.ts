@@ -7,6 +7,7 @@ import { getMortgageRate } from "../../../server/mortgage-rate-service";
 import { loadInvestmentCriteria, DEFAULT_CRITERIA } from "../../../server/services/criteria-service";
 import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 import { runInParallel, apiLimit, heavyLimit } from "../../lib/parallel-utils";
+import { sendNotificationIfEnabled } from "../../../server/services/notification-helper";
 
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
@@ -113,6 +114,61 @@ export async function POST(request: NextRequest) {
 
     // Store the analysis in memory
     const storedAnalysis = await storage.createDealAnalysis(analysisWithAI as any);
+
+    // Send email notifications if enabled
+    try {
+      const { auth } = await import("@clerk/nextjs/server");
+      const authResult = await auth();
+      const userId = authResult?.userId;
+
+      if (userId) {
+        // Get user email from Clerk as fallback
+        let userEmail: string | undefined;
+        try {
+          const { currentUser } = await import("@clerk/nextjs/server");
+          const user = await currentUser();
+          userEmail = user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress;
+        } catch (error) {
+          // Ignore - will use preferences email only
+        }
+
+        // Send analysis complete notification
+        await sendNotificationIfEnabled(
+          userId,
+          'analysis_complete',
+          {
+            subject: 'Property Analysis Complete',
+            data: {
+              id: storedAnalysis.id,
+              address: analysisData.property.address,
+              meetsCriteria: analysisData.meetsCriteria,
+            },
+          },
+          userEmail
+        );
+
+        // Send criteria match notification if property meets criteria
+        if (analysisData.meetsCriteria) {
+          await sendNotificationIfEnabled(
+            userId,
+            'criteria_match',
+            {
+              subject: 'Property Meets Your Investment Criteria!',
+              data: {
+                id: storedAnalysis.id,
+                address: analysisData.property.address,
+                cocReturn: analysisData.cocReturn,
+                capRate: analysisData.capRate,
+              },
+            },
+            userEmail
+          );
+        }
+      }
+    } catch (error) {
+      // Don't fail the request if notifications fail
+      console.error('Failed to send analysis notifications:', error);
+    }
 
     return NextResponse.json({
       success: true,

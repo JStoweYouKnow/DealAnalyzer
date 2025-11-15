@@ -9,7 +9,7 @@ Your DealAnalyzer mobile app now includes integration with **5 free public APIs*
 | **Walk Score API** | 5,000 calls/day | ✅ Yes | Walkability, Transit, Bike Scores |
 | **OpenWeatherMap** | 1,000 calls/day | ✅ Yes | Current Weather, Climate Data |
 | **Bureau of Labor Statistics (BLS)** | 500 calls/day | ❌ No | Employment, Unemployment, Wages |
-| **Federal Reserve (FRED)** | Unlimited | ✅ Yes | Mortgage Rates, Home Price Index, Economic Indicators |
+| **Federal Reserve (FRED)** | 120 requests/minute | ✅ Yes | Mortgage Rates, Home Price Index, Economic Indicators |
 | **Nominatim (OpenStreetMap)** | 1 req/sec | ❌ No | Geocoding (Address → Coordinates) |
 
 ---
@@ -35,7 +35,7 @@ Your DealAnalyzer mobile app now includes integration with **5 free public APIs*
 1. Visit: https://fred.stlouisfed.org/docs/api/api_key.html
 2. Create a free account
 3. Request an API key
-4. **Cost:** Completely FREE (unlimited calls)
+4. **Cost:** Completely FREE (120 requests/minute)
 
 #### Bureau of Labor Statistics & Nominatim
 **No API keys needed!** These are completely free public APIs.
@@ -414,17 +414,20 @@ try {
 - Walk Score: 5,000 calls/day = ~150,000/month
 - OpenWeatherMap: 1,000 calls/day = ~30,000/month
 - BLS: 500 calls/day = ~15,000/month
-- FRED: Unlimited
+- FRED: 120 requests/minute = ~7,200/hour = ~172,800/day (practical limit)
 - Geocoding: ~86,400/day (1/sec) = ~2.5M/month
 
 ### Paid Alternatives (for comparison)
-- Attom Data API: $500-$2,000+/month
-- Zillow API: Deprecated (no longer available)
-- RealtyMole: $99-$299/month
-- Walk Score Commercial: $499+/month
+- **ATTOM Data API**: 
+  - Professional Plan: $499/year (~$42/month) - [Source](https://www.attomdata.com/solutions/property-navigator/pricing/)
+  - Enterprise Plan: Custom pricing (contact for quote)
+- **Zillow API**: Deprecated (no longer available)
+- **Walk Score Premium**: Starting at $115/month - [Source](https://www.walkscore.com/professional/pricing.php)
 
 ### Cost Savings
-By using these free APIs, you're saving **$1,000-$3,000+/month** vs. paid alternatives!
+By using these free APIs instead of paid alternatives, you're saving at least **$115+/month** (Walk Score Premium) and potentially **$42+/month** (ATTOM Professional) depending on your needs. The free tier limits are generous enough for most mobile applications, making this a cost-effective solution for market intelligence data.
+
+**Note:** RealtyMole was discontinued on March 1, 2025, and is no longer available as a service option.
 
 ---
 
@@ -472,6 +475,6 @@ You now have **5 powerful free APIs** integrated into your mobile app:
 
 **Total Cost:** $0/month (100% free)
 
-**Total Value:** $1,000-$3,000+/month equivalent
+**Total Value:** $115+/month equivalent (vs. Walk Score Premium at $115/month, plus potential savings on ATTOM Professional at ~$42/month)
 
 Start using these APIs today to provide premium market intelligence to your users without any cost! 🎉

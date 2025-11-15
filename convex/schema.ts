@@ -320,4 +320,19 @@ export default defineSchema({
     updatedAt: v.number(), // timestamp
   })
     .index("by_user_id", ["userId"]),
+
+  emailPreferences: defineTable({
+    userId: v.string(),
+    notifyOnNewDeals: v.boolean(),
+    notifyOnAnalysisComplete: v.boolean(),
+    notifyOnCriteriaMatch: v.boolean(),
+    notifyOnWeeklySummary: v.boolean(),
+    frequency: v.union(
+      v.literal("immediate"),
+      v.literal("daily"),
+      v.literal("weekly")
+    ),
+    email: v.string(),
+  })
+    .index("by_user_id", ["userId"]),
 });

@@ -297,7 +297,7 @@ npm run test:coverage
 
 ## Building for Production
 
-See the main [README.md](./README.md#building-for-production) for production build instructions using EAS (Expo Application Services).
+See the main [README.md](README.md#building-for-production) for production build instructions using EAS (Expo Application Services).
 
 ## Resources
 
