@@ -205,7 +205,7 @@
   @apply p-6 rounded-xl bg-gradient-to-br from-card via-card/95 to-card/90
          border border-border/60 shadow-lg shadow-black/5
          hover:shadow-xl hover:shadow-black/10 transition-all duration-300
-         relative overflow-hidden group;
+         relative overflow-hidden;
 }
 
 .stat-card::before {
@@ -315,7 +315,6 @@
 .border-gradient::before {
   content: '';
   @apply absolute inset-0 rounded-[inherit] p-[1px] bg-gradient-to-r from-primary/50 via-primary to-primary/50;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
 }
