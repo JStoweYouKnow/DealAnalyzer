@@ -22,26 +22,8 @@ interface MortgageValues {
 }
 
 export default function HomePage() {
-  // Load initial state from localStorage with validation
-  const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('dealanalyzer_current_analysis');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          // Validate that it has the required structure
-          if (parsed && typeof parsed === 'object' && parsed.property) {
-            return parsed;
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load analysis from localStorage:', e);
-        // Clear corrupted data
-        localStorage.removeItem('dealanalyzer_current_analysis');
-      }
-    }
-    return null;
-  });
+  // Don't auto-load last analysis - start fresh each time
+  const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(null);
 
   const [recentAnalyses, setRecentAnalyses] = useState<DealAnalysis[]>(() => {
     if (typeof window !== 'undefined') {
@@ -69,7 +51,10 @@ export default function HomePage() {
           const parsed = JSON.parse(saved);
           if (parsed && typeof parsed === 'object' &&
               typeof parsed.loanAmount === 'number' &&
-              typeof parsed.monthlyPayment === 'number') {
+              typeof parsed.monthlyPayment === 'number' &&
+              typeof parsed.loanTermYears === 'number' &&
+              Number.isInteger(parsed.loanTermYears) &&
+              parsed.loanTermYears > 0) {
             return parsed;
           }
         }
