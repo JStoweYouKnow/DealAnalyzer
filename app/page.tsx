@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -22,13 +22,54 @@ interface MortgageValues {
 }
 
 export default function HomePage() {
-  const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(null);
-  const [recentAnalyses, setRecentAnalyses] = useState<DealAnalysis[]>([]);
-  const [mortgageValues, setMortgageValues] = useState<MortgageValues | null>(null);
+  // Load initial state from localStorage
+  const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dealanalyzer_current_analysis');
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });
+
+  const [recentAnalyses, setRecentAnalyses] = useState<DealAnalysis[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dealanalyzer_recent_analyses');
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+
+  const [mortgageValues, setMortgageValues] = useState<MortgageValues | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dealanalyzer_mortgage_values');
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });
+
   const [lastAnalysisData, setLastAnalysisData] = useState<{ emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any; } | null>(null);
   const [currentFormValues, setCurrentFormValues] = useState<{ strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any; file?: File } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Save to localStorage whenever state changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && analysisResult) {
+      localStorage.setItem('dealanalyzer_current_analysis', JSON.stringify(analysisResult));
+    }
+  }, [analysisResult]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dealanalyzer_recent_analyses', JSON.stringify(recentAnalyses));
+    }
+  }, [recentAnalyses]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && mortgageValues) {
+      localStorage.setItem('dealanalyzer_mortgage_values', JSON.stringify(mortgageValues));
+    }
+  }, [mortgageValues]);
 
   const { 
     comparisonList, 
