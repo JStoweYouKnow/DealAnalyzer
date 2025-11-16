@@ -208,17 +208,95 @@ export function MarketIntelligence() {
   });
 
   // Fetch analysis history for property cards
+  // Also load from localStorage as fallback for serverless environments
   const { data: analysisHistory = [], isLoading: historyLoading, isError: historyError, error: historyErrorObj } = useQuery<DealAnalysis[]>({
     queryKey: ['/api/history'],
     queryFn: async () => {
       try {
+        // Try to fetch from API first
         const response = await apiRequest('GET', '/api/history');
         const data = await response.json();
-        return Array.isArray(data) ? data : [];
+        const apiHistory = Array.isArray(data) ? data : [];
+
+        // Also load from localStorage
+        let localHistory: DealAnalysis[] = [];
+        if (typeof window !== 'undefined') {
+          const currentAnalysis = localStorage.getItem('dealanalyzer_current_analysis');
+          const recentAnalyses = localStorage.getItem('dealanalyzer_recent_analyses');
+
+          if (currentAnalysis) {
+            try {
+              const parsed = JSON.parse(currentAnalysis);
+              localHistory.push(parsed);
+            } catch (e) {
+              console.warn('Failed to parse current analysis from localStorage:', e);
+            }
+          }
+
+          if (recentAnalyses) {
+            try {
+              const parsed = JSON.parse(recentAnalyses);
+              if (Array.isArray(parsed)) {
+                localHistory = [...localHistory, ...parsed];
+              }
+            } catch (e) {
+              console.warn('Failed to parse recent analyses from localStorage:', e);
+            }
+          }
+        }
+
+        // Merge and deduplicate (prefer API data, then localStorage)
+        const allHistory = [...apiHistory];
+        const apiIds = new Set(apiHistory.map(a => a.propertyId || a.id));
+
+        for (const localAnalysis of localHistory) {
+          const localId = localAnalysis.propertyId || localAnalysis.id;
+          if (localId && !apiIds.has(localId)) {
+            allHistory.push(localAnalysis);
+          }
+        }
+
+        // Sort by analysis date
+        return allHistory.sort((a, b) => {
+          const dateA = a.analysisDate ? new Date(a.analysisDate).getTime() : 0;
+          const dateB = b.analysisDate ? new Date(b.analysisDate).getTime() : 0;
+          return dateB - dateA;
+        });
       } catch (err) {
-        // Optional logging
-        console.error('Failed to fetch analysis history:', err);
-        throw err; // Re-throw to let React Query handle the error state
+        // If API fails, fallback to localStorage only
+        console.warn('API failed, using localStorage fallback:', err);
+
+        let localHistory: DealAnalysis[] = [];
+        if (typeof window !== 'undefined') {
+          const currentAnalysis = localStorage.getItem('dealanalyzer_current_analysis');
+          const recentAnalyses = localStorage.getItem('dealanalyzer_recent_analyses');
+
+          if (currentAnalysis) {
+            try {
+              const parsed = JSON.parse(currentAnalysis);
+              localHistory.push(parsed);
+            } catch (e) {
+              console.warn('Failed to parse current analysis from localStorage:', e);
+            }
+          }
+
+          if (recentAnalyses) {
+            try {
+              const parsed = JSON.parse(recentAnalyses);
+              if (Array.isArray(parsed)) {
+                localHistory = [...localHistory, ...parsed];
+              }
+            } catch (e) {
+              console.warn('Failed to parse recent analyses from localStorage:', e);
+            }
+          }
+        }
+
+        return localHistory.sort((a, b) => {
+          const dateA = a.analysisDate ? new Date(a.analysisDate).getTime() : 0;
+          const dateB = b.analysisDate ? new Date(b.analysisDate).getTime() : 0;
+          return dateB - dateA;
+        });
       }
     },
   });
