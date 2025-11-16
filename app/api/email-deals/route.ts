@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`Fetching email deals for user: ${userId.substring(0, 20)}...`);
-    const emailDeals = await storage.getEmailDeals(userId);
+    const emailDeals = await storage.getEmailDeals();
     console.log(`Retrieved ${emailDeals.length} email deals for user`);
     return NextResponse.json(emailDeals);
   } catch (error) {
