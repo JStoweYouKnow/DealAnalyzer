@@ -136,11 +136,15 @@ export default function HomePage() {
           fundingSource: data.fundingSource,
           mortgageValues: data.mortgageValues,
         });
-        return response.json() as Promise<AnalyzePropertyResponse>;
+        return await response.json() as AnalyzePropertyResponse;
       }
     },
     onSuccess: (data) => {
       if (data.success && data.data) {
+        // Ensure propertyId exists, generate one if missing
+        if (!data.data.propertyId) {
+          data.data.propertyId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        }
         setAnalysisResult(data.data);
         // Add to recent analyses (keep last 10)
         setRecentAnalyses(prev => {
