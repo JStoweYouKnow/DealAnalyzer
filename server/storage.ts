@@ -19,12 +19,12 @@ export interface IStorage {
   getAnalysisHistory(): Promise<DealAnalysis[]>;
   
   // Email deal methods
-  getEmailDeals(userId: string): Promise<EmailDeal[]>;
-  getEmailDeal(id: string, userId: string): Promise<EmailDeal | undefined>;
-  createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>, userId: string): Promise<EmailDeal>;
-  updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>, userId: string): Promise<EmailDeal | undefined>;
-  deleteEmailDeal(id: string, userId: string): Promise<boolean>;
-  findEmailDealByContentHash(contentHash: string, userId: string): Promise<EmailDeal | undefined>;
+  getEmailDeals(): Promise<EmailDeal[]>;
+  getEmailDeal(id: string): Promise<EmailDeal | undefined>;
+  createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
+  updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>): Promise<EmailDeal | undefined>;
+  deleteEmailDeal(id: string): Promise<boolean>;
+  findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | undefined>;
   
   // Comparison methods
   createComparison(propertyIds: string[], name?: string): Promise<PropertyComparison | null>;

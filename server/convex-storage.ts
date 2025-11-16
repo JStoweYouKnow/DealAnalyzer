@@ -71,7 +71,7 @@ export interface ConvexStorage {
 class ConvexStorageImpl implements ConvexStorage {
   private convex: ConvexHttpClient;
   private initPromise: Promise<boolean>;
-  private getRequestUserId(): string {
+  private async getRequestUserId(): Promise<string> {
     // Try to resolve a user-scoped ID from Next.js request context
     try {
       // Prefer Clerk if available
@@ -79,26 +79,8 @@ class ConvexStorageImpl implements ConvexStorage {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const clerk = require('@clerk/nextjs/server');
         if (clerk?.auth) {
-          const authResult = clerk.auth();
-          // auth() may return a promise in newer versions; normalize
-          if (typeof authResult?.then === 'function') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-            const userId = require('devalue').uneval; // placeholder to satisfy TS in try block
-          }
-          // Handle both sync and async variants without top-level await
-          const getUserId = () => {
-            try {
-              const res = clerk.auth();
-              if (typeof res?.then === 'function') {
-                // Async variant not supported in this sync helper; skip to headers/cookies fallback
-                return undefined;
-              }
-              return res?.userId as string | undefined;
-            } catch {
-              return undefined;
-            }
-          };
-          const clerkUserId = getUserId();
+          const res = await clerk.auth();
+          const clerkUserId = res?.userId as string | undefined;
           if (clerkUserId && clerkUserId.trim().length > 0) {
             return clerkUserId;
           }
@@ -126,7 +108,7 @@ class ConvexStorageImpl implements ConvexStorage {
     } catch {
       // Ignore - not in a Next.js request context
     }
-    throw new Error("User context is required but was not found (missing header 'x-user-id' or cookie 'dealanalyzer_user_session_id').");
+    throw new Error("User context is required but was not found (missing Clerk session, header 'x-user-id', or cookie 'dealanalyzer_user_session_id').");
   }
 
   constructor() {
@@ -157,14 +139,14 @@ class ConvexStorageImpl implements ConvexStorage {
   // Email Deals Implementation
   async getEmailDeals(): Promise<EmailDeal[]> {
     await this.ensureInitialized();
-    const userId = this.getRequestUserId();
+    const userId = await this.getRequestUserId();
     const deals = await this.convex.query(api.emailDeals.list, { userId });
     return deals.map(this.mapConvexEmailDealToEmailDeal);
   }
 
   async getEmailDeal(id: string): Promise<EmailDeal | null> {
     await this.ensureInitialized();
-    const userId = this.getRequestUserId();
+    const userId = await this.getRequestUserId();
     // First try to get by Gmail ID (for backward compatibility)
     let deal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
 
@@ -183,7 +165,7 @@ class ConvexStorageImpl implements ConvexStorage {
   async createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal> {
     await this.ensureInitialized();
     const gmailId = 'id' in deal ? deal.id : `temp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-    const userId = this.getRequestUserId();
+    const userId = await this.getRequestUserId();
 
     const convexDeal = {
       userId,
@@ -221,7 +203,7 @@ class ConvexStorageImpl implements ConvexStorage {
     }
 
     // Enforce ownership
-    const userId = this.getRequestUserId();
+    const userId = await this.getRequestUserId();
     if (convexDeal && convexDeal.userId !== userId) {
       throw new Error("Unauthorized: Cannot update email deal belonging to another user");
     }
@@ -256,7 +238,7 @@ class ConvexStorageImpl implements ConvexStorage {
     }
 
     // Enforce ownership
-    const userId = this.getRequestUserId();
+    const userId = await this.getRequestUserId();
     if (convexDeal.userId !== userId) {
       throw new Error("Unauthorized: Cannot delete email deal belonging to another user");
     }
@@ -265,7 +247,7 @@ class ConvexStorageImpl implements ConvexStorage {
 
   async findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | null> {
     await this.ensureInitialized();
-    const userId = this.getRequestUserId();
+    const userId = await this.getRequestUserId();
     const deal = await this.convex.query(api.emailDeals.findByContentHash, { contentHash });
 
     // Enforce ownership
@@ -276,7 +258,7 @@ class ConvexStorageImpl implements ConvexStorage {
   }
 
   async bulkCreateEmailDeals(deals: Omit<EmailDeal, 'createdAt' | 'updatedAt'>[]): Promise<EmailDeal[]> {
-    const userId = this.getRequestUserId();
+    const userId = await this.getRequestUserId();
     const convexDeals = deals.map(deal => ({
       gmailId: deal.id,
       subject: deal.subject,
