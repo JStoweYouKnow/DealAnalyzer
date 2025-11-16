@@ -71,6 +71,63 @@ export interface ConvexStorage {
 class ConvexStorageImpl implements ConvexStorage {
   private convex: ConvexHttpClient;
   private initPromise: Promise<boolean>;
+  private getRequestUserId(): string {
+    // Try to resolve a user-scoped ID from Next.js request context
+    try {
+      // Prefer Clerk if available
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const clerk = require('@clerk/nextjs/server');
+        if (clerk?.auth) {
+          const authResult = clerk.auth();
+          // auth() may return a promise in newer versions; normalize
+          if (typeof authResult?.then === 'function') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            const userId = require('devalue').uneval; // placeholder to satisfy TS in try block
+          }
+          // Handle both sync and async variants without top-level await
+          const getUserId = () => {
+            try {
+              const res = clerk.auth();
+              if (typeof res?.then === 'function') {
+                // Async variant not supported in this sync helper; skip to headers/cookies fallback
+                return undefined;
+              }
+              return res?.userId as string | undefined;
+            } catch {
+              return undefined;
+            }
+          };
+          const clerkUserId = getUserId();
+          if (clerkUserId && clerkUserId.trim().length > 0) {
+            return clerkUserId;
+          }
+        }
+      } catch {
+        // Clerk not available; continue to headers/cookies
+      }
+      // Use dynamic require to avoid bundling issues in non-Next contexts
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const nh = require('next/headers');
+      if (nh?.headers) {
+        const h = nh.headers();
+        const headerUserId = h.get('x-user-id') || h.get('x-user-session-id');
+        if (headerUserId && headerUserId.trim().length > 0) {
+          return headerUserId;
+        }
+      }
+      if (nh?.cookies) {
+        const c = nh.cookies();
+        const cookieUser = c.get('dealanalyzer_user_session_id')?.value;
+        if (cookieUser && cookieUser.trim().length > 0) {
+          return cookieUser;
+        }
+      }
+    } catch {
+      // Ignore - not in a Next.js request context
+    }
+    throw new Error("User context is required but was not found (missing header 'x-user-id' or cookie 'dealanalyzer_user_session_id').");
+  }
 
   constructor() {
     const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
@@ -98,14 +155,16 @@ class ConvexStorageImpl implements ConvexStorage {
   }
 
   // Email Deals Implementation
-  async getEmailDeals(userId: string): Promise<EmailDeal[]> {
+  async getEmailDeals(): Promise<EmailDeal[]> {
     await this.ensureInitialized();
+    const userId = this.getRequestUserId();
     const deals = await this.convex.query(api.emailDeals.list, { userId });
     return deals.map(this.mapConvexEmailDealToEmailDeal);
   }
 
-  async getEmailDeal(id: string, userId: string): Promise<EmailDeal | null> {
+  async getEmailDeal(id: string): Promise<EmailDeal | null> {
     await this.ensureInitialized();
+    const userId = this.getRequestUserId();
     // First try to get by Gmail ID (for backward compatibility)
     let deal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
 
@@ -114,17 +173,17 @@ class ConvexStorageImpl implements ConvexStorage {
       deal = await this.convex.query(api.emailDeals.getById, { id: id as any });
     }
 
-    // Verify the deal belongs to this user
+    // Enforce ownership
     if (deal && deal.userId !== userId) {
       return null;
     }
-
     return deal ? this.mapConvexEmailDealToEmailDeal(deal) : null;
   }
 
-  async createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>, userId: string): Promise<EmailDeal> {
+  async createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal> {
     await this.ensureInitialized();
     const gmailId = 'id' in deal ? deal.id : `temp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    const userId = this.getRequestUserId();
 
     const convexDeal = {
       userId,
@@ -148,9 +207,9 @@ class ConvexStorageImpl implements ConvexStorage {
     return this.mapConvexEmailDealToEmailDeal(createdDeal);
   }
 
-  async updateEmailDeal(id: string, updates: Partial<EmailDeal>, userId: string): Promise<EmailDeal> {
+  async updateEmailDeal(id: string, updates: Partial<EmailDeal>): Promise<EmailDeal> {
     // Get the deal first to find the Convex ID
-    const existingDeal = await this.getEmailDeal(id, userId);
+    const existingDeal = await this.getEmailDeal(id);
     if (!existingDeal) {
       throw new Error("Email deal not found");
     }
@@ -161,11 +220,11 @@ class ConvexStorageImpl implements ConvexStorage {
       convexDeal = await this.convex.query(api.emailDeals.getById, { id: id as any });
     }
 
-    // Verify ownership
+    // Enforce ownership
+    const userId = this.getRequestUserId();
     if (convexDeal && convexDeal.userId !== userId) {
       throw new Error("Unauthorized: Cannot update email deal belonging to another user");
     }
-
     if (!convexDeal) {
       throw new Error("Email deal not found in Convex");
     }
@@ -185,7 +244,7 @@ class ConvexStorageImpl implements ConvexStorage {
     return this.mapConvexEmailDealToEmailDeal(updatedDeal!);
   }
 
-  async deleteEmailDeal(id: string, userId: string): Promise<boolean> {
+  async deleteEmailDeal(id: string): Promise<void> {
     // Find the Convex deal to get the internal ID
     let convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
     if (!convexDeal && id.startsWith("k")) {
@@ -196,27 +255,28 @@ class ConvexStorageImpl implements ConvexStorage {
       throw new Error("Email deal not found");
     }
 
-    // Verify ownership
+    // Enforce ownership
+    const userId = this.getRequestUserId();
     if (convexDeal.userId !== userId) {
       throw new Error("Unauthorized: Cannot delete email deal belonging to another user");
     }
-
     await this.convex.mutation(api.emailDeals.remove, { id: convexDeal._id });
-    return true;
   }
 
-  async findEmailDealByContentHash(contentHash: string, userId: string): Promise<EmailDeal | null> {
+  async findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | null> {
+    await this.ensureInitialized();
+    const userId = this.getRequestUserId();
     const deal = await this.convex.query(api.emailDeals.findByContentHash, { contentHash });
 
-    // Verify the deal belongs to this user
+    // Enforce ownership
     if (deal && deal.userId !== userId) {
       return null;
     }
-
     return deal ? this.mapConvexEmailDealToEmailDeal(deal) : null;
   }
 
-  async bulkCreateEmailDeals(deals: Omit<EmailDeal, 'createdAt' | 'updatedAt'>[], userId: string): Promise<EmailDeal[]> {
+  async bulkCreateEmailDeals(deals: Omit<EmailDeal, 'createdAt' | 'updatedAt'>[]): Promise<EmailDeal[]> {
+    const userId = this.getRequestUserId();
     const convexDeals = deals.map(deal => ({
       gmailId: deal.id,
       subject: deal.subject,

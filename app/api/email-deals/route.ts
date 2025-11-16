@@ -14,16 +14,25 @@ export async function GET(request: NextRequest) {
 
     // Get userId from Clerk auth (in production) or fallback to session header (in development)
     const { userId: clerkUserId } = await auth();
-    const sessionUserId = request.headers.get('x-user-session-id');
-
-    // Prefer Clerk userId, fallback to session ID for development
-    const userId = clerkUserId || sessionUserId;
-
+    const isDev = process.env.NODE_ENV === 'development';
+    let userId = clerkUserId;
+    if (!userId && isDev) {
+      const headerUserId = request.headers.get('x-user-session-id');
+      if (headerUserId && headerUserId !== 'temp-ssr-id') {
+        console.log("Development fallback: using x-user-session-id from request headers.");
+        userId = headerUserId;
+      }
+    }
     if (!userId || userId === 'temp-ssr-id') {
-      console.warn("No valid user ID provided (neither Clerk nor session)");
-      return NextResponse.json({
-        error: "Unauthorized. Please sign in."
-      }, { status: 401 });
+      if (!isDev) {
+        console.warn("Unauthorized: Missing Clerk userId in production.");
+      } else {
+        console.warn("Unauthorized in development: No valid Clerk userId and no valid x-user-session-id header.");
+      }
+      return NextResponse.json(
+        { error: "Unauthorized. Please sign in." },
+        { status: 401 }
+      );
     }
 
     console.log(`Fetching email deals for user: ${userId.substring(0, 20)}...`);

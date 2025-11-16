@@ -70,11 +70,10 @@ Clerk uses **HTTP-only cookies** to manage sessions:
 **You don't need to do anything!** Clerk manages all of this automatically.
 
 ### Session Duration
-
-By default, Clerk sessions:
-- **Active Duration**: 7 days (can be extended to 30 days)
-- **Inactive Duration**: Sessions expire after 7 days of no activity
-- **Configurable**: Adjust in Clerk Dashboard → Sessions settings
+By default, for new Clerk instances:
+- **Maximum session lifetime**: 7 days
+- **Inactivity timeout**: Disabled by default (can be enabled and adjusted up to 30 days)
+- **Configurable**: Manage both in Clerk Dashboard → Sessions settings
 
 ## Data Privacy & Security
 
