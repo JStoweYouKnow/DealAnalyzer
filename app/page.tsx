@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -22,27 +22,61 @@ interface MortgageValues {
 }
 
 export default function HomePage() {
-  // Load initial state from localStorage
+  // Load initial state from localStorage with validation
   const [analysisResult, setAnalysisResult] = useState<DealAnalysis | null>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('dealanalyzer_current_analysis');
-      return saved ? JSON.parse(saved) : null;
+      try {
+        const saved = localStorage.getItem('dealanalyzer_current_analysis');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Validate that it has the required structure
+          if (parsed && typeof parsed === 'object' && parsed.property) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load analysis from localStorage:', e);
+        // Clear corrupted data
+        localStorage.removeItem('dealanalyzer_current_analysis');
+      }
     }
     return null;
   });
 
   const [recentAnalyses, setRecentAnalyses] = useState<DealAnalysis[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('dealanalyzer_recent_analyses');
-      return saved ? JSON.parse(saved) : [];
+      try {
+        const saved = localStorage.getItem('dealanalyzer_recent_analyses');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load recent analyses from localStorage:', e);
+        localStorage.removeItem('dealanalyzer_recent_analyses');
+      }
     }
     return [];
   });
 
   const [mortgageValues, setMortgageValues] = useState<MortgageValues | null>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('dealanalyzer_mortgage_values');
-      return saved ? JSON.parse(saved) : null;
+      try {
+        const saved = localStorage.getItem('dealanalyzer_mortgage_values');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object' &&
+              typeof parsed.loanAmount === 'number' &&
+              typeof parsed.monthlyPayment === 'number') {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load mortgage values from localStorage:', e);
+        localStorage.removeItem('dealanalyzer_mortgage_values');
+      }
     }
     return null;
   });
@@ -52,22 +86,41 @@ export default function HomePage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Save to localStorage whenever state changes
+  // Track if this is the initial mount to avoid unnecessary localStorage writes
+  const isInitialMount = useRef(true);
+
+  // Save to localStorage whenever state changes (but not on initial mount)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     if (typeof window !== 'undefined' && analysisResult) {
-      localStorage.setItem('dealanalyzer_current_analysis', JSON.stringify(analysisResult));
+      try {
+        localStorage.setItem('dealanalyzer_current_analysis', JSON.stringify(analysisResult));
+      } catch (e) {
+        console.error('Failed to save analysis to localStorage:', e);
+      }
     }
   }, [analysisResult]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('dealanalyzer_recent_analyses', JSON.stringify(recentAnalyses));
+      try {
+        localStorage.setItem('dealanalyzer_recent_analyses', JSON.stringify(recentAnalyses));
+      } catch (e) {
+        console.error('Failed to save recent analyses to localStorage:', e);
+      }
     }
   }, [recentAnalyses]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && mortgageValues) {
-      localStorage.setItem('dealanalyzer_mortgage_values', JSON.stringify(mortgageValues));
+      try {
+        localStorage.setItem('dealanalyzer_mortgage_values', JSON.stringify(mortgageValues));
+      } catch (e) {
+        console.error('Failed to save mortgage values to localStorage:', e);
+      }
     }
   }, [mortgageValues]);
 
@@ -143,7 +196,7 @@ export default function HomePage() {
       if (data.success && data.data) {
         // Ensure propertyId exists, generate one if missing
         if (!data.data.propertyId) {
-          data.data.propertyId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          data.data.propertyId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
         }
         setAnalysisResult(data.data);
         // Add to recent analyses (keep last 10)
