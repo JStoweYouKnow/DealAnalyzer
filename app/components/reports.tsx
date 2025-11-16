@@ -79,13 +79,61 @@ export function Reports({ analyses, comparisonList }: ReportsProps) {
     setIsGenerating(true);
     
     try {
+      // Ensure all selected analyses are persisted and have a server id
+      // Map from analysisId used in UI to actual analysis object
+      const idToAnalysis = new Map<string, DealAnalysis>();
+      allAnalyses.forEach((a, index) => {
+        const key = a.id || `${a.propertyId}-${index}`;
+        idToAnalysis.set(key, a);
+      });
+
+      const idsNeedingPersistence = selectedAnalyses
+        .map(id => idToAnalysis.get(id))
+        .filter((a): a is DealAnalysis => Boolean(a))
+        .filter(a => !a.id);
+
+      let persistedIdMap = new Map<string, string>(); // UI id -> persisted id
+      if (idsNeedingPersistence.length > 0) {
+        const results = await Promise.all(idsNeedingPersistence.map(async (a) => {
+          const res = await fetch('/api/persist-analysis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ analysis: a }),
+          });
+          if (!res.ok) {
+            throw new Error(`Failed to persist analysis (status ${res.status})`);
+          }
+          const json = await res.json();
+          return json?.data as DealAnalysis;
+        }));
+
+        // Update local map for quick id translation
+        results.forEach((stored) => {
+          // Find the corresponding UI key(s) that referenced this analysis
+          const matchingEntries = [...idToAnalysis.entries()].filter(([, a]) => a.propertyId === stored.propertyId);
+          for (const [uiId] of matchingEntries) {
+            persistedIdMap.set(uiId, (stored as any).id);
+          }
+        });
+      }
+
+      // Translate UI-selected ids to real server ids
+      const serverIds = selectedAnalyses.map(id => {
+        const analysis = idToAnalysis.get(id);
+        return analysis?.id || persistedIdMap.get(id);
+      }).filter((v): v is string => Boolean(v));
+
+      if (serverIds.length === 0) {
+        throw new Error('No valid persisted analyses found for report generation');
+      }
+
       const response = await fetch('/api/generate-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          analysisIds: selectedAnalyses,
+          analysisIds: serverIds,
           format,
           title: reportTitle,
           includeComparison
