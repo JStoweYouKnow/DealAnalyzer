@@ -5,6 +5,7 @@ import { Doc, Id } from "./_generated/dataModel";
 // Create a new email deal
 export const create = mutation({
   args: {
+    userId: v.string(), // Now required - passed from API
     gmailId: v.string(),
     subject: v.string(),
     sender: v.string(),
@@ -23,12 +24,12 @@ export const create = mutation({
     extractedProperty: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    // Temporarily use hardcoded userId until auth is fully configured
-    const userId = "temp-user-id";
-    // const userId = await getAuthUserId(ctx);
-    // if (!userId) {
-    //   throw new Error("Not authenticated");
-    // }
+    // Use the userId passed from the API (either from Clerk or session)
+    const userId = args.userId;
+
+    if (!userId) {
+      throw new Error("User ID is required");
+    }
 
     // Check if email deal already exists by Gmail ID for this user
     const existing = await ctx.db
@@ -73,6 +74,7 @@ export const create = mutation({
 // Get all email deals for the current user
 export const list = query({
   args: {
+    userId: v.string(), // Now required - passed from API
     status: v.optional(v.union(
       v.literal("new"),
       v.literal("reviewed"),
@@ -85,12 +87,12 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Temporarily use hardcoded userId until auth is fully configured
-    const userId = "temp-user-id";
-    // const userId = await getAuthUserId(ctx);
-    // if (!userId) {
-    //   throw new Error("Not authenticated");
-    // }
+    // Use the userId passed from the API (either from Clerk or session)
+    const userId = args.userId;
+
+    if (!userId) {
+      throw new Error("User ID is required");
+    }
 
     let query = ctx.db.query("emailDeals").withIndex("by_user_id", (q) => q.eq("userId", userId));
 
@@ -216,6 +218,7 @@ export const findByContentHash = query({
 // Bulk create email deals (for Gmail sync)
 export const bulkCreate = mutation({
   args: {
+    userId: v.string(), // Now required - passed from API
     deals: v.array(v.object({
       gmailId: v.string(),
       subject: v.string(),
@@ -236,20 +239,21 @@ export const bulkCreate = mutation({
     })),
   },
   handler: async (ctx, args) => {
-    // Temporarily use hardcoded userId until auth is fully configured
-    const userId = "temp-user-id";
-    // const userId = await getAuthUserId(ctx);
-    // if (!userId) {
-    //   throw new Error("Not authenticated");
-    // }
-    
+    // Use the userId passed from the API (either from Clerk or session)
+    const userId = args.userId;
+
+    if (!userId) {
+      throw new Error("User ID is required");
+    }
+
     const results = [];
-    
+
     for (const deal of args.deals) {
-      // Check if email deal already exists by Gmail ID
+      // Check if email deal already exists by Gmail ID for this user
       const existing = await ctx.db
         .query("emailDeals")
         .withIndex("by_gmail_id", (q) => q.eq("gmailId", deal.gmailId))
+        .filter((q) => q.eq(q.field("userId"), userId))
         .first();
 
       if (existing) {
@@ -257,11 +261,12 @@ export const bulkCreate = mutation({
         continue;
       }
 
-      // Check for duplicate by content hash if provided
+      // Check for duplicate by content hash if provided for this user
       if (deal.contentHash) {
         const duplicate = await ctx.db
           .query("emailDeals")
           .withIndex("by_content_hash", (q) => q.eq("contentHash", deal.contentHash))
+          .filter((q) => q.eq(q.field("userId"), userId))
           .first();
 
         if (duplicate) {

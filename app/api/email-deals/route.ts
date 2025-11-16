@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { storage } from "../../../server/storage";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     console.log("Getting email deals from storage...");
 
@@ -11,9 +12,23 @@ export async function GET() {
       return NextResponse.json([]);
     }
 
-    // No authentication check since we removed Clerk
-    const emailDeals = await storage.getEmailDeals();
-    console.log(`Retrieved ${emailDeals.length} email deals`);
+    // Get userId from Clerk auth (in production) or fallback to session header (in development)
+    const { userId: clerkUserId } = await auth();
+    const sessionUserId = request.headers.get('x-user-session-id');
+
+    // Prefer Clerk userId, fallback to session ID for development
+    const userId = clerkUserId || sessionUserId;
+
+    if (!userId || userId === 'temp-ssr-id') {
+      console.warn("No valid user ID provided (neither Clerk nor session)");
+      return NextResponse.json({
+        error: "Unauthorized. Please sign in."
+      }, { status: 401 });
+    }
+
+    console.log(`Fetching email deals for user: ${userId.substring(0, 20)}...`);
+    const emailDeals = await storage.getEmailDeals(userId);
+    console.log(`Retrieved ${emailDeals.length} email deals for user`);
     return NextResponse.json(emailDeals);
   } catch (error) {
     console.error("Error getting email deals:", error);

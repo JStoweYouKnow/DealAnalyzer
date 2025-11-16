@@ -98,30 +98,36 @@ class ConvexStorageImpl implements ConvexStorage {
   }
 
   // Email Deals Implementation
-  async getEmailDeals(): Promise<EmailDeal[]> {
+  async getEmailDeals(userId: string): Promise<EmailDeal[]> {
     await this.ensureInitialized();
-    const deals = await this.convex.query(api.emailDeals.list, {});
+    const deals = await this.convex.query(api.emailDeals.list, { userId });
     return deals.map(this.mapConvexEmailDealToEmailDeal);
   }
 
-  async getEmailDeal(id: string): Promise<EmailDeal | null> {
+  async getEmailDeal(id: string, userId: string): Promise<EmailDeal | null> {
     await this.ensureInitialized();
     // First try to get by Gmail ID (for backward compatibility)
     let deal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
-    
+
     // If not found by Gmail ID, try by Convex ID
     if (!deal && id.startsWith("k")) {
       deal = await this.convex.query(api.emailDeals.getById, { id: id as any });
     }
 
+    // Verify the deal belongs to this user
+    if (deal && deal.userId !== userId) {
+      return null;
+    }
+
     return deal ? this.mapConvexEmailDealToEmailDeal(deal) : null;
   }
 
-  async createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal> {
+  async createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>, userId: string): Promise<EmailDeal> {
     await this.ensureInitialized();
-    const gmailId = 'id' in deal ? deal.id : `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+    const gmailId = 'id' in deal ? deal.id : `temp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
     const convexDeal = {
+      userId,
       gmailId,
       subject: deal.subject,
       sender: deal.sender,
@@ -134,7 +140,7 @@ class ConvexStorageImpl implements ConvexStorage {
 
     const dealId = await this.convex.mutation(api.emailDeals.create, convexDeal);
     const createdDeal = await this.convex.query(api.emailDeals.getById, { id: dealId });
-    
+
     if (!createdDeal) {
       throw new Error("Failed to create email deal");
     }
@@ -142,9 +148,9 @@ class ConvexStorageImpl implements ConvexStorage {
     return this.mapConvexEmailDealToEmailDeal(createdDeal);
   }
 
-  async updateEmailDeal(id: string, updates: Partial<EmailDeal>): Promise<EmailDeal> {
+  async updateEmailDeal(id: string, updates: Partial<EmailDeal>, userId: string): Promise<EmailDeal> {
     // Get the deal first to find the Convex ID
-    const existingDeal = await this.getEmailDeal(id);
+    const existingDeal = await this.getEmailDeal(id, userId);
     if (!existingDeal) {
       throw new Error("Email deal not found");
     }
@@ -153,6 +159,11 @@ class ConvexStorageImpl implements ConvexStorage {
     let convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
     if (!convexDeal && id.startsWith("k")) {
       convexDeal = await this.convex.query(api.emailDeals.getById, { id: id as any });
+    }
+
+    // Verify ownership
+    if (convexDeal && convexDeal.userId !== userId) {
+      throw new Error("Unauthorized: Cannot update email deal belonging to another user");
     }
 
     if (!convexDeal) {
@@ -174,7 +185,7 @@ class ConvexStorageImpl implements ConvexStorage {
     return this.mapConvexEmailDealToEmailDeal(updatedDeal!);
   }
 
-  async deleteEmailDeal(id: string): Promise<void> {
+  async deleteEmailDeal(id: string, userId: string): Promise<boolean> {
     // Find the Convex deal to get the internal ID
     let convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
     if (!convexDeal && id.startsWith("k")) {
@@ -185,15 +196,27 @@ class ConvexStorageImpl implements ConvexStorage {
       throw new Error("Email deal not found");
     }
 
+    // Verify ownership
+    if (convexDeal.userId !== userId) {
+      throw new Error("Unauthorized: Cannot delete email deal belonging to another user");
+    }
+
     await this.convex.mutation(api.emailDeals.remove, { id: convexDeal._id });
+    return true;
   }
 
-  async findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | null> {
+  async findEmailDealByContentHash(contentHash: string, userId: string): Promise<EmailDeal | null> {
     const deal = await this.convex.query(api.emailDeals.findByContentHash, { contentHash });
+
+    // Verify the deal belongs to this user
+    if (deal && deal.userId !== userId) {
+      return null;
+    }
+
     return deal ? this.mapConvexEmailDealToEmailDeal(deal) : null;
   }
 
-  async bulkCreateEmailDeals(deals: Omit<EmailDeal, 'createdAt' | 'updatedAt'>[]): Promise<EmailDeal[]> {
+  async bulkCreateEmailDeals(deals: Omit<EmailDeal, 'createdAt' | 'updatedAt'>[], userId: string): Promise<EmailDeal[]> {
     const convexDeals = deals.map(deal => ({
       gmailId: deal.id,
       subject: deal.subject,
@@ -205,7 +228,7 @@ class ConvexStorageImpl implements ConvexStorage {
       extractedProperty: deal.extractedProperty,
     }));
 
-    const results = await this.convex.mutation(api.emailDeals.bulkCreate, { deals: convexDeals });
+    const results = await this.convex.mutation(api.emailDeals.bulkCreate, { userId, deals: convexDeals });
     
     // Fetch the created deals
     const createdDeals = [];

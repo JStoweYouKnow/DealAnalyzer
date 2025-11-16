@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { getUserSessionId } from "./user-session";
 
 async function throwIfResNotOk(res: Response, url?: string) {
   if (!res.ok) {
@@ -21,10 +22,21 @@ export async function apiRequest(
 ): Promise<Response> {
   // For Next.js, API routes are relative paths starting with /api
   const apiUrl = url.startsWith('/api') ? url : `/api${url}`;
-  
+
+  // Get user session ID and include in headers
+  const userSessionId = getUserSessionId();
+
+  const headers: Record<string, string> = {
+    'x-user-session-id': userSessionId,
+  };
+
+  if (data) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const res = await fetch(apiUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -49,8 +61,14 @@ export const getQueryFn: <T>(options: {
     if (!url.startsWith("/api/") && !url.startsWith("/api")) {
       url = `/api${url}`;
     }
-    
+
+    // Get user session ID and include in headers
+    const userSessionId = getUserSessionId();
+
     const res = await fetch(url, {
+      headers: {
+        'x-user-session-id': userSessionId,
+      },
       credentials: "include",
     });
 

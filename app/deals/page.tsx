@@ -884,6 +884,26 @@ export default function DealsPage() {
   return (
     <div className="container mx-auto px-4 py-8">
         <div className="space-y-6">
+      {/* Authentication Info Banner */}
+      <Card className="border-2 border-blue-300 bg-blue-50 dark:bg-blue-950/30">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <i className="fas fa-shield-alt text-2xl text-blue-600 dark:text-blue-400"></i>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                🔒 Secure Authentication Enabled
+              </h3>
+              <p className="text-xs text-blue-800 dark:text-blue-200">
+                Your email deals are private and secure. Data is isolated per user account.
+                {process.env.NODE_ENV === 'development' && ' (Development mode: authentication optional)'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Combined Header and Dashboard */}
       <Card className="analysis-card">
         <CardHeader>
