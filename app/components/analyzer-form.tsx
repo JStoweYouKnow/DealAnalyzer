@@ -112,6 +112,30 @@ export function AnalyzerForm({ onAnalyze, isLoading, mortgageValues, onMortgageC
         return;
       }
 
+      // Check file size - warn on mobile for files > 5MB
+      const fileSizeInMB = file.size / (1024 * 1024);
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+      if (fileSizeInMB > 50) {
+        toast({
+          title: "File Too Large",
+          description: `File size (${fileSizeInMB.toFixed(1)}MB) exceeds 50MB limit. Please choose a smaller file.`,
+          variant: "destructive",
+        });
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+
+      if (isMobile && fileSizeInMB > 5) {
+        toast({
+          title: "Large File Warning",
+          description: `File is ${fileSizeInMB.toFixed(1)}MB. Large files may cause performance issues on mobile devices. Consider using a smaller file.`,
+          variant: "destructive",
+        });
+      }
+
       setSelectedFile(file);
     } else {
       setSelectedFile(null);

@@ -74,38 +74,84 @@ export default function HomePage() {
   // Track if this is the initial mount to avoid unnecessary localStorage writes
   const isInitialMount = useRef(true);
 
+  // Helper function to safely save to localStorage with quota error handling
+  const safeLocalStorageSave = (key: string, data: any) => {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      const serialized = JSON.stringify(data);
+      // Check if data is too large (mobile browsers typically have 5-10MB limit)
+      const sizeInMB = new Blob([serialized]).size / (1024 * 1024);
+
+      if (sizeInMB > 4) { // Warn at 4MB to leave headroom
+        console.warn(`Large data size (${sizeInMB.toFixed(2)}MB) for key: ${key}. May cause issues on mobile.`);
+        toast({
+          title: "Storage Warning",
+          description: "Analysis data is large. Consider clearing old analyses to free up space.",
+          variant: "destructive",
+        });
+      }
+
+      localStorage.setItem(key, serialized);
+      return true;
+    } catch (e) {
+      console.error(`Failed to save ${key} to localStorage:`, e);
+
+      // Check if it's a quota exceeded error
+      if (e instanceof Error && (e.name === 'QuotaExceededError' || e.message.includes('quota'))) {
+        toast({
+          title: "Storage Full",
+          description: "Browser storage is full. Please clear some data to continue saving analyses.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Storage Error",
+          description: "Failed to save data. Your browser may be in private mode or storage is disabled.",
+          variant: "destructive",
+        });
+      }
+      return false;
+    }
+  };
+
   // Save to localStorage whenever state changes (but not on initial mount)
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
     }
-    if (typeof window !== 'undefined' && analysisResult) {
-      try {
-        localStorage.setItem('dealanalyzer_current_analysis', JSON.stringify(analysisResult));
-      } catch (e) {
-        console.error('Failed to save analysis to localStorage:', e);
-      }
+    if (analysisResult) {
+      // Strip sensitive data before saving (don't save full property description/emails)
+      const sanitizedAnalysis = {
+        ...analysisResult,
+        property: {
+          ...analysisResult.property,
+          // Keep only essential property data, strip potentially sensitive email content
+          description: analysisResult.property.description?.substring(0, 200) || '',
+        }
+      };
+      safeLocalStorageSave('dealanalyzer_current_analysis', sanitizedAnalysis);
     }
   }, [analysisResult]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('dealanalyzer_recent_analyses', JSON.stringify(recentAnalyses));
-      } catch (e) {
-        console.error('Failed to save recent analyses to localStorage:', e);
-      }
+    if (recentAnalyses.length > 0) {
+      // Sanitize recent analyses as well
+      const sanitizedRecent = recentAnalyses.map(analysis => ({
+        ...analysis,
+        property: {
+          ...analysis.property,
+          description: analysis.property.description?.substring(0, 200) || '',
+        }
+      }));
+      safeLocalStorageSave('dealanalyzer_recent_analyses', sanitizedRecent);
     }
   }, [recentAnalyses]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && mortgageValues) {
-      try {
-        localStorage.setItem('dealanalyzer_mortgage_values', JSON.stringify(mortgageValues));
-      } catch (e) {
-        console.error('Failed to save mortgage values to localStorage:', e);
-      }
+    if (mortgageValues) {
+      safeLocalStorageSave('dealanalyzer_mortgage_values', mortgageValues);
     }
   }, [mortgageValues]);
 
@@ -129,52 +175,66 @@ export default function HomePage() {
   // Analysis mutation
   const analysisMutation = useMutation({
     mutationFn: async (data: { emailContent?: string; file?: File; strMetrics?: any; ltrMetrics?: any; monthlyExpenses?: any; fundingSource?: any; mortgageValues?: MortgageValues }) => {
-      if (data.file) {
-        // Handle file upload
-        const formData = new FormData();
-        formData.append('file', data.file);
-        if (data.strMetrics) {
-          formData.append('strMetrics', JSON.stringify(data.strMetrics));
+      try {
+        if (data.file) {
+          // Handle file upload
+          const formData = new FormData();
+          formData.append('file', data.file);
+          if (data.strMetrics) {
+            formData.append('strMetrics', JSON.stringify(data.strMetrics));
+          }
+          if (data.ltrMetrics) {
+            formData.append('ltrMetrics', JSON.stringify(data.ltrMetrics));
+          }
+          if (data.monthlyExpenses) {
+            formData.append('monthlyExpenses', JSON.stringify(data.monthlyExpenses));
+          }
+          if (data.fundingSource) {
+            formData.append('fundingSource', data.fundingSource);
+          }
+          if (data.mortgageValues) {
+            formData.append('mortgageValues', JSON.stringify(data.mortgageValues));
+          }
+
+          const response = await fetch('/api/analyze-file', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const responseData = await response.json();
+
+          if (!response.ok) {
+            // Try to extract error message from response
+            const errorMessage = responseData.error || responseData.message || `HTTP error! status: ${response.status}`;
+            const errorDetails = responseData.details || '';
+            throw new Error(errorMessage + (errorDetails ? `\n${errorDetails}` : ''));
+          }
+
+          return responseData as AnalyzePropertyResponse;
+        } else {
+          // Handle text input (existing functionality)
+          const response = await apiRequest("POST", "/api/analyze", {
+            emailContent: data.emailContent,
+            strMetrics: data.strMetrics,
+            ltrMetrics: data.ltrMetrics,
+            monthlyExpenses: data.monthlyExpenses,
+            fundingSource: data.fundingSource,
+            mortgageValues: data.mortgageValues,
+          });
+          return await response.json() as AnalyzePropertyResponse;
         }
-        if (data.ltrMetrics) {
-          formData.append('ltrMetrics', JSON.stringify(data.ltrMetrics));
+      } catch (error) {
+        // Catch any errors including memory issues on mobile
+        console.error('Analysis mutation error:', error);
+
+        // Check if it's a memory/quota error
+        if (error instanceof Error) {
+          if (error.message.includes('memory') || error.message.includes('quota') || error.message.includes('out of memory')) {
+            throw new Error('Analysis failed due to insufficient memory. Try using a smaller file or clearing old data.');
+          }
         }
-        if (data.monthlyExpenses) {
-          formData.append('monthlyExpenses', JSON.stringify(data.monthlyExpenses));
-        }
-        if (data.fundingSource) {
-          formData.append('fundingSource', data.fundingSource);
-        }
-        if (data.mortgageValues) {
-          formData.append('mortgageValues', JSON.stringify(data.mortgageValues));
-        }
-        
-        const response = await fetch('/api/analyze-file', {
-          method: 'POST',
-          body: formData,
-        });
-        
-        const responseData = await response.json();
-        
-        if (!response.ok) {
-          // Try to extract error message from response
-          const errorMessage = responseData.error || responseData.message || `HTTP error! status: ${response.status}`;
-          const errorDetails = responseData.details || '';
-          throw new Error(errorMessage + (errorDetails ? `\n${errorDetails}` : ''));
-        }
-        
-        return responseData as AnalyzePropertyResponse;
-      } else {
-        // Handle text input (existing functionality)
-        const response = await apiRequest("POST", "/api/analyze", {
-          emailContent: data.emailContent,
-          strMetrics: data.strMetrics,
-          ltrMetrics: data.ltrMetrics,
-          monthlyExpenses: data.monthlyExpenses,
-          fundingSource: data.fundingSource,
-          mortgageValues: data.mortgageValues,
-        });
-        return await response.json() as AnalyzePropertyResponse;
+
+        throw error;
       }
     },
     onSuccess: (data) => {
@@ -237,33 +297,99 @@ export default function HomePage() {
   const handleAnalysisUpdate = (updatedAnalysis: DealAnalysis) => {
     setAnalysisResult(updatedAnalysis);
     // Also update in recent analyses
-    setRecentAnalyses(prev => 
-      prev.map(analysis => 
+    setRecentAnalyses(prev =>
+      prev.map(analysis =>
         analysis.propertyId === updatedAnalysis.propertyId ? updatedAnalysis : analysis
       )
     );
-    
+
     // Show toast notification about criteria refresh
     toast({
       title: "Analysis Updated",
-      description: updatedAnalysis.meetsCriteria 
-        ? "Property now meets investment criteria!" 
+      description: updatedAnalysis.meetsCriteria
+        ? "Property now meets investment criteria!"
         : "Criteria assessment refreshed with updated data.",
       variant: updatedAnalysis.meetsCriteria ? "default" : "destructive",
     });
   };
 
+  const handleClearAllData = () => {
+    if (confirm('⚠️ Clear All Data?\n\nThis will permanently delete all saved analyses, mortgage values, and property data from this browser.\n\nThis cannot be undone. Continue?')) {
+      try {
+        // Clear all state
+        setAnalysisResult(null);
+        setRecentAnalyses([]);
+        setMortgageValues(null);
+        setLastAnalysisData(null);
+        setCurrentFormValues(null);
+
+        // Clear all localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('dealanalyzer_current_analysis');
+          localStorage.removeItem('dealanalyzer_recent_analyses');
+          localStorage.removeItem('dealanalyzer_mortgage_values');
+
+          // Also clear comparison list from localStorage
+          localStorage.removeItem('dealanalyzer_comparison_list');
+        }
+
+        toast({
+          title: "Data Cleared",
+          description: "All saved analyses and data have been permanently deleted.",
+        });
+      } catch (e) {
+        console.error('Failed to clear data:', e);
+        toast({
+          title: "Clear Failed",
+          description: "Some data could not be cleared. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Criteria Configuration */}
+      {/* Criteria Configuration with Privacy Controls */}
       <div className="mb-8">
-        <CriteriaConfig 
-          criteria={criteria}
-          onUpdate={() => {
-            // Invalidate criteria cache to refresh both dashboard and account page
-            queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
-          }}
-        />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex-1">
+            <CriteriaConfig
+              criteria={criteria}
+              onUpdate={() => {
+                // Invalidate criteria cache to refresh both dashboard and account page
+                queryClient.invalidateQueries({ queryKey: ['/api/criteria'] });
+              }}
+            />
+          </div>
+          <div className="ml-4 flex gap-2">
+            {(recentAnalyses.length > 0 || analysisResult) && (
+              <Button
+                onClick={handleClearAllData}
+                variant="outline"
+                size="sm"
+                className="gap-2 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+                title="Clear all saved analyses and data from this browser"
+              >
+                <i className="fas fa-trash-alt"></i>
+                Clear All Data
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Privacy Notice */}
+        {(recentAnalyses.length > 0 || analysisResult) && (
+          <div className="mb-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <i className="fas fa-shield-alt text-yellow-600 dark:text-yellow-400 mt-0.5"></i>
+              <div className="text-sm text-yellow-800 dark:text-yellow-200">
+                <strong>Privacy Notice:</strong> Your analysis data is saved locally in your browser for convenience.
+                This data persists across sessions. Use "Clear All Data" to remove all saved information from this device.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Section Divider */}
