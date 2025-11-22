@@ -11,12 +11,12 @@ jest.mock('@clerk/nextjs/server', () => ({
   auth: jest.fn(),
 }));
 
-// Type for auth return value
+// Type for auth return value - matches what Clerk's auth() returns
 type AuthResult = {
   userId: string | null;
   sessionId?: string | null;
   orgId?: string | null;
-};
+} & Record<string, unknown>;
 
 // Mock storage
 jest.mock('../../../server/storage', () => ({
@@ -38,7 +38,7 @@ describe('GET /api/email-deals - Integration Tests', () => {
   });
 
   it('should return 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue({ userId: null } as AuthResult);
+    mockAuth.mockResolvedValue({ userId: null } as any);
 
     const request = new NextRequest('http://localhost:3000/api/email-deals');
     const response = await GET(request);
@@ -64,7 +64,7 @@ describe('GET /api/email-deals - Integration Tests', () => {
       },
     ];
 
-    mockAuth.mockResolvedValue({ userId } as AuthResult);
+    mockAuth.mockResolvedValue({ userId } as any);
     mockGetEmailDeals.mockResolvedValue(mockDeals);
 
     const request = new NextRequest('http://localhost:3000/api/email-deals');
@@ -90,7 +90,7 @@ describe('GET /api/email-deals - Integration Tests', () => {
 
   it('should handle storage errors gracefully', async () => {
     const userId = 'user_123';
-    mockAuth.mockResolvedValue({ userId } as AuthResult);
+    mockAuth.mockResolvedValue({ userId } as any);
     mockGetEmailDeals.mockRejectedValue(new Error('Database connection failed'));
 
     const request = new NextRequest('http://localhost:3000/api/email-deals');
@@ -104,7 +104,7 @@ describe('GET /api/email-deals - Integration Tests', () => {
 
   it('should return empty array for Convex-related errors', async () => {
     const userId = 'user_123';
-    mockAuth.mockResolvedValue({ userId } as AuthResult);
+    mockAuth.mockResolvedValue({ userId } as any);
     mockGetEmailDeals.mockRejectedValue(new Error('CONVEX_API_ERROR: Connection failed'));
 
     const request = new NextRequest('http://localhost:3000/api/email-deals');

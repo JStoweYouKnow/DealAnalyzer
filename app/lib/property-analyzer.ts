@@ -204,7 +204,7 @@ export function analyzeProperty(
   } else if (mortgageValues && mortgageValues.monthlyPayment > 0) {
     // Use the monthly payment from mortgage calculator
     monthlyMortgagePayment = mortgageValues.monthlyPayment;
-    logger.debug('Using mortgage calculator monthly payment:', monthlyMortgagePayment);
+    logger.debug('Using mortgage calculator monthly payment:', { monthlyMortgagePayment });
   } else {
     // Calculate mortgage payment using loan amount and interest rate
     const loanAmount = purchasePrice - calculatedDownpayment;

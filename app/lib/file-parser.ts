@@ -259,7 +259,7 @@ export function parseJSONFile(content: string): ParsedProperty {
 
     return property;
   } catch (error) {
-    logger.error('Failed to parse JSON, falling back to text parser:', error);
+    logger.error('Failed to parse JSON, falling back to text parser:', error instanceof Error ? error : undefined);
     return parseTextFile(content);
   }
 }

@@ -160,7 +160,7 @@ function MapInstanceHandler({
             delete (container as any)._leaflet;
           } catch (err) {
             // Only log errors, not warnings for expected cleanup scenarios
-            logger.error('LeafletMap: Error cleaning up existing instance:', err);
+            logger.error('LeafletMap: Error cleaning up existing instance:', err instanceof Error ? err : undefined);
             // Still clear references on error
             delete (container as any)._leaflet_id;
             delete (container as any)._leaflet;
@@ -235,7 +235,7 @@ export function LeafletMap({
           mapInstanceRef.current.invalidateSize();
         }
         } catch (err) {
-          logger.warn('LeafletMap: Failed to invalidate size', err);
+          logger.warn('LeafletMap: Failed to invalidate size', err instanceof Error ? { error: err.message } : { error: String(err) });
         }
     }, 200);
   }, []);
@@ -282,7 +282,7 @@ export function LeafletMap({
               duration: 1.0
             });
           } catch (err) {
-            logger.warn('LeafletMap: Error updating map view', err);
+            logger.warn('LeafletMap: Error updating map view', err instanceof Error ? { error: err.message } : { error: String(err) });
           }
         }
       }
@@ -313,7 +313,7 @@ export function LeafletMap({
         duration: 0.5,
       });
       } catch (err) {
-        logger.warn('LeafletMap: Failed to update map view', err);
+        logger.warn('LeafletMap: Failed to update map view', err instanceof Error ? { error: err.message } : { error: String(err) });
       }
   }, [isMounted, mapCenter.lat, mapCenter.lng, zoomLevel]);
 
@@ -325,7 +325,7 @@ export function LeafletMap({
       try {
         mapInstanceRef.current?.invalidateSize();
       } catch (err) {
-        logger.warn('LeafletMap: Failed to invalidate map size', err);
+        logger.warn('LeafletMap: Failed to invalidate map size', err instanceof Error ? { error: err.message } : { error: String(err) });
       }
     }, 150);
 
@@ -370,7 +370,7 @@ export function LeafletMap({
           delete (prevContainer as any)._leaflet;
         }
         } catch (err) {
-          logger.warn('LeafletMap: Error cleaning up previous container:', err);
+          logger.warn('LeafletMap: Error cleaning up previous container:', err instanceof Error ? { error: err.message } : { error: String(err) });
         }
     }
 
@@ -390,7 +390,7 @@ export function LeafletMap({
           delete (node as any)._leaflet_id;
           delete (node as any)._leaflet;
         } catch (err) {
-          logger.warn('LeafletMap: Error cleaning up orphaned instance:', err);
+          logger.warn('LeafletMap: Error cleaning up orphaned instance:', err instanceof Error ? { error: err.message } : { error: String(err) });
         }
       }
       
@@ -439,7 +439,7 @@ export function LeafletMap({
             }
           }, 50);
         } catch (err) {
-          logger.warn('LeafletMap: Error in cleanup effect:', err);
+          logger.warn('LeafletMap: Error in cleanup effect:', err instanceof Error ? { error: err.message } : { error: String(err) });
           // Even if cleanup fails, allow rendering to proceed
           setIsContainerReady(true);
           cleanupDoneRef.current = true;
@@ -543,12 +543,12 @@ export function LeafletMap({
           logger.debug('LeafletMap: Icon configuration set successfully');
           setIsLeafletReady(true);
         } catch (err) {
-          logger.error('LeafletMap: Failed to configure Leaflet icons:', err);
+          logger.error('LeafletMap: Failed to configure Leaflet icons:', err instanceof Error ? err : undefined);
           setLeafletDegraded(true);
           // Do not mark as ready - icons failed to load
         }
       }).catch(err => {
-        logger.error('LeafletMap: Failed to load Leaflet library:', err);
+        logger.error('LeafletMap: Failed to load Leaflet library:', err instanceof Error ? err : undefined);
         setLeafletDegraded(true);
         // Do not mark as ready - Leaflet failed to load
       });
@@ -592,7 +592,7 @@ export function LeafletMap({
             delete (container as any)._leaflet;
           }
         } catch (err) {
-          logger.warn('LeafletMap: Error cleaning up container:', err);
+          logger.warn('LeafletMap: Error cleaning up container:', err instanceof Error ? { error: err.message } : { error: String(err) });
         }
         }
       }
@@ -688,7 +688,7 @@ export function LeafletMap({
                   // Force remount on next render (handled by useEffect with cleanup)
                   needsRemountRef.current = true;
                 } catch (err) {
-                  logger.error('LeafletMap: Error cleaning up during render:', err);
+                  logger.error('LeafletMap: Error cleaning up during render:', err instanceof Error ? err : undefined);
                   // Still clear references on error
                   delete (container as any)._leaflet_id;
                   delete (container as any)._leaflet;
@@ -875,7 +875,7 @@ export function LeafletMap({
       </div>
     );
   } catch (error) {
-    logger.error('Map rendering error:', error);
+    logger.error('Map rendering error:', error instanceof Error ? error : undefined);
     return (
       <div className="w-full h-96 bg-red-50 flex items-center justify-center rounded-lg border border-red-200">
         <div className="text-center p-4">

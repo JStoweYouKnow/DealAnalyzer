@@ -10,7 +10,6 @@ interface LogContext {
   requestId?: string;
   userId?: string;
   correlationId?: string;
-  [key: string]: unknown;
 }
 
 interface LogEntry {
