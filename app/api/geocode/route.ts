@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { geocodingService } from "../../../server/services/geocoding-service";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +15,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      logger.info("Batch geocoding addresses", { count: addresses.length });
       const results = await geocodingService.geocodeAddresses(addresses);
+      logger.info("Batch geocoding completed", { count: results.length });
       return NextResponse.json({ success: true, data: results });
     } else {
       // Single address geocode
@@ -25,19 +28,22 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      logger.debug("Geocoding single address", { address });
       const result = await geocodingService.geocodeAddress(address);
       
       if (!result) {
+        logger.warn("Could not geocode address", { address });
         return NextResponse.json(
           { success: false, error: "Could not geocode address" },
           { status: 404 }
         );
       }
 
+      logger.debug("Geocoding successful", { address, lat: result.lat, lng: result.lng });
       return NextResponse.json({ success: true, data: result });
     }
   } catch (error) {
-    console.error("Error geocoding address:", error);
+    logger.error("Error geocoding address", error instanceof Error ? error : undefined);
     return NextResponse.json(
       { success: false, error: "Failed to geocode address" },
       { status: 500 }

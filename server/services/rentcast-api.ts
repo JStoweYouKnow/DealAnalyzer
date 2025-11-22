@@ -1,5 +1,7 @@
 import type { NeighborhoodTrend, ComparableSale, MarketHeatMapData } from '@shared/schema.ts';
 import { rentCastCache } from './rentcast-cache';
+import { logger } from '../../app/lib/logger';
+import { fetchWithTimeout, TIMEOUTS } from '../../app/lib/api-timeout';
 
 interface RentCastPropertyData {
   id: string;
@@ -41,7 +43,7 @@ export class RentCastAPIService {
     if (this._apiKey === null) {
       this._apiKey = process.env.RENTCAST_API_KEY || '';
       if (!this._apiKey) {
-        console.warn('RentCast API key not found. Using fallback data.');
+        logger.warn('RentCast API key not found. Using fallback data.');
       }
     }
     return this._apiKey;
@@ -73,23 +75,33 @@ export class RentCastAPIService {
         });
 
         try {
-          const response = await fetch(url.toString(), {
-            headers: {
-              'X-Api-Key': key,
-              'Content-Type': 'application/json'
-            }
-          });
+          logger.debug('Making RentCast API request', { endpoint, params });
+          const response = await fetchWithTimeout(
+            url.toString(),
+            {
+              headers: {
+                'X-Api-Key': key,
+                'Content-Type': 'application/json'
+              }
+            },
+            TIMEOUTS.STANDARD
+          );
 
           if (!response.ok) {
             const errorBody = await response.text();
-            const message = `[RentCast] ${endpoint} responded ${response.status} ${response.statusText}: ${errorBody}`;
-            console.warn(message);
+            const message = `RentCast ${endpoint} responded ${response.status} ${response.statusText}: ${errorBody}`;
+            logger.warn('RentCast API error', { endpoint, status: response.status, errorBody });
             throw new Error(message);
           }
 
-          return await response.json();
+          const data = await response.json();
+          logger.debug('RentCast API request successful', { endpoint });
+          return data;
         } catch (error) {
-          console.error('RentCast API request failed:', error);
+          logger.error('RentCast API request failed', error instanceof Error ? error : undefined, {
+            endpoint,
+            params,
+          });
           throw error instanceof Error ? error : new Error(String(error));
         }
       }
@@ -107,7 +119,7 @@ export class RentCastAPIService {
       });
 
       if (!marketData || !Array.isArray(marketData)) {
-        console.warn('No market data returned from RentCast');
+        logger.warn('No market data returned from RentCast', { city, state });
         return [];
       }
 

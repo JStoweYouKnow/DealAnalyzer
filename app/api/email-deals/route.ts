@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { storage } from "../../../server/storage";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("Getting email deals from storage...");
+    logger.info("Getting email deals from storage");
 
     // Check if Convex is configured
     if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
-      console.warn("NEXT_PUBLIC_CONVEX_URL not configured. Returning empty email deals array.");
+      logger.warn("NEXT_PUBLIC_CONVEX_URL not configured. Returning empty email deals array.");
       return NextResponse.json([]);
     }
 
@@ -19,15 +20,17 @@ export async function GET(request: NextRequest) {
     if (!userId && isDev) {
       const headerUserId = request.headers.get('x-user-session-id');
       if (headerUserId && headerUserId !== 'temp-ssr-id') {
-        console.log("Development fallback: using x-user-session-id from request headers.");
+        logger.info("Development fallback: using x-user-session-id from request headers", {
+          userId: headerUserId.substring(0, 20),
+        });
         userId = headerUserId;
       }
     }
     if (!userId || userId === 'temp-ssr-id') {
       if (!isDev) {
-        console.warn("Unauthorized: Missing Clerk userId in production.");
+        logger.warn("Unauthorized: Missing Clerk userId in production");
       } else {
-        console.warn("Unauthorized in development: No valid Clerk userId and no valid x-user-session-id header.");
+        logger.warn("Unauthorized in development: No valid Clerk userId and no valid x-user-session-id header");
       }
       return NextResponse.json(
         { error: "Unauthorized. Please sign in." },
@@ -35,19 +38,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log(`Fetching email deals for user: ${userId.substring(0, 20)}...`);
+    const requestLogger = logger.withContext({ userId: userId.substring(0, 20) });
+    requestLogger.info("Fetching email deals for user");
     const emailDeals = await storage.getEmailDeals();
-    console.log(`Retrieved ${emailDeals.length} email deals for user`);
+    requestLogger.info(`Retrieved ${emailDeals.length} email deals for user`, {
+      count: emailDeals.length,
+    });
     return NextResponse.json(emailDeals);
   } catch (error) {
-    console.error("Error getting email deals:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error("Error stack:", errorStack);
+    
+    logger.error("Error getting email deals", error instanceof Error ? error : undefined, {
+      errorMessage,
+    });
 
     // Check if the error is related to Convex initialization
     if (errorMessage.includes('CONVEX') || errorMessage.includes('Convex')) {
-      console.warn("Convex storage not available. Returning empty array. Make sure NEXT_PUBLIC_CONVEX_URL is set and Convex is deployed.");
+      logger.warn("Convex storage not available. Returning empty array. Make sure NEXT_PUBLIC_CONVEX_URL is set and Convex is deployed.");
       return NextResponse.json([]);
     }
 

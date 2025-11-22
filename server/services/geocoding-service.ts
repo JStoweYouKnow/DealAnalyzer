@@ -1,4 +1,6 @@
 import { geocodingCache } from './geocoding-cache';
+import { logger } from '../../app/lib/logger';
+import { fetchWithTimeout, TIMEOUTS } from '../../app/lib/api-timeout';
 
 interface GeocodeResult {
   lat: number;
@@ -63,76 +65,94 @@ export class GeocodingService {
       };
 
   async geocodeAddress(address: string): Promise<GeocodeResult | null> {
+    const addressLogger = logger.withContext({ address });
+    
     try {
       // Clean and normalize the address
       const cleanAddress = address.trim();
 
-      console.log(`[Geocoding] Starting geocode for address: "${address}"`);
+      addressLogger.debug('Starting geocode for address');
 
       if (!cleanAddress) {
-        console.warn('[Geocoding] Empty address provided');
+        logger.warn('Empty address provided');
         return null;
       }
 
       // 1. Check cache first (Redis/KV or in-memory fallback)
       const cachedResult = await geocodingCache.get(cleanAddress);
       if (cachedResult) {
-        console.log(`[Geocoding] ✅ Cache hit: "${address}" -> (${cachedResult.lat}, ${cachedResult.lng})`);
+        addressLogger.debug('Cache hit for address', {
+          lat: cachedResult.lat,
+          lng: cachedResult.lng,
+        });
         return cachedResult;
       }
 
       // 2. Try real geocoding with Nominatim (OpenStreetMap)
       const realResult = await this.geocodeWithNominatim(cleanAddress);
       if (realResult) {
-        console.log(`[Geocoding] ✅ Nominatim success: "${address}" -> (${realResult.lat}, ${realResult.lng})`);
+        addressLogger.info('Nominatim geocoding successful', {
+          lat: realResult.lat,
+          lng: realResult.lng,
+        });
         // Cache the result for future requests
         await geocodingCache.set(cleanAddress, realResult);
         return realResult;
       }
 
       // 3. Fallback to deterministic coordinates for demo purposes
-      console.warn(`[Geocoding] ⚠️ Real geocoding failed for "${address}", using fallback coordinates`);
+      logger.warn('Real geocoding failed, using fallback coordinates', { address });
       const fallback = this.getFallbackCoordinates(cleanAddress);
       if (fallback) {
-        console.log(`[Geocoding] Fallback result: "${address}" -> (${fallback.lat}, ${fallback.lng})`);
+        addressLogger.debug('Fallback result', {
+          lat: fallback.lat,
+          lng: fallback.lng,
+        });
         // Also cache fallback results to avoid repeated API calls
         await geocodingCache.set(cleanAddress, fallback);
       }
       return fallback;
 
     } catch (error) {
-      console.error('[Geocoding] Error:', error);
+      logger.error('Geocoding error', error instanceof Error ? error : undefined, { address });
       // Try fallback on any error
       return this.getFallbackCoordinates(address);
     }
   }
 
   private async geocodeWithNominatim(address: string): Promise<GeocodeResult | null> {
+    const addressLogger = logger.withContext({ address, service: 'nominatim' });
+    
     try {
       // Use Nominatim geocoding service (OpenStreetMap)
       // Increase limit to get multiple results and filter for best match
       const encodedAddress = encodeURIComponent(address);
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=5&addressdetails=1&countrycodes=us`;
 
-      console.log(`[Nominatim] Requesting: ${url}`);
+      addressLogger.debug('Requesting geocode from Nominatim');
 
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'RealEstateAnalyzer/1.0 (https://replit.com)', // Required by Nominatim
+      const response = await fetchWithTimeout(
+        url,
+        {
+          headers: {
+            'User-Agent': 'RealEstateAnalyzer/1.0 (https://replit.com)', // Required by Nominatim
+          },
         },
-      });
+        TIMEOUTS.QUICK
+      );
 
       if (!response.ok) {
-        console.error(`[Nominatim] API error: ${response.status} ${response.statusText}`);
+        addressLogger.warn('Nominatim API error', {
+          status: response.status,
+          statusText: response.statusText,
+        });
         return null;
       }
 
       const data = await response.json();
 
-      console.log(`[Nominatim] Response data:`, JSON.stringify(data, null, 2));
-
       if (!data || data.length === 0) {
-        console.warn(`[Nominatim] No results found for: "${address}"`);
+        addressLogger.warn('No results found from Nominatim');
         return null;
       }
 
@@ -141,11 +161,17 @@ export class GeocodingService {
       const result = data[0];
       
       if (data.length > 1) {
-        console.log(`[Nominatim] Multiple results found (${data.length}), using first: ${result.display_name}`);
-        console.log(`[Nominatim] All results:`, data.map((r: any) => r.display_name));
+        addressLogger.debug('Multiple results found, using first', {
+          resultCount: data.length,
+          selectedResult: result.display_name,
+        });
       }
 
-      console.log(`[Nominatim] Found result: ${result.display_name} at (${result.lat}, ${result.lon})`);
+      addressLogger.debug('Nominatim geocoding successful', {
+        displayName: result.display_name,
+        lat: result.lat,
+        lon: result.lon,
+      });
 
       return {
         lat: parseFloat(result.lat),

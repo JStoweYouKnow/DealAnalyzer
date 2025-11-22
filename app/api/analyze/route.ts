@@ -8,6 +8,7 @@ import { loadInvestmentCriteria, DEFAULT_CRITERIA } from "../../../server/servic
 import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 import { runInParallel, apiLimit, heavyLimit } from "../../lib/parallel-utils";
 import { sendNotificationIfEnabled } from "../../../server/services/notification-helper";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
@@ -49,10 +50,10 @@ export async function POST(request: NextRequest) {
     let criteria;
     
     if (mortgageValues) {
-      console.log('Using mortgage calculator values:', {
+      logger.debug('Using mortgage calculator values', {
         loanAmount: mortgageValues.loanAmount,
         loanTermYears: mortgageValues.loanTermYears,
-        monthlyPayment: mortgageValues.monthlyPayment
+        monthlyPayment: mortgageValues.monthlyPayment,
       });
       // mortgageRate will be undefined when mortgageValues is provided,
       // and analyzeProperty will use mortgageValues.monthlyPayment directly
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       criteria = fetchedCriteria;
     }
     
-    console.log('Using criteria for analysis:', {
+    logger.debug('Using criteria for analysis', {
       maxPurchasePrice: criteria.max_purchase_price,
       cocMinimum: criteria.coc_minimum_min,
       capMinimum: criteria.cap_minimum,
@@ -87,12 +88,13 @@ export async function POST(request: NextRequest) {
     // Run TypeScript analysis with optional mortgage values and criteria
     const analysisData = analyzeProperty(propertyData, strMetrics, monthlyExpenses, propertyFundingSource, mortgageRate, mortgageValues, criteria);
     
-    console.log('Analysis Results:', {
+    logger.info('Property analysis completed', {
       meetsCriteria: analysisData.meetsCriteria,
       cocReturn: analysisData.cocReturn,
       capRate: analysisData.capRate,
       cashFlow: analysisData.cashFlow,
       totalMonthlyExpenses: analysisData.totalMonthlyExpenses,
+      address: analysisData.property?.address,
     });
     
     // Run AI analysis if available (lazy loaded for better initial performance)
@@ -109,7 +111,7 @@ export async function POST(request: NextRequest) {
         } as any;
       }
     } catch (error) {
-      console.warn("AI analysis failed, continuing without AI insights:", error);
+      logger.warn("AI analysis failed, continuing without AI insights", error instanceof Error ? error : undefined);
     }
 
     // Store the analysis in memory
@@ -122,6 +124,8 @@ export async function POST(request: NextRequest) {
       const userId = authResult?.userId;
 
       if (userId) {
+        const notificationLogger = logger.withContext({ userId });
+        
         // Get user email from Clerk as fallback
         let userEmail: string | undefined;
         try {
@@ -149,6 +153,11 @@ export async function POST(request: NextRequest) {
 
         // Send criteria match notification if property meets criteria
         if (analysisData.meetsCriteria) {
+          notificationLogger.info('Property meets criteria, sending notification', {
+            analysisId: storedAnalysis.id,
+            address: analysisData.property.address,
+          });
+          
           await sendNotificationIfEnabled(
             userId,
             'criteria_match',
@@ -167,7 +176,7 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       // Don't fail the request if notifications fail
-      console.error('Failed to send analysis notifications:', error);
+      logger.error('Failed to send analysis notifications', error instanceof Error ? error : undefined);
     }
 
     return NextResponse.json({
@@ -175,7 +184,7 @@ export async function POST(request: NextRequest) {
       data: storedAnalysis
     });
   } catch (error) {
-    console.error("Error in analyze endpoint:", error);
+    logger.error("Error in analyze endpoint", error instanceof Error ? error : undefined);
     return NextResponse.json(
       { success: false, error: "Internal server error during analysis" },
       { status: 500 }

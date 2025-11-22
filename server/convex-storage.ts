@@ -1,6 +1,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import { EmailDeal, PhotoAnalysis, DealAnalysis } from "@shared/schema";
 import { IStorage } from "./storage";
+import { logger } from "../app/lib/logger";
 
 // Conditional imports for Convex API - only when generated files exist
 let api: any = null;
@@ -34,7 +35,7 @@ async function initializeConvex() {
     
     api = apiModule.api;
     convexInitialized = true;
-    console.log("Convex API initialized successfully");
+    logger.info("Convex API initialized successfully");
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -126,7 +127,9 @@ class ConvexStorageImpl implements ConvexStorage {
     
     this.convex = new ConvexHttpClient(convexUrl);
     this.initPromise = initializeConvex();
-    console.log(`ConvexStorage initialized with URL: ${convexUrl.substring(0, 30)}...`);
+    logger.info("ConvexStorage initialized", {
+      urlPrefix: convexUrl.substring(0, 30),
+    });
   }
 
   private async ensureInitialized() {
@@ -476,12 +479,14 @@ export const convexStorage = (() => {
   }
   
   try {
-    console.log('[ConvexStorage] Creating new ConvexStorage instance');
+    logger.info("Creating new ConvexStorage instance");
     convexStorageInstance = new ConvexStorageImpl();
     return convexStorageInstance;
   } catch (error) {
     convexStorageInitError = error instanceof Error ? error : new Error(String(error));
-    console.error('[ConvexStorage] Failed to create instance:', convexStorageInitError.message);
+    logger.error("Failed to create ConvexStorage instance", convexStorageInitError, {
+      message: convexStorageInitError.message,
+    });
     throw convexStorageInitError;
   }
 })();

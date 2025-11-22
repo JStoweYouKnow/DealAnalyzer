@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 import type { Property, AIAnalysis, SmartPropertyRecommendation, RentPricingRecommendation, InvestmentTimingAdvice } from "@shared/schema";
+import { logger } from "../app/lib/logger";
+import { withTimeout, TIMEOUTS } from "../app/lib/api-timeout";
 
 // Lazy initialization of OpenAI client to ensure environment variables are loaded first
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
@@ -21,30 +23,40 @@ function getOpenAIClient(): OpenAI {
 export class AIAnalysisService {
   async analyzeProperty(property: Property): Promise<AIAnalysis> {
     const prompt = this.buildAnalysisPrompt(property);
+    const propertyLogger = logger.withContext({
+      address: property.address,
+      propertyId: property.id,
+    });
     
     try {
-      const response = await getOpenAIClient().chat.completions.create({
-        model: "gpt-5",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert real estate investment analyst with decades of experience. 
-            Analyze properties comprehensively considering market conditions, financial metrics, and investment potential.
-            Provide detailed, actionable insights that help investors make informed decisions.
-            Always respond with valid JSON in the exact format specified.`
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        response_format: { type: "json_object" },
-      });
+      propertyLogger.info("Starting AI property analysis");
+      
+      const response = await withTimeout(
+        getOpenAIClient().chat.completions.create({
+          model: "gpt-5",
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert real estate investment analyst with decades of experience. 
+              Analyze properties comprehensively considering market conditions, financial metrics, and investment potential.
+              Provide detailed, actionable insights that help investors make informed decisions.
+              Always respond with valid JSON in the exact format specified.`
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          response_format: { type: "json_object" },
+        }),
+        TIMEOUTS.LONG
+      );
 
       const analysisResult = JSON.parse(response.choices[0].message.content || "{}");
+      propertyLogger.info("AI analysis completed successfully");
       return this.validateAndNormalizeAnalysis(analysisResult);
     } catch (error) {
-      console.error("AI Analysis Error:", error);
+      propertyLogger.error("AI analysis failed, using fallback", error instanceof Error ? error : undefined);
       return this.getFallbackAnalysis(property);
     }
   }
