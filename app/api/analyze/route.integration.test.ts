@@ -4,12 +4,15 @@
  */
 
 import { POST } from './route';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 // Mock rate limiting
-jest.mock('@/app/lib/rate-limit', () => ({
-  withRateLimit: jest.fn((req, limiter, handler) => handler(req)),
+jest.mock('@/lib/rate-limit', () => ({
+  withRateLimit: jest.fn(
+    (req: NextRequest, limiter: any, handler: (req: NextRequest) => Promise<NextResponse>) => handler(req)
+  ),
   generalRateLimit: jest.fn(() => null),
+  expensiveRateLimit: jest.fn(() => null),
 }));
 
 // Mock OpenAI
@@ -24,8 +27,9 @@ jest.mock('openai', () => ({
 }));
 
 // Mock property analyzer
-jest.mock('@/app/lib/property-analyzer', () => ({
+jest.mock('@/lib/property-analyzer', () => ({
   analyzeProperty: jest.fn(),
+  parseEmailContent: jest.fn(),
 }));
 
 describe('POST /api/analyze - Integration Tests', () => {
@@ -59,17 +63,19 @@ describe('POST /api/analyze - Integration Tests', () => {
   });
 
   it('should handle rate limiting correctly', async () => {
-    const { withRateLimit } = require('@/app/lib/rate-limit');
+    const { withRateLimit } = require('@/lib/rate-limit');
     
     // Simulate rate limit exceeded
-    withRateLimit.mockImplementation((req, limiter, handler) => {
-      return Promise.resolve(
-        new NextResponse(
-          JSON.stringify({ error: 'Rate limit exceeded' }),
-          { status: 429 }
-        )
-      );
-    });
+    (withRateLimit as jest.Mock).mockImplementation(
+      (req: NextRequest, limiter: any, handler: (req: NextRequest) => Promise<NextResponse>) => {
+        return Promise.resolve(
+          NextResponse.json(
+            { error: 'Rate limit exceeded' },
+            { status: 429 }
+          )
+        );
+      }
+    );
 
     const request = new NextRequest('http://localhost:3000/api/analyze', {
       method: 'POST',

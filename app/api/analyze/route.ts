@@ -111,7 +111,9 @@ export async function POST(request: NextRequest) {
         } as any;
       }
     } catch (error) {
-      logger.warn("AI analysis failed, continuing without AI insights", error instanceof Error ? error : undefined);
+      logger.warn("AI analysis failed, continuing without AI insights", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     // Store the analysis in memory

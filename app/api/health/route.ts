@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRedis } from "@/app/lib/rate-limit";
+import { getRedis } from "@/lib/rate-limit";
 
 interface HealthCheckResult {
   status: "healthy" | "degraded" | "unhealthy";
