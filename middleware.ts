@@ -104,6 +104,16 @@ const publicRoutes = [...safePublicRoutes, ...devOnlyPublicRoutes];
 
 const isPublicRoute = createRouteMatcher(publicRoutes);
 
+// Helper function to decode base64 with padding
+function decodeBase64(base64: string): string {
+  // Add padding if needed
+  let padded = base64;
+  while (padded.length % 4) {
+    padded += '=';
+  }
+  return Buffer.from(padded, 'base64').toString('utf-8');
+}
+
 // Helper function to extract user ID from bearer token (for mobile apps)
 async function getUserIdFromBearerToken(request: NextRequest): Promise<string | null> {
   const authHeader = request.headers.get("authorization");
@@ -114,7 +124,8 @@ async function getUserIdFromBearerToken(request: NextRequest): Promise<string | 
         // Decode the JWT to extract the user ID
         const parts = token.split('.');
         if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          // Decode the payload (second part of JWT) with proper base64 padding
+          const payload = JSON.parse(decodeBase64(parts[1]));
           if (payload?.sub) {
             // Verify it's a Clerk token by checking the issuer
             if (payload.iss?.includes('clerk') || payload.iss?.includes('clerk.accounts')) {
@@ -129,13 +140,15 @@ async function getUserIdFromBearerToken(request: NextRequest): Promise<string | 
               });
             }
           } else {
-            console.log('[Middleware] ⚠️ Token payload missing sub claim');
+            console.log('[Middleware] ⚠️ Token payload missing sub claim', {
+              payloadKeys: Object.keys(payload || {}),
+            });
           }
         } else {
           console.log('[Middleware] ⚠️ Invalid JWT format - expected 3 parts, got', parts.length);
         }
       } catch (error) {
-        console.error('[Middleware] ❌ Error decoding bearer token:', error);
+        console.error('[Middleware] ❌ Error decoding bearer token:', error instanceof Error ? error.message : String(error));
       }
     } else {
       console.log('[Middleware] ⚠️ Bearer token is empty');

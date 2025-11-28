@@ -5,6 +5,16 @@ import { logger } from "@/lib/logger";
 
 const DEFAULT_PROJECT_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN;
 
+// Helper function to decode base64 with padding
+function decodeBase64(base64: string): string {
+  // Add padding if needed
+  let padded = base64;
+  while (padded.length % 4) {
+    padded += '=';
+  }
+  return Buffer.from(padded, 'base64').toString('utf-8');
+}
+
 async function getUserIdFromRequest(request: NextRequest): Promise<string | null> {
   // Try Clerk cookie-based auth first (for web)
   try {
@@ -26,7 +36,8 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
         // Decode the JWT to extract the user ID
         const parts = token.split('.');
         if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          // Decode the payload (second part of JWT) with proper base64 padding
+          const payload = JSON.parse(decodeBase64(parts[1]));
           if (payload?.sub) {
             // Verify it's a Clerk token by checking the issuer
             if (payload.iss?.includes('clerk') || payload.iss?.includes('clerk.accounts')) {
@@ -34,8 +45,18 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
                 userId: payload.sub.substring(0, 20),
               });
               return payload.sub;
+            } else {
+              logger.warn("⚠️ Token issuer is not Clerk", {
+                issuer: payload.iss,
+              });
             }
+          } else {
+            logger.warn("⚠️ Token payload missing sub claim", {
+              payloadKeys: Object.keys(payload || {}),
+            });
           }
+        } else {
+          logger.warn("⚠️ Invalid JWT format - expected 3 parts, got", parts.length);
         }
       } catch (error) {
         logger.warn("❌ Failed to decode bearer token for Gmail auth URL", {
