@@ -1,11 +1,71 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import type { GenerateAuthUrlOpts } from "google-auth-library";
+import { logger } from "@/lib/logger";
 
 const DEFAULT_PROJECT_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN;
 
-export async function GET(request: Request) {
+async function getUserIdFromRequest(request: NextRequest): Promise<string | null> {
+  // Try Clerk cookie-based auth first (for web)
   try {
+    const { auth } = await import("@clerk/nextjs/server");
+    const { userId } = await auth();
+    if (userId) {
+      return userId;
+    }
+  } catch (error) {
+    // Clerk auth not available, continue to bearer token check
+  }
+
+  // Try bearer token auth (for mobile apps)
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7).trim();
+    if (token) {
+      try {
+        // Decode the JWT to extract the user ID
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          if (payload?.sub) {
+            // Verify it's a Clerk token by checking the issuer
+            if (payload.iss?.includes('clerk') || payload.iss?.includes('clerk.accounts')) {
+              logger.info("✅ Authenticated via Clerk bearer token for Gmail auth URL", {
+                userId: payload.sub.substring(0, 20),
+              });
+              return payload.sub;
+            }
+          }
+        }
+      } catch (error) {
+        logger.warn("❌ Failed to decode bearer token for Gmail auth URL", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  return null;
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    // Check authentication
+    const userId = await getUserIdFromRequest(request);
+    if (!userId) {
+      console.log('[Gmail Auth URL] ❌ Authentication failed', {
+        hasAuthHeader: !!request.headers.get("authorization"),
+        authHeaderPreview: request.headers.get("authorization")?.substring(0, 30),
+      });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+    
+    console.log('[Gmail Auth URL] ✅ Authenticated request', {
+      userId: userId.substring(0, 20),
+    });
     // Check for a "clear" parameter to force account selection
     const url = new URL(request.url);
     const clearSession = url.searchParams.get('clear') === 'true';

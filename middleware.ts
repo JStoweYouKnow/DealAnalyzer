@@ -104,6 +104,51 @@ const publicRoutes = [...safePublicRoutes, ...devOnlyPublicRoutes];
 
 const isPublicRoute = createRouteMatcher(publicRoutes);
 
+// Helper function to extract user ID from bearer token (for mobile apps)
+async function getUserIdFromBearerToken(request: NextRequest): Promise<string | null> {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7).trim();
+    if (token) {
+      try {
+        // Decode the JWT to extract the user ID
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          if (payload?.sub) {
+            // Verify it's a Clerk token by checking the issuer
+            if (payload.iss?.includes('clerk') || payload.iss?.includes('clerk.accounts')) {
+              console.log('[Middleware] ✅ Authenticated via bearer token', {
+                userId: payload.sub.substring(0, 20),
+                issuer: payload.iss,
+              });
+              return payload.sub;
+            } else {
+              console.log('[Middleware] ⚠️ Token issuer is not Clerk', {
+                issuer: payload.iss,
+              });
+            }
+          } else {
+            console.log('[Middleware] ⚠️ Token payload missing sub claim');
+          }
+        } else {
+          console.log('[Middleware] ⚠️ Invalid JWT format - expected 3 parts, got', parts.length);
+        }
+      } catch (error) {
+        console.error('[Middleware] ❌ Error decoding bearer token:', error);
+      }
+    } else {
+      console.log('[Middleware] ⚠️ Bearer token is empty');
+    }
+  } else {
+    console.log('[Middleware] ℹ️ No Authorization header or not Bearer token', {
+      hasAuthHeader: !!authHeader,
+      authHeaderPreview: authHeader?.substring(0, 30),
+    });
+  }
+  return null;
+}
+
 export default clerkMiddleware(async (auth, request: NextRequest) => {
   const pathname = request.nextUrl.pathname;
   const method = request.method;
@@ -128,9 +173,20 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   }
 
   // Production mode: protect all other routes
-  const { userId } = await auth();
+  // Try Clerk cookie-based auth first (for web)
+  const { userId: clerkUserId } = await auth();
+  
+  // If no Clerk userId, try bearer token auth (for mobile apps)
+  let userId = clerkUserId;
+  if (!userId) {
+    userId = await getUserIdFromBearerToken(request);
+  }
   
   if (!userId) {
+    console.log('[Middleware] ❌ Authentication failed for', pathname, {
+      hasClerkUserId: !!clerkUserId,
+      hasAuthHeader: !!request.headers.get("authorization"),
+    });
     // For API routes, return 401 instead of redirecting
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
@@ -144,6 +200,11 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
     signInUrl.searchParams.set('redirect_url', request.url);
     return NextResponse.redirect(signInUrl);
   }
+  
+  console.log('[Middleware] ✅ Authenticated request for', pathname, {
+    userId: userId.substring(0, 20),
+    authMethod: clerkUserId ? 'cookie' : 'bearer',
+  });
 
   return NextResponse.next();
 });
