@@ -53,7 +53,9 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
             });
           }
         } else {
-          logger.warn("⚠️ Invalid JWT format - expected 3 parts, got", parts.length);
+          logger.warn("⚠️ Invalid JWT format - expected 3 parts", {
+            actualParts: parts.length,
+          });
         }
       } catch (error) {
         logger.warn("❌ Failed to decode bearer token for Gmail status", {
