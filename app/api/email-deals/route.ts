@@ -3,6 +3,62 @@ import { auth } from "@clerk/nextjs/server";
 import { storage } from "../../../server/storage";
 import { logger } from "@/lib/logger";
 
+async function getUserIdFromRequest(request: NextRequest): Promise<string | null> {
+  // Try Clerk cookie-based auth first (for web)
+  try {
+    const { userId } = await auth();
+    if (userId) {
+      return userId;
+    }
+  } catch (error) {
+    // Clerk auth not available, continue to bearer token check
+  }
+
+  // Try bearer token auth (for mobile apps)
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7).trim();
+    if (token) {
+      try {
+        // Clerk JWT tokens have the user ID in the 'sub' claim
+        // Decode the JWT to extract the user ID
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          // Decode the payload (second part of JWT)
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          if (payload?.sub) {
+            // Verify it's a Clerk token by checking the issuer
+            if (payload.iss?.includes('clerk') || payload.iss?.includes('clerk.accounts')) {
+              logger.info("Authenticated via Clerk bearer token", {
+                userId: payload.sub.substring(0, 20),
+              });
+              return payload.sub;
+            }
+          }
+        }
+      } catch (error) {
+        logger.warn("Failed to decode bearer token", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  // Development fallback: check x-user-session-id header
+  const isDev = process.env.NODE_ENV === 'development';
+  if (isDev) {
+    const headerUserId = request.headers.get('x-user-session-id');
+    if (headerUserId && headerUserId !== 'temp-ssr-id') {
+      logger.info("Development fallback: using x-user-session-id from request headers", {
+        userId: headerUserId.substring(0, 20),
+      });
+      return headerUserId;
+    }
+  }
+
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     logger.info("Getting email deals from storage");
@@ -13,20 +69,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    // Get userId from Clerk auth (in production) or fallback to session header (in development)
-    const { userId: clerkUserId } = await auth();
-    const isDev = process.env.NODE_ENV === 'development';
-    let userId = clerkUserId;
-    if (!userId && isDev) {
-      const headerUserId = request.headers.get('x-user-session-id');
-      if (headerUserId && headerUserId !== 'temp-ssr-id') {
-        logger.info("Development fallback: using x-user-session-id from request headers", {
-          userId: headerUserId.substring(0, 20),
-        });
-        userId = headerUserId;
-      }
-    }
+    // Get userId from request (supports both cookie-based and bearer token auth)
+    const userId = await getUserIdFromRequest(request);
+    
     if (!userId || userId === 'temp-ssr-id') {
+      const isDev = process.env.NODE_ENV === 'development';
       if (!isDev) {
         logger.warn("Unauthorized: Missing Clerk userId in production");
       } else {
