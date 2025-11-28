@@ -26,22 +26,48 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
         if (parts.length === 3) {
           // Decode the payload (second part of JWT)
           const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          logger.info("Decoded JWT payload", {
+            hasSub: !!payload?.sub,
+            issuer: payload?.iss,
+            userId: payload?.sub?.substring(0, 20),
+          });
+          
           if (payload?.sub) {
             // Verify it's a Clerk token by checking the issuer
             if (payload.iss?.includes('clerk') || payload.iss?.includes('clerk.accounts')) {
-              logger.info("Authenticated via Clerk bearer token", {
+              logger.info("✅ Authenticated via Clerk bearer token", {
                 userId: payload.sub.substring(0, 20),
               });
               return payload.sub;
+            } else {
+              logger.warn("⚠️ Token issuer is not Clerk", {
+                issuer: payload.iss,
+              });
             }
+          } else {
+            logger.warn("⚠️ Token payload missing 'sub' claim", {
+              payloadKeys: Object.keys(payload || {}),
+            });
           }
+        } else {
+          logger.warn("⚠️ Invalid JWT format - expected 3 parts", {
+            actualParts: parts.length,
+          });
         }
       } catch (error) {
-        logger.warn("Failed to decode bearer token", {
+        logger.warn("❌ Failed to decode bearer token", {
           error: error instanceof Error ? error.message : String(error),
+          tokenPreview: token.substring(0, 20) + '...',
         });
       }
+    } else {
+      logger.warn("⚠️ Bearer token is empty");
     }
+  } else {
+    logger.info("ℹ️ No Authorization header or not Bearer token", {
+      hasAuthHeader: !!authHeader,
+      authHeaderPreview: authHeader?.substring(0, 20),
+    });
   }
 
   // Development fallback: check x-user-session-id header
