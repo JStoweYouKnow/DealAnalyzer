@@ -5,20 +5,29 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import { Loading } from '../components/ui/Loading';
+import { Button } from '../components/ui/Button';
 import { apiClient } from '../services/api';
+import { RootStackParamList } from '../types';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface MarketData {
   city: string;
   state: string;
   medianPrice: number;
   medianRent: number;
-  capRate: number;
+  capRate?: number; // Some APIs return this
+  averageCapRate?: number; // RentCast API returns this
   marketScore: number;
+  trend?: 'up' | 'down' | 'stable';
   trends?: {
     priceChange: number;
     rentChange: number;
@@ -26,6 +35,7 @@ interface MarketData {
 }
 
 export default function MarketScreen() {
+  const navigation = useNavigation<NavigationProp>();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const { data: marketData = [], isLoading, refetch, error } = useQuery<MarketData[]>({
@@ -71,8 +81,19 @@ export default function MarketScreen() {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Market Intelligence</Text>
-        <Text style={styles.subtitle}>Real-time market data and trends</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Market Intelligence</Text>
+            <Text style={styles.subtitle}>Real-time market data and trends</Text>
+          </View>
+          <Button
+            onPress={() => navigation.navigate('Neighborhood')}
+            style={styles.neighborhoodButton}
+          >
+            <Ionicons name="location" size={16} color="#fff" />
+            <Text style={styles.neighborhoodButtonText}>ZIP Search</Text>
+          </Button>
+        </View>
       </View>
 
       {marketData.length === 0 ? (
@@ -121,7 +142,15 @@ export default function MarketScreen() {
                 <View style={styles.metric}>
                   <Text style={styles.metricLabel}>Cap Rate</Text>
                   <Text style={styles.metricValue}>
-                    {(market.capRate * 100).toFixed(2)}%
+                    {(() => {
+                      // Handle both capRate and averageCapRate fields
+                      // API returns cap rate as percentage (e.g., 5.0 for 5%)
+                      const capRate = market.capRate ?? market.averageCapRate ?? 0;
+                      // Ensure it's a valid number and not NaN
+                      const validCapRate = Number.isFinite(capRate) && !isNaN(capRate) && capRate >= 0 ? capRate : 0;
+                      // API returns as percentage already, so display directly
+                      return `${validCapRate.toFixed(2)}%`;
+                    })()}
                   </Text>
                 </View>
                 <View style={styles.metric}>
@@ -208,6 +237,15 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 24,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  headerText: {
+    flex: 1,
+  },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -217,6 +255,20 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#8E8E93',
+  },
+  neighborhoodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+  },
+  neighborhoodButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   marketCard: {
     marginBottom: 16,

@@ -43,6 +43,7 @@ const safePublicRoutes = [
   '/api/analyze-file',         // Property analysis from file - rate limited, safe for public use
   '/api/geocode',              // Geocoding service - rate limited, safe for public use
   '/api/market/cached-stats',  // Market intelligence - public market data, safe for public use
+  '/api/market/neighborhood-trends', // Neighborhood trends - public market data by ZIP code, safe for public use
 ];
 
 // Development-only: additional routes that are public in dev but protected in production
