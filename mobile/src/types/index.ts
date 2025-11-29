@@ -76,6 +76,12 @@ export type RootStackParamList = {
   SignIn: undefined;
   SignUp: undefined;
   Neighborhood: undefined;
+  Preferences: undefined;
+  Notifications: undefined;
+  EmailSettings: undefined;
+  HelpSupport: undefined;
+  TermsPrivacy: undefined;
+  Subscription: undefined;
 };
 
 export type TabParamList = {

@@ -53,11 +53,15 @@ async function getMarketStats(city: string, state: string): Promise<MarketStats>
 
       if (response.ok) {
         const data = await response.json();
-        console.log(`[RentCast] ✅ Got data for ${city}, ${state}`);
+        console.log(`[RentCast] ✅ Got data for ${city}, ${state}`, {
+          medianPrice: data.medianPrice,
+          medianRent: data.medianRent,
+        });
 
         // Extract and validate medianPrice and medianRent
-        const medianPrice = Number(data.medianPrice);
-        const medianRent = Number(data.medianRent);
+        // RentCast API may return these in different fields
+        const medianPrice = Number(data.medianPrice ?? data.saleData?.medianPrice ?? 0);
+        const medianRent = Number(data.medianRent ?? data.rentalData?.medianRent ?? 0);
 
         // Check if values are valid and non-zero before performing divisions
         const isValidPrice = Number.isFinite(medianPrice) && medianPrice > 0;
@@ -121,13 +125,20 @@ async function getMarketStats(city: string, state: string): Promise<MarketStats>
           }
         }
 
+        // Ensure all values are valid numbers (not NaN)
+        const finalCapRate = Number.isFinite(capRate) && !isNaN(capRate) && capRate > 0 ? capRate : 0;
+        const finalPrice = isValidPrice && !isNaN(medianPrice) ? medianPrice : 0;
+        const finalRent = isValidRent && !isNaN(medianRent) ? medianRent : 0;
+        const finalScore = Number.isFinite(marketScore) && !isNaN(marketScore) ? Math.round(marketScore) : 0;
+
         return {
           city,
           state,
-          medianPrice: isValidPrice ? medianPrice : 0,
-          medianRent: isValidRent ? medianRent : 0,
-          averageCapRate: Number.isFinite(capRate) ? capRate : 0,
-          marketScore: Math.round(marketScore),
+          medianPrice: finalPrice,
+          medianRent: finalRent,
+          averageCapRate: finalCapRate,
+          capRate: finalCapRate, // Also include as capRate for compatibility
+          marketScore: finalScore,
           trend,
           lastUpdated: new Date().toISOString(),
         };
@@ -144,13 +155,20 @@ async function getMarketStats(city: string, state: string): Promise<MarketStats>
   const hash = city.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const basePrice = 300000 + (hash % 300000);
   const baseRent = 1500 + (hash % 1500);
+  
+  // Calculate cap rate: (Annual Rent / Purchase Price) * 100
+  const annualRent = baseRent * 12;
+  const fallbackCapRate = basePrice > 0 ? (annualRent / basePrice) * 100 : 0;
+  // Ensure it's a realistic cap rate (between 3% and 12%)
+  const realisticCapRate = Math.max(3.0, Math.min(12.0, fallbackCapRate));
 
   return {
     city,
     state,
     medianPrice: basePrice,
     medianRent: baseRent,
-    averageCapRate: ((baseRent * 12) / basePrice * 100),
+    averageCapRate: realisticCapRate,
+    capRate: realisticCapRate, // Also include as capRate for compatibility
     marketScore: 60 + (hash % 40),
     trend: hash % 3 === 0 ? 'up' : hash % 3 === 1 ? 'down' : 'stable',
     lastUpdated: new Date().toISOString(),

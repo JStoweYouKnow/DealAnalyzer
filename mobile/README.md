@@ -1,294 +1,147 @@
-# DealAnalyzer Mobile
+# Deal Analyzer Mobile App
 
-Native mobile app for DealAnalyzer built with React Native and Expo.
+A React Native mobile application that provides a 1-to-1 copy of the web experience, optimized for mobile devices.
 
-## Overview
+## Features
 
-This mobile app shares the same backend API as the web application, allowing users to:
-- Analyze real estate investment properties on the go
-- View and manage email deals
-- Access market intelligence and comparable sales data
-- Search for properties
-- Generate investment reports
+- ✅ Property Analysis - Upload PDFs, paste email content, or enter manually
+- ✅ Email Deal Management - View and analyze deals from your inbox
+- ✅ Market Intelligence - Get market trends and comparable sales
+- ✅ Property Search - Advanced search with natural language queries
+- ✅ Property Comparison - Side-by-side comparison of multiple properties
+- ✅ Account Management - User settings and preferences
+- ✅ Authentication - Clerk integration for secure login
+- ✅ Real-time Data - Convex backend integration
 
 ## Tech Stack
 
-- **React Native** - Cross-platform mobile framework
-- **Expo** - Development platform and build tools
-- **TypeScript** - Type safety
-- **React Navigation** - Screen navigation
-- **Axios** - HTTP client for API calls
+- **React Native** 0.76.5
+- **Expo SDK** 52
+- **TypeScript** 5.6
+- **React Navigation** 7.x
+- **Clerk** - Authentication
+- **Convex** - Backend/Real-time data
+- **React Query** - Data fetching and caching
+- **Axios** - HTTP client
+
+## Setup Instructions
+
+### Prerequisites
+
+- Node.js 20.x or later
+- npm or yarn
+- Expo CLI (`npm install -g expo-cli`)
+- iOS Simulator (for Mac) or Android Studio (for Android development)
+
+### Installation
+
+1. **Install dependencies:**
+   ```bash
+   cd mobile
+   npm install
+   ```
+
+2. **Configure environment variables:**
+   
+   Create a `.env` file in the `mobile` directory:
+   ```env
+   EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+   EXPO_PUBLIC_CONVEX_URL=your_convex_url
+   EXPO_PUBLIC_API_URL=http://localhost:3002
+   ```
+   
+   Or update `app.json` extra section with your values.
+
+3. **Start the development server:**
+   ```bash
+   npm start
+   ```
+
+4. **Run on iOS:**
+   ```bash
+   npm run ios
+   ```
+
+5. **Run on Android:**
+   ```bash
+   npm run android
+   ```
 
 ## Project Structure
 
 ```
 mobile/
-├── App.tsx                 # Root component
+├── App.tsx                 # Main app entry point with providers
+├── app.json                # Expo configuration
+├── assets/                 # Images, icons, fonts
 ├── src/
+│   ├── components/         # Reusable UI components
 │   ├── navigation/         # Navigation configuration
-│   │   └── AppNavigator.tsx
-│   ├── screens/            # App screens
-│   │   ├── HomeScreen.tsx
-│   │   ├── DealsScreen.tsx
-│   │   ├── DealDetailScreen.tsx
-│   │   ├── MarketScreen.tsx
-│   │   ├── SearchScreen.tsx
-│   │   ├── SettingsScreen.tsx
-│   │   └── AnalyzeScreen.tsx
-│   ├── components/         # Reusable components
-│   ├── services/           # API client
-│   │   └── api.ts
-│   ├── types/              # TypeScript types
+│   ├── screens/            # Screen components
+│   ├── services/           # API and business logic
+│   ├── types/              # TypeScript type definitions
 │   └── utils/              # Utility functions
-├── assets/                 # Images, fonts, etc.
 └── package.json
 ```
 
-## Getting Started
+## Key Features Implementation
 
-### Prerequisites
+### Authentication
+- Uses Clerk Expo SDK for authentication
+- Secure token storage with Expo SecureStore
+- Automatic token refresh
 
-- Node.js 18+ and npm
-- iOS: Xcode (Mac only) or iOS Simulator
-- Android: Android Studio and Android SDK
+### API Integration
+- Centralized API client with axios
+- Automatic authentication header injection
+- Error handling and retry logic
+- React Query for data fetching and caching
 
-### Installation
+### Navigation
+- Bottom tab navigation for main screens
+- Stack navigation for detail screens
+- Deep linking support
 
-1. Navigate to the mobile directory:
-   ```bash
-   cd mobile
-   ```
+### Data Management
+- React Query for server state
+- AsyncStorage for local persistence
+- Convex for real-time data
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+## Development
 
-3. Start the development server:
-   ```bash
-   npx expo start
-   ```
-
-### Running on Devices
-
-#### iOS (Mac only)
+### Type Checking
 ```bash
-npm run ios
+npm run type-check
 ```
 
-Or press `i` in the Expo terminal to open in iOS Simulator.
-
-#### Android
+### Linting
 ```bash
-npm run android
+npm run lint
 ```
-
-Or press `a` in the Expo terminal to open in Android Emulator.
-
-#### Physical Device
-1. Install the Expo Go app from App Store or Google Play
-2. Scan the QR code shown in the terminal
-
-## Backend Configuration
-
-The app connects to the DealAnalyzer backend API. The API URL is configured in `src/services/api.ts`:
-
-- **Development**: Configurable via `DEV_SERVER_URL` environment variable (see below)
-- **Production**: `https://comfort-finder-analyzer.vercel.app`
-
-The app automatically uses the development URL when running with `__DEV__` flag.
-
-### Development Server URL Configuration
-
-The app uses platform-aware defaults for the development server URL:
-
-- **Android Emulator**: `http://10.0.2.2:3000` (special IP for Android emulator)
-- **iOS Simulator**: `http://localhost:3000`
-- **Physical Devices**: Requires explicit configuration (see below)
-
-#### Setting DEV_SERVER_URL for Physical Devices
-
-For physical devices, you **must** set `DEV_SERVER_URL` to your machine's LAN IP address. The app will automatically use this value if provided.
-
-**Option 1: Using app.json (Recommended)**
-
-Add the dev server URL to `app.json`:
-
-```json
-{
-  "expo": {
-    "extra": {
-      "devServerUrl": "http://192.168.1.100:3000"
-    }
-  }
-}
-```
-
-Replace `192.168.1.100` with your actual LAN IP address.
-
-**Option 2: Using Environment Variable**
-
-Create a `.env` file in the `mobile/` directory (requires `expo-constants`):
-
-```bash
-DEV_SERVER_URL=http://192.168.1.100:3000
-```
-
-**Finding Your LAN IP Address**
-
-- **macOS/Linux**: 
-  ```bash
-  ifconfig | grep "inet " | grep -v 127.0.0.1
-  ```
-  Look for the IP address (usually starts with `192.168.x.x` or `10.x.x.x`)
-
-- **Windows**: 
-  ```bash
-  ipconfig
-  ```
-  Look for "IPv4 Address" under your active network adapter
-
-**Example**: If your IP is `192.168.1.100`, set `DEV_SERVER_URL=http://192.168.1.100:3000`
-
-### Testing with Local Backend
-
-1. Start your local backend server:
-   ```bash
-   cd .. # Go to root directory
-   npm run dev
-   ```
-
-2. Configure the dev server URL based on your testing environment:
-   - **iOS Simulator**: No configuration needed (uses `localhost` by default)
-   - **Android Emulator**: No configuration needed (uses `10.0.2.2` by default)
-   - **Physical Device**: Set `DEV_SERVER_URL` in `app.json` or `.env` to your LAN IP
-
-3. Ensure your device/simulator can reach your local machine:
-   - Simulators/Emulators: Should work automatically
-   - Physical devices: Must be on the same WiFi network as your development machine
-
-## API Integration
-
-All backend API endpoints are available through the `api` service:
-
-```typescript
-import api from '../services/api';
-
-// Analyze property
-const analysis = await api.analyzeProperty({
-  emailContent: propertyDetails,
-  fundingSource: 'cash',
-});
-
-// Get email deals
-const deals = await api.getEmailDeals();
-
-// Search properties
-const results = await api.searchProperties(query);
-```
-
-See `src/services/api.ts` for all available methods.
-
-## Authentication
-
-The app will integrate with Clerk for authentication (same as web app):
-
-1. Users sign in with the same credentials as the web app
-2. Auth tokens are automatically added to API requests
-3. Protected routes redirect to login when unauthenticated
 
 ## Building for Production
 
 ### iOS
-
-1. Build for App Store:
-   ```bash
-   npx eas build --platform ios
-   ```
-
-2. Submit to App Store:
-   ```bash
-   npx eas submit --platform ios
-   ```
+```bash
+eas build --platform ios
+```
 
 ### Android
+```bash
+eas build --platform android
+```
 
-1. Build for Google Play:
-   ```bash
-   npx eas build --platform android
-   ```
+## Environment Variables
 
-2. Submit to Google Play:
-   ```bash
-   npx eas submit --platform android
-   ```
+Update `app.json` or use `.env` file:
 
-## Development Roadmap
+- `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk publishable key
+- `EXPO_PUBLIC_CONVEX_URL` - Convex deployment URL
+- `EXPO_PUBLIC_API_URL` - API base URL (defaults to localhost:3002 in dev)
 
-### Phase 1: Core Features (Current)
-- [x] Project setup and navigation
-- [x] API client integration
-- [x] Home screen with feature cards
-- [x] Email deals list
-- [ ] Deal detail view with full analysis
-- [ ] Property analysis form
-- [ ] Market intelligence dashboard
+## Notes
 
-### Phase 2: Enhanced Features
-- [ ] Clerk authentication integration
-- [ ] Push notifications for new deals
-- [ ] Offline support with local caching
-- [ ] Photo capture and analysis
-- [ ] PDF report viewing
-- [ ] Property comparison
-
-### Phase 3: Advanced Features
-- [ ] Dark mode support
-- [ ] Customizable deal criteria
-- [ ] Charts and data visualizations
-- [ ] Map integration for property locations
-- [ ] Saved searches and favorites
-- [ ] Export capabilities
-
-## Shared Code with Web App
-
-The mobile and web apps share:
-- **API Routes** - Same backend endpoints
-- **Types/Schemas** - Can share TypeScript types (see `../shared/`)
-- **Business Logic** - Property analysis calculations
-- **Authentication** - Same Clerk setup
-
-## Troubleshooting
-
-### "Network request failed"
-- Check that your backend server is running
-- Verify the API URL in `src/services/api.ts`
-- For Android emulator, use `10.0.2.2` instead of `localhost`
-
-### Expo Go not connecting
-- Ensure your mobile device and computer are on the same WiFi network
-- Try scanning the QR code again
-- Check firewall settings
-
-### Build errors
-- Clear the cache: `npx expo start -c`
-- Delete `node_modules` and reinstall: `rm -rf node_modules && npm install`
-- Check for TypeScript errors: `npx tsc --noEmit`
-
-## Contributing
-
-1. Create a feature branch
-2. Make your changes
-3. Test on both iOS and Android
-4. Submit a pull request
-
-## Resources
-
-- [Expo Documentation](https://docs.expo.dev/)
-- [React Native Documentation](https://reactnative.dev/)
-- [React Navigation](https://reactnavigation.org/)
-- [DealAnalyzer Web App](../)
-
-## License
-
-Same as the main DealAnalyzer project.
+- The app is designed to be a 1-to-1 copy of the web experience
+- All features from the web app are available in the mobile version
+- UI is optimized for mobile with touch-friendly interactions
+- Uses native mobile components where appropriate

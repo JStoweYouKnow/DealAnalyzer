@@ -1,149 +1,421 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import InfoTooltip from '../components/InfoTooltip';
+import { RootStackParamList } from '../types';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Card, CardContent, CardHeader } from '../components/ui/Card';
+import { Loading } from '../components/ui/Loading';
+import { useApiClient } from '../services/api';
+import { analyzeProperty } from '../services/propertyAnalyzer';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-function getFeatureInfo(featureId: string): string {
-  switch (featureId) {
-    case 'analyze':
-      return "Upload property details via PDF, paste email content, or enter manually. DealAnalyzer will calculate key metrics like cash-on-cash return, cap rate, and ROI to help you make informed investment decisions.";
-    case 'deals':
-      return "View all property deals received via email. Deals are automatically extracted from your inbox and can be analyzed with one tap. Connect your Gmail account or set up email forwarding to start receiving deals.";
-    case 'market':
-      return "Get comprehensive market intelligence including comparable sales, market trends, and property valuations. This helps you understand the local market and make better pricing decisions.";
-    case 'search':
-      return "Search for properties using natural language queries. Find properties matching your investment criteria, location preferences, and budget constraints.";
-    default:
-      return '';
-  }
+interface AnalysisResult {
+  propertyId: string;
+  property: any;
+  cashFlow: number;
+  cocReturn: number;
+  capRate: number;
+  meetsCriteria: boolean;
+  [key: string]: any;
 }
 
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const apiClient = useApiClient();
+  const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [propertyUrl, setPropertyUrl] = useState('');
+  const [purchasePrice, setPurchasePrice] = useState('');
+  const [monthlyRent, setMonthlyRent] = useState('');
+  const [adr, setAdr] = useState('');
+  const [occupancyRate, setOccupancyRate] = useState('');
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const features = [
-    {
-      id: 'analyze',
-      title: 'Analyze Property',
-      description: 'Upload or paste property details for instant analysis',
-      icon: 'calculator',
-      color: '#007AFF',
-      onPress: () => navigation.navigate('Analyze'),
+  // Load recent analyses
+  const { data: recentAnalyses = [] } = useQuery({
+    queryKey: ['recentAnalyses'],
+    queryFn: async () => {
+      try {
+        const stored = await AsyncStorage.getItem('recentAnalyses');
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
     },
-    {
-      id: 'deals',
-      title: 'Email Deals',
-      description: 'View and analyze deals from your inbox',
-      icon: 'mail',
-      color: '#34C759',
-      onPress: () => navigation.navigate('MainTabs', { screen: 'Deals' }),
+    retry: false,
+  });
+
+  // File upload mutation
+  const uploadMutation = useMutation({
+    mutationFn: async (file: any) => {
+      try {
+        const formData = new FormData();
+        formData.append('file', {
+          uri: file.uri,
+          type: file.mimeType || 'application/pdf',
+          name: file.name || 'document.pdf',
+        } as any);
+
+        const response = await apiClient.post('/analyze-file', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data || response;
+      } catch (error: any) {
+        console.error('File upload error:', error);
+        throw new Error(error.message || 'Failed to upload and analyze file');
+      }
     },
-    {
-      id: 'market',
-      title: 'Market Intelligence',
-      description: 'Get insights on market trends and comps',
-      icon: 'analytics',
-      color: '#FF9500',
-      onPress: () => navigation.navigate('MainTabs', { screen: 'Market' }),
+  });
+
+  // Property analysis mutation
+  const analyzeMutation = useMutation({
+    mutationFn: async (data: any) => {
+      try {
+        const response = await apiClient.post('/analyze', data);
+        return response.data || response;
+      } catch (error: any) {
+        console.error('Analysis error:', error);
+        throw new Error(error.message || 'Failed to analyze property');
+      }
     },
-    {
-      id: 'search',
-      title: 'Search Properties',
-      description: 'Find properties matching your criteria',
-      icon: 'search',
-      color: '#5856D6',
-      onPress: () => navigation.navigate('MainTabs', { screen: 'Search' }),
-    },
-  ];
+  });
+
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'text/*', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedFile(result.assets[0]);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick document');
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant photo library access');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedFile(result.assets[0]);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const handleExtractFromUrl = async () => {
+    if (!propertyUrl.trim()) {
+      Alert.alert('Error', 'Please enter a property URL');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const response = await apiClient.post('/extract-property-url', { url: propertyUrl });
+      const data = response.data || response;
+      if (data.property) {
+        setPurchasePrice(data.property.purchasePrice?.toString() || '');
+        setMonthlyRent(data.property.monthlyRent?.toString() || '');
+        Alert.alert('Success', 'Property data extracted successfully');
+      }
+    } catch (error: any) {
+      console.error('URL extraction error:', error);
+      Alert.alert(
+        'Error', 
+        error.message || 'Failed to extract property data. Please enter details manually.'
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!selectedFile && !purchasePrice && !monthlyRent) {
+      Alert.alert('Error', 'Please provide a file or enter property details');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      let analysis: AnalysisResult;
+
+      if (selectedFile) {
+        // Upload and analyze file
+        try {
+          const fileResult = await uploadMutation.mutateAsync(selectedFile);
+          analysis = fileResult.analysis;
+        } catch (fileError: any) {
+          // If file upload fails, try local analysis
+          console.warn('File upload failed, using manual entry:', fileError);
+          if (!purchasePrice && !monthlyRent) {
+            throw new Error('Please provide property details or a valid file');
+          }
+          // Fall through to manual analysis
+          const propertyData = {
+            purchasePrice: parseFloat(purchasePrice) || 0,
+            monthlyRent: parseFloat(monthlyRent) || 0,
+            address: 'Manual Entry',
+          };
+          const strMetrics = adr && occupancyRate ? {
+            adr: parseFloat(adr),
+            occupancyRate: parseFloat(occupancyRate) / 100,
+          } : undefined;
+          analysis = analyzeProperty(propertyData, strMetrics);
+        }
+      } else {
+        // Analyze from form data
+        const propertyData = {
+          purchasePrice: parseFloat(purchasePrice) || 0,
+          monthlyRent: parseFloat(monthlyRent) || 0,
+          address: 'Manual Entry',
+        };
+
+        const strMetrics = adr && occupancyRate ? {
+          adr: parseFloat(adr),
+          occupancyRate: parseFloat(occupancyRate) / 100,
+        } : undefined;
+
+        analysis = analyzeProperty(propertyData, strMetrics);
+      }
+
+      setAnalysisResult(analysis);
+
+      // Save to recent analyses
+      const updated = [analysis, ...(recentAnalyses as AnalysisResult[]).slice(0, 9)];
+      await AsyncStorage.setItem('recentAnalyses', JSON.stringify(updated));
+
+      Alert.alert(
+        'Analysis Complete',
+        analysis.meetsCriteria
+          ? 'This property meets your investment criteria!'
+          : 'This property does not meet your investment criteria.'
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to analyze property');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <View style={styles.headerRow}>
-            <Text style={styles.title}>Welcome to DealAnalyzer</Text>
-            <InfoTooltip
-              title="About DealAnalyzer"
-              content={[
-                "DealAnalyzer helps you analyze real estate investment opportunities on the go. Use the features below to:",
-                "• Analyze properties from emails, PDFs, or manual entry",
-                "• View and manage deals from your inbox",
-                "• Get market intelligence and comparable sales",
-                "• Search for properties matching your criteria",
-              ]}
+          <Text style={styles.title}>Property Analyzer</Text>
+          <Text style={styles.subtitle}>Analyze real estate investments</Text>
+        </View>
+
+        <Card>
+          <CardHeader>
+            <Text style={styles.sectionTitle}>Upload Property Data</Text>
+          </CardHeader>
+          <CardContent>
+            <View style={styles.buttonRow}>
+              <Button
+                title="Pick PDF/Document"
+                onPress={handlePickDocument}
+                variant="outline"
+                style={styles.fileButton}
+              />
+              <Button
+                title="Pick Image"
+                onPress={handlePickImage}
+                variant="outline"
+                style={styles.fileButton}
+              />
+            </View>
+            {selectedFile && (
+              <View style={styles.fileInfo}>
+                <Ionicons name="document" size={20} color="#007AFF" />
+                <Text style={styles.fileName} numberOfLines={1}>
+                  {selectedFile.name || 'Selected file'}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <Input
+              label="Property URL"
+              placeholder="Enter property listing URL"
+              value={propertyUrl}
+              onChangeText={setPropertyUrl}
+              keyboardType="url"
+              autoCapitalize="none"
             />
-          </View>
-          <Text style={styles.subtitle}>
-            Analyze real estate investments on the go
-          </Text>
-        </View>
+            <Button
+              title="Extract from URL"
+              onPress={handleExtractFromUrl}
+              variant="outline"
+              loading={isAnalyzing}
+              style={styles.extractButton}
+            />
+          </CardContent>
+        </Card>
 
-        <View style={styles.featuresContainer}>
-          {features.map((feature) => (
-            <TouchableOpacity
-              key={feature.id}
-              style={[styles.featureCard, { borderLeftColor: feature.color }]}
-              onPress={feature.onPress}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: `${feature.color}15` }]}>
-                <Ionicons name={feature.icon as any} size={32} color={feature.color} />
-              </View>
-              <View style={styles.featureContent}>
-                <View style={styles.featureTitleRow}>
-                  <Text style={styles.featureTitle}>{feature.title}</Text>
-                  <InfoTooltip
-                    title={feature.title}
-                    content={getFeatureInfo(feature.id)}
-                    iconSize={18}
-                    iconColor={feature.color}
-                  />
-                </View>
-                <Text style={styles.featureDescription}>{feature.description}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color="#C7C7CC" />
-            </TouchableOpacity>
-          ))}
-        </View>
+        <Card>
+          <CardHeader>
+            <Text style={styles.sectionTitle}>Property Details</Text>
+          </CardHeader>
+          <CardContent>
+            <Input
+              label="Purchase Price"
+              placeholder="Enter purchase price"
+              value={purchasePrice}
+              onChangeText={setPurchasePrice}
+              keyboardType="numeric"
+            />
+            <Input
+              label="Monthly Rent (LTR)"
+              placeholder="Enter monthly rent"
+              value={monthlyRent}
+              onChangeText={setMonthlyRent}
+              keyboardType="numeric"
+            />
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <View style={styles.statHeader}>
-              <Text style={styles.statValue}>0</Text>
-              <InfoTooltip
-                title="Properties Analyzed"
-                content="This shows the total number of properties you've analyzed using DealAnalyzer. Each analysis includes financial metrics, ROI calculations, and investment recommendations."
-                iconSize={16}
-                iconColor="#007AFF"
-              />
-            </View>
-            <Text style={styles.statLabel}>Properties Analyzed</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={styles.statHeader}>
-              <Text style={styles.statValue}>0</Text>
-              <InfoTooltip
-                title="Email Deals"
-                content="This shows the number of property deals received via email. Connect your Gmail or set up email forwarding to automatically receive and analyze property deals from your inbox."
-                iconSize={16}
-                iconColor="#007AFF"
-              />
-            </View>
-            <Text style={styles.statLabel}>Email Deals</Text>
-          </View>
-        </View>
+            <Text style={styles.subsectionTitle}>Short-Term Rental (Optional)</Text>
+            <Input
+              label="ADR (Average Daily Rate)"
+              placeholder="Enter ADR"
+              value={adr}
+              onChangeText={setAdr}
+              keyboardType="numeric"
+            />
+            <Input
+              label="Occupancy Rate (%)"
+              placeholder="Enter occupancy rate"
+              value={occupancyRate}
+              onChangeText={setOccupancyRate}
+              keyboardType="numeric"
+            />
+          </CardContent>
+        </Card>
+
+        <Button
+          title={isAnalyzing ? 'Analyzing...' : 'Analyze Property'}
+          onPress={handleAnalyze}
+          loading={isAnalyzing}
+          style={styles.analyzeButton}
+        />
+
+        {analysisResult && (
+          <Card style={styles.resultCard}>
+            <CardHeader>
+              <Text style={styles.sectionTitle}>Analysis Results</Text>
+            </CardHeader>
+            <CardContent>
+              <View style={styles.resultRow}>
+                <Text style={styles.resultLabel}>Cash Flow:</Text>
+                <Text style={[
+                  styles.resultValue,
+                  analysisResult.cashFlow >= 0 ? styles.positive : styles.negative
+                ]}>
+                  ${analysisResult.cashFlow.toFixed(2)}/month
+                </Text>
+              </View>
+              <View style={styles.resultRow}>
+                <Text style={styles.resultLabel}>Cash-on-Cash Return:</Text>
+                <Text style={styles.resultValue}>
+                  {(analysisResult.cocReturn * 100).toFixed(2)}%
+                </Text>
+              </View>
+              <View style={styles.resultRow}>
+                <Text style={styles.resultLabel}>Cap Rate:</Text>
+                <Text style={styles.resultValue}>
+                  {(analysisResult.capRate * 100).toFixed(2)}%
+                </Text>
+              </View>
+              <View style={styles.resultRow}>
+                <Text style={styles.resultLabel}>Meets Criteria:</Text>
+                <Text style={[
+                  styles.resultValue,
+                  analysisResult.meetsCriteria ? styles.positive : styles.negative
+                ]}>
+                  {analysisResult.meetsCriteria ? 'Yes ✓' : 'No ✗'}
+                </Text>
+              </View>
+
+              <View style={styles.buttonRow}>
+                <Button
+                  title="View Details"
+                  onPress={() => navigation.navigate('Analyze', { initialData: analysisResult })}
+                  variant="outline"
+                  style={styles.detailButton}
+                />
+                <Button
+                  title="Add to Compare"
+                  onPress={() => navigation.navigate('Comparison')}
+                  variant="secondary"
+                  style={styles.detailButton}
+                />
+              </View>
+            </CardContent>
+          </Card>
+        )}
+
+        {recentAnalyses && (recentAnalyses as AnalysisResult[]).length > 0 && (
+          <Card>
+            <CardHeader>
+              <Text style={styles.sectionTitle}>Recent Analyses</Text>
+            </CardHeader>
+            <CardContent>
+              {(recentAnalyses as AnalysisResult[]).slice(0, 5).map((analysis, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.recentItem}
+                  onPress={() => setAnalysisResult(analysis)}
+                >
+                  <Text style={styles.recentAddress}>
+                    {analysis.property?.address || 'Unknown Address'}
+                  </Text>
+                  <Text style={styles.recentPrice}>
+                    ${analysis.property?.purchasePrice?.toLocaleString() || 'N/A'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -155,101 +427,120 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  header: {
-    padding: 20,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 16,
+  scrollContent: {
+    padding: 16,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  header: {
+    marginBottom: 24,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 8,
-    flex: 1,
   },
   subtitle: {
     fontSize: 16,
     color: '#8E8E93',
   },
-  featuresContainer: {
-    padding: 16,
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000000',
   },
-  featureCard: {
+  subsectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  buttonRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    gap: 12,
     marginBottom: 12,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  featureContent: {
+  fileButton: {
     flex: 1,
   },
-  featureTitleRow: {
+  fileInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    padding: 12,
+    backgroundColor: '#E5F2FF',
+    borderRadius: 8,
+    marginTop: 8,
   },
-  featureTitle: {
-    fontSize: 18,
+  fileName: {
+    marginLeft: 8,
+    flex: 1,
+    color: '#007AFF',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E5EA',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    color: '#8E8E93',
+    fontSize: 14,
+  },
+  extractButton: {
+    marginTop: 8,
+  },
+  analyzeButton: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  resultCard: {
+    marginTop: 16,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  resultLabel: {
+    fontSize: 16,
+    color: '#000000',
+  },
+  resultValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  positive: {
+    color: '#34C759',
+  },
+  negative: {
+    color: '#FF3B30',
+  },
+  detailButton: {
+    flex: 1,
+  },
+  recentItem: {
+    padding: 12,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  recentAddress: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#000000',
     marginBottom: 4,
-    flex: 1,
   },
-  featureDescription: {
-    fontSize: 14,
+  recentPrice: {
+    fontSize: 12,
     color: '#8E8E93',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
   },
 });

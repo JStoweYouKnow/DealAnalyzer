@@ -13,7 +13,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import { Loading } from '../components/ui/Loading';
-import { Button } from '../components/ui/Button';
 import { apiClient } from '../services/api';
 import { RootStackParamList } from '../types';
 
@@ -86,13 +85,14 @@ export default function MarketScreen() {
             <Text style={styles.title}>Market Intelligence</Text>
             <Text style={styles.subtitle}>Real-time market data and trends</Text>
           </View>
-          <Button
+          <TouchableOpacity
             onPress={() => navigation.navigate('Neighborhood')}
             style={styles.neighborhoodButton}
+            activeOpacity={0.7}
           >
-            <Ionicons name="location" size={16} color="#fff" />
+            <Ionicons name="location" size={18} color="#FFFFFF" />
             <Text style={styles.neighborhoodButtonText}>ZIP Search</Text>
-          </Button>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -259,16 +259,24 @@ const styles = StyleSheet.create({
   neighborhoodButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: '#007AFF',
-    borderRadius: 8,
+    borderRadius: 10,
+    minHeight: 44,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   neighborhoodButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   marketCard: {
     marginBottom: 16,

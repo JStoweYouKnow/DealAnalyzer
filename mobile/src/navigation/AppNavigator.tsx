@@ -16,6 +16,12 @@ import SearchScreen from '../screens/SearchScreen';
 import AnalyzeScreen from '../screens/AnalyzeScreen';
 import ComparisonScreen from '../screens/ComparisonScreen';
 import AccountScreen from '../screens/AccountScreen';
+import PreferencesScreen from '../screens/PreferencesScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import EmailSettingsScreen from '../screens/EmailSettingsScreen';
+import HelpSupportScreen from '../screens/HelpSupportScreen';
+import TermsPrivacyScreen from '../screens/TermsPrivacyScreen';
+import SubscriptionScreen from '../screens/SubscriptionScreen';
 import SignInScreen from '../screens/SignInScreen';
 import SignUpScreen from '../screens/SignUpScreen';
 import { navigationRef } from './navigationRef';
@@ -165,6 +171,36 @@ export default function AppNavigator() {
               name="Neighborhood"
               component={NeighborhoodScreen}
               options={{ title: 'Neighborhood Intelligence' }}
+            />
+            <Stack.Screen
+              name="Preferences"
+              component={PreferencesScreen}
+              options={{ title: 'Preferences' }}
+            />
+            <Stack.Screen
+              name="Notifications"
+              component={NotificationsScreen}
+              options={{ title: 'Notifications' }}
+            />
+            <Stack.Screen
+              name="EmailSettings"
+              component={EmailSettingsScreen}
+              options={{ title: 'Email Settings' }}
+            />
+            <Stack.Screen
+              name="HelpSupport"
+              component={HelpSupportScreen}
+              options={{ title: 'Help & Support' }}
+            />
+            <Stack.Screen
+              name="TermsPrivacy"
+              component={TermsPrivacyScreen}
+              options={{ title: 'Terms & Privacy' }}
+            />
+            <Stack.Screen
+              name="Subscription"
+              component={SubscriptionScreen}
+              options={{ title: 'Subscription' }}
             />
           </>
         )}

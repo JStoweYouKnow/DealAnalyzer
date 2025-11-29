@@ -349,4 +349,30 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user_id", ["userId"]),
+
+  subscriptions: defineTable({
+    userId: v.string(),
+    stripeCustomerId: v.string(),
+    stripeSubscriptionId: v.string(),
+    planId: v.string(), // 'basic', 'pro', 'enterprise'
+    status: v.union(
+      v.literal("active"),
+      v.literal("canceled"),
+      v.literal("past_due"),
+      v.literal("trialing"),
+      v.literal("incomplete"),
+      v.literal("incomplete_expired"),
+      v.literal("unpaid")
+    ),
+    currentPeriodStart: v.number(), // timestamp
+    currentPeriodEnd: v.number(), // timestamp
+    cancelAtPeriodEnd: v.optional(v.boolean()),
+    canceledAt: v.optional(v.number()), // timestamp
+    createdAt: v.number(), // timestamp
+    updatedAt: v.number(), // timestamp
+  })
+    .index("by_user_id", ["userId"])
+    .index("by_stripe_customer_id", ["stripeCustomerId"])
+    .index("by_stripe_subscription_id", ["stripeSubscriptionId"])
+    .index("by_status", ["status"]),
 });

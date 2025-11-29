@@ -35,6 +35,7 @@ const safePublicRoutes = [
   '/api/health',               // Health check - monitoring
   '/api/gmail-callback',       // OAuth callback - required for Gmail auth
   '/api/receive-email',        // SendGrid webhook - email forwarding
+  '/api/stripe/webhook',       // Stripe webhook - payment processing (must be public for Stripe to call)
   '/api/og-image',             // Open Graph images - social sharing (query params only)
   '/api/criteria',             // Investment criteria - returns default values (GET is safe, PUT should be protected but uses in-memory cache)
   '/api/extract-property-url', // Property URL extraction - rate limited, safe for public use

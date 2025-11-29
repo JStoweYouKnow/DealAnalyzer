@@ -13,7 +13,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import { Loading } from '../components/ui/Loading';
 import { Input } from '../components/ui/Input';
-import { Button } from '../components/ui/Button';
 import { apiClient } from '../services/api';
 
 interface NeighborhoodTrend {
@@ -66,7 +65,9 @@ export default function NeighborhoodScreen() {
         params.append('zipCode', searchZip);
         params.append('live', 'true');
         
-        const response = await apiClient.get(`/market/neighborhood-trends?${params.toString()}`);
+        const url = `/market/neighborhood-trends?${params.toString()}`;
+        console.log('📡 API URL:', url);
+        const response = await apiClient.get(url);
         const data = response.data || response;
         const trendsData = data.data || data || [];
         console.log('✅ Neighborhood data fetched:', trendsData.length, 'trends');
@@ -143,13 +144,21 @@ export default function NeighborhoodScreen() {
               maxLength={5}
               style={styles.searchInput}
             />
-            <Button
+            <TouchableOpacity
               onPress={handleSearch}
               disabled={zipCode.trim().length !== 5}
-              style={styles.searchButton}
+              style={[
+                styles.searchButton,
+                zipCode.trim().length !== 5 && styles.searchButtonDisabled,
+              ]}
+              activeOpacity={0.7}
             >
-              <Ionicons name="search" size={20} color="#fff" />
-            </Button>
+              <Ionicons 
+                name="search" 
+                size={20} 
+                color={zipCode.trim().length === 5 ? "#FFFFFF" : "#8E8E93"} 
+              />
+            </TouchableOpacity>
           </View>
         </CardContent>
       </Card>
@@ -420,8 +429,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchButton: {
-    minWidth: 50,
-    paddingHorizontal: 16,
+    minWidth: 56,
+    minHeight: 44,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  searchButtonDisabled: {
+    backgroundColor: '#E5E5EA',
+    opacity: 0.6,
   },
   trendsContainer: {
     gap: 16,

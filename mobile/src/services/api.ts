@@ -1,250 +1,199 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { Platform, Alert } from 'react-native';
-import { navigateToTab } from '../navigation/navigationRef';
+import axios, { AxiosInstance } from 'axios';
+import Constants from 'expo-constants';
+import * as SecureStore from 'expo-secure-store';
+import { useAuth } from '@clerk/clerk-expo';
 
-// Try to import expo-constants, fallback if not available
-let Constants: any;
-try {
-  Constants = require('expo-constants');
-} catch (e) {
-  // expo-constants not available, will use fallbacks
-  Constants = null;
-}
-
-/**
- * Get the development server URL with platform-aware fallbacks
- * 
- * Priority order:
- * 1. DEV_SERVER_URL environment variable (from .env or app.json extra)
- * 2. Platform-specific defaults:
- *    - Android Emulator: 'http://10.0.2.2:3000' (special IP for Android emulator)
- *    - iOS Simulator: 'http://localhost:3000'
- *    - Physical devices: 'http://localhost:3000' (fallback - should use DEV_SERVER_URL)
- * 
- * For physical devices, you MUST set DEV_SERVER_URL to your machine's LAN IP
- * (e.g., 'http://192.168.1.100:3000'). Find your IP with:
- * - macOS/Linux: `ifconfig | grep "inet " | grep -v 127.0.0.1`
- * - Windows: `ipconfig` (look for IPv4 Address)
- */
-function getDevServerUrl(): string {
-  // Check for explicit DEV_SERVER_URL from environment or app config
-  const envUrl = 
-    process.env.DEV_SERVER_URL || 
-    (Constants?.expoConfig?.extra?.devServerUrl) ||
-    (Constants?.manifest?.extra?.devServerUrl);
+// Get API base URL from environment or use localhost for development
+const getApiBaseUrl = (): string => {
+  const apiUrl = Constants.expoConfig?.extra?.apiUrl || 
+    process.env.EXPO_PUBLIC_API_URL;
   
-  if (envUrl) {
-    return envUrl;
-  }
-
-  // Platform-specific fallbacks
-  if (Platform.OS === 'android') {
-    // Android emulator uses special IP to access host machine
-    return 'http://10.0.2.2:3000';
-  } else if (Platform.OS === 'ios') {
-    // iOS simulator can use localhost
-    return 'http://localhost:3000';
-  }
-
-  // Default fallback (should rarely be used)
-  return 'http://localhost:3000';
-}
-
-// API Configuration
-const API_URL = __DEV__
-  ? getDevServerUrl()
-  : 'https://comfort-finder-analyzer.vercel.app'; // Production: your deployed backend
-
-/**
- * API Client for DealAnalyzer backend
- *
- * This client connects to the same backend as the web app,
- * allowing the mobile app to reuse all existing API routes.
- */
-class ApiClient {
-  private client: AxiosInstance;
-
-  constructor() {
-    this.client = axios.create({
-      baseURL: API_URL,
-      timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    // Request interceptor for auth tokens
-    this.client.interceptors.request.use(
-      (config) => {
-        // TODO: Add Clerk auth token here
-        // const token = await getAuthToken();
-        // if (token) {
-        //   config.headers.Authorization = `Bearer ${token}`;
-        // }
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
+  // Validate and return if provided (and not empty string)
+  if (apiUrl && typeof apiUrl === 'string') {
+    const trimmed = apiUrl.trim();
+    if (trimmed !== '' && trimmed !== 'undefined' && trimmed !== 'null') {
+      // Ensure it's an absolute URL
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        return trimmed;
       }
-    );
+      // If it doesn't have a protocol, add https://
+      return `https://${trimmed}`;
+    }
+  }
+  
+  // Default to localhost for development
+  // Note: For physical devices, use your computer's IP address instead of localhost
+  // e.g., 'http://192.168.1.100:3002'
+  if (__DEV__) {
+    // Try to get the local IP from Constants, fallback to localhost
+    const debuggerHost = Constants.expoConfig?.hostUri?.split(':')[0];
+    if (debuggerHost && debuggerHost !== 'localhost' && debuggerHost !== '127.0.0.1') {
+      return `http://${debuggerHost}:3002`;
+    }
+    return 'http://localhost:3002';
+  }
+  
+  // Production fallback
+  console.warn('API URL not configured. Using localhost. Please set apiUrl in app.json extra section for production.');
+  return 'http://localhost:3002';
+};
 
-    // Response interceptor for error handling
-    this.client.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
-          // Handle unauthorized - redirect to login
-          // Navigate to Settings screen (or Login if available)
-          // To add a Login screen, update RootStackParamList in AppNavigator.tsx
-          // and use: navigate('Login') instead
-          try {
-            // Safe navigation with error handling - navigateToTab already has guards,
-            // but wrap in try-catch as additional safety layer to prevent interceptor crashes
-            navigateToTab('Settings');
-          } catch (navError) {
-            // Swallow navigation errors to prevent interceptor from crashing
-            // The navigateToTab function already handles errors internally,
-            // but this provides an extra safety layer
-            if (__DEV__) {
-              console.warn('Failed to navigate to Settings on 401 error:', navError);
-            }
-          }
-        } else if (error.response?.status === 429) {
-          // Handle rate limiting - show user-friendly message
-          Alert.alert(
-            'Too Many Requests',
-            'You\'ve made too many requests. Please wait a moment and try again.',
-            [{ text: 'OK' }]
-          );
+// Check if API is configured
+export const isApiConfigured = (): boolean => {
+  const baseURL = getApiBaseUrl();
+  return baseURL !== '' && 
+         baseURL !== 'http://localhost:3002' || __DEV__;
+};
+
+// Create axios instance
+const createApiClient = (getToken?: () => Promise<string | null>): AxiosInstance => {
+  const baseURL = getApiBaseUrl();
+  
+  // Validate base URL
+  if (!baseURL || (!baseURL.startsWith('http://') && !baseURL.startsWith('https://'))) {
+    console.error('Invalid API base URL:', baseURL);
+    throw new Error('API base URL must be an absolute URL starting with http:// or https://');
+  }
+  
+  // Ensure baseURL doesn't have trailing slash
+  const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+  
+  const client = axios.create({
+    baseURL: cleanBaseURL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    timeout: 30000, // 30 seconds
+  });
+  
+  // Interceptor to add /api prefix to requests if using production URL
+  client.interceptors.request.use((config) => {
+    // If the URL doesn't start with /api and we're using a production URL (not localhost)
+    if (config.url && !config.url.startsWith('/api') && !cleanBaseURL.includes('localhost')) {
+      // Ensure URL starts with / before prepending /api
+      const url = config.url.startsWith('/') ? config.url : `/${config.url}`;
+      config.url = `/api${url}`;
+    }
+    return config;
+  });
+
+  // Add auth token to requests if available
+  if (getToken) {
+    client.interceptors.request.use(async (config) => {
+      try {
+        const token = await getToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+          console.log('✅ Auth token added to request:', token.substring(0, 20) + '...');
+        } else {
+          console.warn('⚠️ No auth token available - user may not be signed in');
         }
-        return Promise.reject(error);
+      } catch (error) {
+        console.error('❌ Failed to get auth token:', error);
       }
-    );
-  }
-
-  // Property Analysis
-  async analyzeProperty(data: {
-    emailContent: string;
-    strMetrics?: string;
-    monthlyExpenses?: Record<string, number>;
-    fundingSource?: string;
-    mortgageValues?: any;
-  }): Promise<any> {
-    const response = await this.client.post('/api/analyze', data);
-    return response.data;
-  }
-
-  // File Upload and Analysis
-  async analyzeFile(formData: FormData): Promise<any> {
-    const response = await this.client.post('/api/analyze-file', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      return config;
     });
-    return response.data;
   }
 
-  // URL Extraction
-  async extractPropertyFromUrl(url: string): Promise<any> {
-    const response = await this.client.post('/api/extract-property-url', { url });
-    return response.data;
-  }
+  // Add user session ID from secure store
+  client.interceptors.request.use(async (config) => {
+    try {
+      const sessionId = await SecureStore.getItemAsync('user-session-id');
+      if (sessionId) {
+        config.headers['x-user-session-id'] = sessionId;
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+    return config;
+  });
 
-  // Email Deals
-  async getEmailDeals(): Promise<any> {
-    const response = await this.client.get('/api/email-deals');
-    return response.data;
-  }
+  // Handle errors
+  client.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      if (error.response?.status === 401) {
+        // Handle unauthorized - could redirect to login
+        console.warn('Unauthorized request');
+      }
+      return Promise.reject(error);
+    }
+  );
 
-  async getEmailDeal(id: string): Promise<any> {
-    const response = await this.client.get(`/api/email-deals/${id}`);
-    return response.data;
-  }
+  return client;
+};
 
-  async analyzeEmailDeal(data: {
-    dealId: string;
-    emailContent: string;
-    fundingSource?: string;
-    mortgageValues?: any;
-  }): Promise<any> {
-    const response = await this.client.post('/api/analyze-email-deal', data);
-    return response.data;
-  }
+// Default API client (without auth token)
+export const apiClient = createApiClient();
 
-  // Gmail Integration
-  async getGmailStatus(): Promise<any> {
-    const response = await this.client.get('/api/gmail-status');
-    return response.data;
-  }
+// Hook to get authenticated API client
+export const useApiClient = () => {
+  const { getToken } = useAuth();
+  
+  return createApiClient(async () => {
+    try {
+      return await getToken();
+    } catch {
+      return null;
+    }
+  });
+};
 
-  async syncEmails(): Promise<any> {
-    const response = await this.client.post('/api/sync-emails');
-    return response.data;
-  }
+// API request helper
+export const apiRequest = async <T = any>(
+  method: string,
+  url: string,
+  data?: any,
+  client: AxiosInstance = apiClient,
+  config?: any
+): Promise<T> => {
+  const response = await client.request({
+    method,
+    url,
+    data,
+    ...config,
+  });
+  return response.data;
+};
 
-  // Market Intelligence
-  async getMarketStats(params: {
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  }): Promise<any> {
-    const response = await this.client.get('/api/market/cached-stats', { params });
-    return response.data;
-  }
+// Validate URL is absolute
+const validateUrl = (url: string): boolean => {
+  if (!url || typeof url !== 'string') return false;
+  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
+};
 
-  async getComparableSales(params: {
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  }): Promise<any> {
-    const response = await this.client.get('/api/market/comparable-sales', { params });
-    return response.data;
-  }
+// Convenience methods with URL validation
+export const api = {
+  get: <T = any>(url: string, client?: AxiosInstance) => {
+    if (!validateUrl(url) && !url.startsWith('/')) {
+      return Promise.reject(new Error(`Invalid URL: ${url}. URL must be absolute or start with /`));
+    }
+    return apiRequest<T>('GET', url, undefined, client);
+  },
+  post: <T = any>(url: string, data?: any, client?: AxiosInstance, config?: any) => {
+    if (!validateUrl(url) && !url.startsWith('/')) {
+      return Promise.reject(new Error(`Invalid URL: ${url}. URL must be absolute or start with /`));
+    }
+    return apiRequest<T>('POST', url, data, client, config);
+  },
+  put: <T = any>(url: string, data?: any, client?: AxiosInstance) => {
+    if (!validateUrl(url) && !url.startsWith('/')) {
+      return Promise.reject(new Error(`Invalid URL: ${url}. URL must be absolute or start with /`));
+    }
+    return apiRequest<T>('PUT', url, data, client);
+  },
+  delete: <T = any>(url: string, client?: AxiosInstance) => {
+    if (!validateUrl(url) && !url.startsWith('/')) {
+      return Promise.reject(new Error(`Invalid URL: ${url}. URL must be absolute or start with /`));
+    }
+    return apiRequest<T>('DELETE', url, undefined, client);
+  },
+  patch: <T = any>(url: string, data?: any, client?: AxiosInstance) => {
+    if (!validateUrl(url) && !url.startsWith('/')) {
+      return Promise.reject(new Error(`Invalid URL: ${url}. URL must be absolute or start with /`));
+    }
+    return apiRequest<T>('PATCH', url, data, client);
+  },
+};
 
-  // Property Search
-  async searchProperties(query: string): Promise<any> {
-    const response = await this.client.post('/api/search/natural-language', { query });
-    return response.data;
-  }
-
-  // Mortgage Calculator
-  async calculateMortgage(data: {
-    propertyPrice: number;
-    downPaymentPercent: number;
-    interestRate: number;
-    loanTermYears: number;
-  }): Promise<any> {
-    const response = await this.client.post('/api/mortgage-calculator', data);
-    return response.data;
-  }
-
-  // Report Generation
-  async generateReport(data: {
-    propertyId: string;
-    analysisId: string;
-  }): Promise<any> {
-    const response = await this.client.post('/api/generate-report', data);
-    return response.data;
-  }
-}
-
-export const api = new ApiClient();
-export default api;
-
-// Export market data APIs
-export {
-  marketDataService,
-  walkScoreAPI,
-  openWeatherMapAPI,
-  blsAPI,
-  fredAPI,
-  geocodingAPI,
-  WalkScoreAPI,
-  OpenWeatherMapAPI,
-  BLSAPI,
-  FREDAPI,
-  GeocodingAPI,
-  MarketDataService,
-} from './marketDataAPIs';
+export default apiClient;
