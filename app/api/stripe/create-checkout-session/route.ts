@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { logger } from "@/lib/logger";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-12-18.acacia",
-});
+// Use the default API version from the installed Stripe library to avoid
+// hard-coding a specific date that can drift from the type definition.
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 // Helper function to get user ID from request
 async function getUserIdFromRequest(request: NextRequest): Promise<string | null> {
