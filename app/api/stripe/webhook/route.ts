@@ -44,38 +44,10 @@ export async function POST(request: NextRequest) {
         const subscriptionId = session.subscription as string;
 
         if (userId && planId && customerId && subscriptionId) {
-          // Retrieve full subscription details from Stripe
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-          
-          // Store subscription in Convex database
-          if (process.env.NEXT_PUBLIC_CONVEX_URL) {
-            try {
-              const { ConvexHttpClient } = await import('convex/browser');
-              const apiModule = await import('../../../convex/_generated/api');
-              const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
-              
-              await convexClient.mutation(apiModule.api.subscriptions.upsert, {
-                userId,
-                stripeCustomerId: customerId,
-                stripeSubscriptionId: subscriptionId,
-                planId,
-                status: subscription.status as any,
-                currentPeriodStart: subscription.current_period_start * 1000, // Convert to milliseconds
-                currentPeriodEnd: subscription.current_period_end * 1000,
-                cancelAtPeriodEnd: subscription.cancel_at_period_end,
-                canceledAt: subscription.canceled_at ? subscription.canceled_at * 1000 : undefined,
-              });
-
-              logger.info("Subscription stored in database", {
-                userId: userId.substring(0, 20),
-                planId,
-                subscriptionId,
-              });
-            } catch (error) {
-              logger.error("Failed to store subscription in database", error instanceof Error ? error : new Error(String(error)));
-            }
-          }
-
+          // In this version we don't persist subscription details to Convex.
+          // Stripe still processes the payment and you can see subscriptions
+          // in the Stripe Dashboard. A future version can add persistent
+          // storage without relying on convex/_generated/api on Vercel.
           logger.info("Checkout session completed", {
             userId: userId.substring(0, 20),
             planId,
@@ -89,42 +61,6 @@ export async function POST(request: NextRequest) {
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        
-        // Update subscription in database
-        if (process.env.NEXT_PUBLIC_CONVEX_URL) {
-          try {
-            const { ConvexHttpClient } = await import('convex/browser');
-            const apiModule = await import('../../../convex/_generated/api');
-            const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
-            
-            // Get existing subscription to find userId
-            const existing = await convexClient.query(apiModule.api.subscriptions.getBySubscriptionId, {
-              subscriptionId: subscription.id,
-            });
-
-            if (existing) {
-              await convexClient.mutation(apiModule.api.subscriptions.upsert, {
-                userId: existing.userId,
-                stripeCustomerId: subscription.customer as string,
-                stripeSubscriptionId: subscription.id,
-                planId: existing.planId, // Keep existing planId
-                status: subscription.status as any,
-                currentPeriodStart: subscription.current_period_start * 1000,
-                currentPeriodEnd: subscription.current_period_end * 1000,
-                cancelAtPeriodEnd: subscription.cancel_at_period_end,
-                canceledAt: subscription.canceled_at ? subscription.canceled_at * 1000 : undefined,
-              });
-
-              logger.info(`Subscription ${event.type} in database`, {
-                subscriptionId: subscription.id,
-                status: subscription.status,
-              });
-            }
-          } catch (error) {
-            logger.error("Failed to update subscription in database", error instanceof Error ? error : new Error(String(error)));
-          }
-        }
-
         logger.info(`Subscription ${event.type}`, {
           subscriptionId: subscription.id,
           status: subscription.status,

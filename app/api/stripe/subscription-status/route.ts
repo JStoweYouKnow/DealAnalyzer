@@ -58,31 +58,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Retrieve subscription from Convex database
-    if (process.env.NEXT_PUBLIC_CONVEX_URL) {
-      try {
-        const { ConvexHttpClient } = await import('convex/browser');
-        const apiModule = await import('../../../convex/_generated/api');
-        const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
-        
-        const subscription = await convexClient.query(apiModule.api.subscriptions.getByUserId, {
-          userId,
-        });
-
-        if (subscription && subscription.status === 'active') {
-          return NextResponse.json({
-            hasSubscription: true,
-            plan: subscription.planId,
-            status: subscription.status,
-            currentPeriodEnd: subscription.currentPeriodEnd,
-          });
-        }
-      } catch (error) {
-        logger.error("Error retrieving subscription from database", error instanceof Error ? error : new Error(String(error)));
-      }
-    }
-
-    // No active subscription found
+    // NOTE: For now, we don't persist subscriptions in Convex on the server.
+    // The mobile app can still use Stripe Checkout for payments, but this
+    // endpoint will report no active subscription until a full persistence
+    // layer is implemented without relying on convex/_generated/api on Vercel.
     return NextResponse.json({
       hasSubscription: false,
       plan: null,

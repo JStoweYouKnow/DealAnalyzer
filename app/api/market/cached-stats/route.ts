@@ -28,6 +28,7 @@ interface MarketStats {
   medianPrice: number;
   medianRent: number;
   averageCapRate: number;
+  capRate: number; // Backwards-compatible alias for averageCapRate
   marketScore: number;
   trend: 'up' | 'down' | 'stable';
   lastUpdated: string;
