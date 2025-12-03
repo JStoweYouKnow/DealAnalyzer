@@ -94,11 +94,20 @@ export async function GET(request: NextRequest) {
     const clearSession = url.searchParams.get('clear') === 'true';
     
     // Dynamically construct the redirect URI based on the request
+    // For mobile apps, use the API URL from the request origin
     // Allow overriding with NEXT_PUBLIC_APP_DOMAIN for production if needed
     const forwardedProto = request.headers.get('x-forwarded-proto');
     let protocol = forwardedProto || url.protocol.replace(':', '') || 'https';
     let host = request.headers.get('host') || url.hostname;
 
+    // Check if request is from mobile app (has API URL in origin or referer)
+    const origin = request.headers.get('origin') || request.headers.get('referer') || '';
+    const isMobileRequest = origin.includes('api.comfortfinder.com') || 
+                           origin.includes('comfortfinder.projcomfort.com') ||
+                           url.hostname.includes('api.comfortfinder.com') ||
+                           url.hostname.includes('comfortfinder.projcomfort.com');
+
+    // If NEXT_PUBLIC_APP_DOMAIN is set, use it (for production consistency)
     if (DEFAULT_PROJECT_DOMAIN) {
       try {
         const parsed = new URL(
@@ -108,11 +117,16 @@ export async function GET(request: NextRequest) {
         );
         protocol = parsed.protocol.replace(':', '') || protocol;
         host = parsed.host || host;
+        console.log('[Gmail Auth URL] Using NEXT_PUBLIC_APP_DOMAIN:', host);
       } catch (error) {
         console.warn('Invalid NEXT_PUBLIC_APP_DOMAIN, falling back to request host:', error);
         host = DEFAULT_PROJECT_DOMAIN;
         protocol = protocol || 'https';
       }
+    } else if (isMobileRequest) {
+      // For mobile requests, prefer the API domain if available
+      // This ensures redirect URI matches where the callback will be received
+      console.log('[Gmail Auth URL] Mobile request detected, using request host:', host);
     }
 
     if (!host) {
@@ -120,6 +134,16 @@ export async function GET(request: NextRequest) {
     }
 
     const redirectUri = `${protocol}://${host}/api/gmail-callback`;
+    
+    console.log('[Gmail Auth URL] Redirect URI determination:', {
+      requestHost: request.headers.get('host'),
+      requestUrl: request.url,
+      origin: request.headers.get('origin'),
+      referer: request.headers.get('referer'),
+      isMobileRequest,
+      DEFAULT_PROJECT_DOMAIN,
+      finalRedirectUri: redirectUri,
+    });
     
     // Create auth URL with dynamic redirect URI
     const auth = new google.auth.OAuth2(
@@ -130,11 +154,31 @@ export async function GET(request: NextRequest) {
 
     const scopes = ['https://www.googleapis.com/auth/gmail.readonly'];
 
+    // Include userId in state parameter so we can retrieve it in the callback
+    // State is base64url encoded to ensure it's URL-safe (no padding, URL-safe characters)
+    let state: string;
+    try {
+      const stateData = JSON.stringify({ userId });
+      state = Buffer.from(stateData).toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, ''); // Remove padding for base64url
+      console.log('[Gmail Auth URL] Generated state parameter', {
+        userId: userId.substring(0, 20),
+        stateLength: state.length,
+      });
+    } catch (error) {
+      console.error('[Gmail Auth URL] Error encoding state:', error);
+      // Fallback: use userId directly (less secure but works)
+      state = userId;
+    }
+
     const authUrlConfig: GenerateAuthUrlOpts = {
       access_type: 'offline',
       scope: scopes,
       include_granted_scopes: true,
       prompt: 'select_account', // default to account chooser for first-time auth
+      state, // Include userId in state for callback
     };
     
     // Force account selection and consent if requested via `clear=true`
@@ -144,9 +188,25 @@ export async function GET(request: NextRequest) {
 
     const authUrl = auth.generateAuthUrl(authUrlConfig);
     
-    console.log("Generated auth URL:", authUrl);
-    console.log("Redirect URI in use:", redirectUri);
-    console.log("Request URL:", request.url);
+    // Parse the generated auth URL to extract redirect_uri for verification
+    let redirectUriInUrl = 'unknown';
+    try {
+      const urlObj = new URL(authUrl);
+      redirectUriInUrl = urlObj.searchParams.get('redirect_uri') || 'not found';
+    } catch (e) {
+      console.warn('[Gmail Auth URL] Could not parse generated auth URL:', e);
+    }
+    
+    console.log('[Gmail Auth URL] Generated OAuth URL', {
+      userId: userId ? userId.substring(0, 20) + '...' : 'MISSING',
+      redirectUri,
+      redirectUriInUrl, // The actual redirect_uri in the generated URL
+      redirectUriMatch: redirectUri === decodeURIComponent(redirectUriInUrl),
+      hasState: !!state,
+      stateLength: state?.length,
+      requestUrl: request.url,
+      fullAuthUrl: authUrl, // Log full URL for debugging
+    });
     
     return NextResponse.json({
       success: true,

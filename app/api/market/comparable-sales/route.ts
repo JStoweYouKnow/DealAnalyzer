@@ -4,8 +4,9 @@ import { rentCastAPI } from "../../../../server/services/rentcast-api";
 import { attomAPI } from "../../../../server/services/attom-api";
 import type { ComparableSale } from "@shared/schema";
 
-// Enable Edge Runtime for GET requests (ultra-fast, <100ms globally)
-export const runtime = 'edge';
+// Use Node.js runtime because rentcast-cache uses Node.js APIs (process.on)
+// Edge Runtime doesn't support Node.js APIs like process.on
+export const runtime = 'nodejs';
 
 type CacheEntry = {
   expires: number;

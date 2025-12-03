@@ -587,8 +587,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/gmail-auth-url", async (req, res) => {
     try {
       const authUrl = emailMonitoringService.getAuthUrl();
-      console.log("Generated auth URL:", authUrl);
-      console.log("Redirect URI in use:", process.env.GMAIL_REDIRECT_URI);
+      
+      // Parse the generated auth URL to extract redirect_uri for verification
+      let redirectUriInUrl = 'unknown';
+      try {
+        const urlObj = new URL(authUrl);
+        redirectUriInUrl = urlObj.searchParams.get('redirect_uri') || 'not found';
+      } catch (e) {
+        console.warn("Could not parse generated auth URL:", e);
+      }
+      
+      console.log("[Express] Generated Gmail auth URL:", {
+        redirectUriFromEnv: process.env.GMAIL_REDIRECT_URI,
+        redirectUriInUrl: decodeURIComponent(redirectUriInUrl),
+        redirectUriMatch: process.env.GMAIL_REDIRECT_URI === decodeURIComponent(redirectUriInUrl),
+        fullAuthUrl: authUrl,
+      });
+      
       res.json({
         success: true,
         authUrl

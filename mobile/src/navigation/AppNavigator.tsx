@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer, NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -102,17 +102,97 @@ function MainTabs() {
 
 export default function AppNavigator() {
   const { isSignedIn, isLoaded } = useAuth();
+  const [loadingTimeout, setLoadingTimeout] = React.useState(false);
+  const [startTime] = React.useState(Date.now());
+
+  // Add timeout to detect if Clerk is stuck loading
+  React.useEffect(() => {
+    const elapsed = Date.now() - startTime;
+    console.log('[AppNavigator] Clerk loading state:', { 
+      isLoaded, 
+      isSignedIn,
+      elapsedMs: elapsed,
+      elapsedSeconds: Math.round(elapsed / 1000)
+    });
+    
+    // Log every 2 seconds while loading
+    if (!isLoaded) {
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        console.log('[AppNavigator] Still loading...', {
+          elapsedSeconds: Math.round(elapsed / 1000),
+          isLoaded,
+        });
+      }, 2000);
+
+      const timeout = setTimeout(() => {
+        if (!isLoaded) {
+          console.error('[AppNavigator] ⚠️ Clerk is taking too long to load (>10s).');
+          console.error('[AppNavigator] Possible causes:');
+          console.error('  1. Network connectivity issue');
+          console.error('  2. Invalid or malformed publishable key');
+          console.error('  3. Clerk instance not accessible');
+          console.error('  4. Firewall/VPN blocking Clerk servers');
+          setLoadingTimeout(true);
+        }
+      }, 10000); // 10 second timeout
+
+      return () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
+    }
+  }, [isLoaded, startTime]);
 
   if (!isLoaded) {
-    // Show loading screen
+    const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
+    
+    // Show loading screen with progress and timeout warning
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
-        <Text>Loading...</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 20 }}>
+        <ActivityIndicator size="large" color="#007AFF" style={{ marginBottom: 20 }} />
+        <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 10 }}>Loading...</Text>
+        <Text style={{ fontSize: 14, color: '#8E8E93', marginBottom: 20 }}>
+          Initializing authentication ({elapsedSeconds}s)
+        </Text>
+        
+        {elapsedSeconds > 10 && (
+          <View style={{ marginTop: 20, padding: 15, backgroundColor: '#FFF3CD', borderRadius: 8, maxWidth: 300 }}>
+            <Text style={{ fontSize: 14, color: '#856404', fontWeight: '600', marginBottom: 8 }}>
+              ⚠️ Slow Connection Detected
+            </Text>
+            <Text style={{ fontSize: 12, color: '#856404', lineHeight: 18 }}>
+              Clerk is taking longer than expected to initialize. This usually indicates:{'\n\n'}
+              • Network connectivity issues{'\n'}
+              • DNS resolution problems{'\n'}
+              • Firewall/VPN blocking{'\n'}
+              • Slow internet connection{'\n\n'}
+              Please check your internet connection or try a different network.
+            </Text>
+          </View>
+        )}
+        
+        {loadingTimeout && (
+          <View style={{ marginTop: 20, padding: 15, backgroundColor: '#F8D7DA', borderRadius: 8, maxWidth: 300 }}>
+            <Text style={{ fontSize: 14, color: '#721C24', fontWeight: '600', marginBottom: 8 }}>
+              ❌ Connection Timeout
+            </Text>
+            <Text style={{ fontSize: 12, color: '#721C24', lineHeight: 18 }}>
+              Clerk failed to initialize after 10 seconds.{'\n\n'}
+              Troubleshooting steps:{'\n'}
+              1. Check your internet connection{'\n'}
+              2. Try a different network (WiFi/cellular){'\n'}
+              3. Disable VPN if active{'\n'}
+              4. Check firewall settings{'\n'}
+              5. Restart the app
+            </Text>
+          </View>
+        )}
       </View>
     );
   }
 
-  console.log('Auth state - isLoaded:', isLoaded, 'isSignedIn:', isSignedIn);
+  console.log('[AppNavigator] Auth state - isLoaded:', isLoaded, 'isSignedIn:', isSignedIn);
 
   return (
     <NavigationContainer ref={navigationRef}>
@@ -175,7 +255,10 @@ export default function AppNavigator() {
             <Stack.Screen
               name="Preferences"
               component={PreferencesScreen}
-              options={{ title: 'Preferences' }}
+              options={{ 
+                title: 'Preferences',
+                headerBackTitle: 'Settings'
+              }}
             />
             <Stack.Screen
               name="Notifications"

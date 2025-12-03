@@ -42,14 +42,31 @@ export default function DealsScreen() {
         return response.data || response;
       } catch (err: any) {
         console.error('❌ Failed to fetch email deals:', err);
+        
+        // Log detailed error information
+        if (err.response) {
+          console.error('Error response:', {
+            status: err.response.status,
+            statusText: err.response.statusText,
+            data: err.response.data,
+          });
+        }
+        
         // Check if it's a network error
         if (err.message?.includes('Network Error') || err.code === 'ERR_NETWORK') {
           console.warn('API server is not reachable. Please check your API URL configuration.');
         }
         // Check if it's an auth error
-        if (err.response?.status === 401) {
+        else if (err.response?.status === 401) {
           console.warn('⚠️ Authentication failed - user may need to sign in again');
         }
+        // Check if it's a server error (500)
+        else if (err.response?.status === 500) {
+          const errorMessage = err.response?.data?.error || err.message || 'Server error';
+          console.error('⚠️ Server error (500):', errorMessage);
+          console.warn('This may indicate an issue with the API server or database connection.');
+        }
+        
         // Return empty array on error instead of crashing
         return [];
       }
@@ -105,6 +122,8 @@ export default function DealsScreen() {
                 ? 'API Server Not Available' 
                 : error && (error as any)?.response?.status === 401
                 ? 'Authentication Required'
+                : error && (error as any)?.response?.status === 500
+                ? 'Server Error'
                 : 'No email deals yet'}
             </Text>
             <Text style={styles.emptySubtext}>
@@ -114,6 +133,8 @@ export default function DealsScreen() {
                 ? 'Please check your API URL configuration in app.json. The API server may not be running or reachable.'
                 : error && (error as any)?.response?.status === 401
                 ? 'Please sign in to access your email deals. You may need to sign in again.'
+                : error && (error as any)?.response?.status === 500
+                ? (error as any)?.response?.data?.error || 'The server encountered an error. Please try again later or contact support if the issue persists.'
                 : 'Connect your email to start receiving property deals'}
             </Text>
           </View>

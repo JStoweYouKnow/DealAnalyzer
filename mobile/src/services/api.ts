@@ -64,6 +64,7 @@ const createApiClient = (getToken?: () => Promise<string | null>): AxiosInstance
       'Content-Type': 'application/json',
     },
     timeout: 30000, // 30 seconds
+    withCredentials: true, // Include cookies in cross-origin requests
   });
   
   // Interceptor to add /api prefix to requests if using production URL

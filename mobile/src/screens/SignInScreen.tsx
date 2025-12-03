@@ -10,7 +10,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { useAuth, useSignIn } from '@clerk/clerk-expo';
+import { useAuth, useSignIn, useClerk } from '@clerk/clerk-expo';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
@@ -18,12 +18,31 @@ import { RootStackParamList } from '../types';
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function SignInScreen() {
-  const { setActive, isLoaded, isSignedIn } = useAuth();
+  const { setActive: setActiveFromAuth, isLoaded, isSignedIn } = useAuth();
+  const clerk = useClerk();
   const { signIn, isLoaded: signInLoaded } = useSignIn();
+  
+  // Try to get setActive from multiple sources
+  const setActive = setActiveFromAuth || clerk?.setActive || (clerk as any)?.__internal_setActive;
+  
+  // Log setActive availability
+  useEffect(() => {
+    if (isLoaded) {
+      console.log('[SignIn] setActive from useAuth:', typeof setActiveFromAuth === 'function');
+      console.log('[SignIn] setActive from useClerk:', typeof clerk?.setActive === 'function');
+      console.log('[SignIn] Final setActive available:', typeof setActive === 'function');
+      if (!setActive) {
+        console.error('[SignIn] ❌ setActive is NOT available - sign in will fail!');
+      }
+    }
+  }, [isLoaded, setActiveFromAuth, clerk, setActive]);
   const navigation = useNavigation<NavigationProp>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Get Clerk key for debugging
+  const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
 
   useEffect(() => {
     console.log('SignInScreen - Auth state:', { 
@@ -60,29 +79,105 @@ export default function SignInScreen() {
     setLoading(true);
     try {
       console.log('Attempting to sign in with email:', email);
-      console.log('signIn object:', signIn);
+      console.log('signIn object available:', !!signIn);
+      console.log('Clerk publishable key:', clerkPublishableKey?.substring(0, 20) + '...');
       
       if (!signIn.create) {
         throw new Error('signIn.create is not available. Clerk may not be properly initialized.');
       }
 
-      const result = await signIn.create({
+      // Create the sign-in attempt with identifier and password
+      // Clerk requires both for password-based authentication
+      console.log('Creating sign-in attempt for:', email.trim());
+      console.log('Using Clerk key:', clerkPublishableKey?.substring(0, 30) + '...');
+      
+      const createResult = await signIn.create({
         identifier: email.trim(),
-        password,
+        password: password,
       });
 
-      console.log('Sign in result status:', result.status);
+      console.log('Sign in create result:', {
+        status: createResult?.status,
+        _status: (createResult as any)?._status,
+        identifier: (createResult as any)?.identifier,
+        supportedFirstFactors: (createResult as any)?.supportedFirstFactors,
+        firstFactorVerification: (createResult as any)?.firstFactorVerification,
+      });
 
-      if (result.status === 'complete') {
-        console.log('Sign in complete, setting active session');
-        await setActive({ session: result.createdSessionId });
-        console.log('Session activated successfully');
+      // Check for errors first
+      const firstFactor = (createResult as any)?.firstFactorVerification;
+      if (firstFactor?.error) {
+        const errorMsg = firstFactor.error.message || firstFactor.error.longMessage || firstFactor.error.code || 'Sign in failed';
+        console.error('❌ Sign in error from firstFactorVerification:', errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      // If status is null or undefined, the sign-in attempt wasn't created properly
+      if (createResult.status === null || createResult.status === undefined) {
+        console.error('❌ Sign in result has no status. This usually means:');
+        console.error('   1. Account does not exist in this Clerk instance');
+        console.error('   2. Email/identifier is incorrect');
+        console.error('   3. Clerk instance configuration issue');
+        throw new Error('Account not found. Please check your email or sign up for a new account.');
+      }
+
+      // Check if we need to attempt first factor (password verification)
+      if (createResult.status === 'needs_first_factor') {
+        console.log('Password verification required, attempting first factor...');
+        
+        // Get the supported strategies
+        const supportedFactors = (createResult as any)?.supportedFirstFactors || [];
+        console.log('Supported first factors:', supportedFactors);
+        
+        // Find password strategy
+        const passwordStrategy = supportedFactors.find((f: any) => f.strategy === 'password');
+        if (!passwordStrategy) {
+          throw new Error('Password authentication not available. Please contact support.');
+        }
+        
+        // Attempt password verification
+        const attemptResult = await signIn.attemptFirstFactor({
+          strategy: 'password',
+          password,
+        });
+
+        console.log('First factor attempt result:', {
+          status: attemptResult?.status,
+          createdSessionId: attemptResult?.createdSessionId,
+        });
+
+        // Check for errors in attempt
+        const attemptFirstFactor = (attemptResult as any)?.firstFactorVerification;
+        if (attemptFirstFactor?.error) {
+          const errorMsg = attemptFirstFactor.error.message || attemptFirstFactor.error.longMessage || 'Password verification failed';
+          console.error('❌ Password verification error:', errorMsg);
+          throw new Error(errorMsg);
+        }
+
+        if (attemptResult.status === 'complete') {
+          console.log('✅ Sign in complete after password verification');
+          if (!attemptResult.createdSessionId) {
+            throw new Error('Session ID not created after verification. Please try again.');
+          }
+          await setActive({ session: attemptResult.createdSessionId });
+          console.log('✅ Session activated successfully');
+          return; // Success, exit early
+        } else {
+          throw new Error(`Password verification incomplete. Status: ${attemptResult.status}`);
+        }
+      }
+
+      if (createResult.status === 'complete') {
+        console.log('✅ Sign in complete, setting active session');
+        if (!createResult.createdSessionId) {
+          throw new Error('Session ID not created. Please try again.');
+        }
+        await setActive({ session: createResult.createdSessionId });
+        console.log('✅ Session activated successfully');
         // Navigation will automatically switch to MainTabs
-      } else if (result.status === 'needs_first_factor') {
-        // Handle multi-factor authentication if needed
-        Alert.alert('Additional Verification', 'Please complete additional verification steps.');
       } else {
-        Alert.alert('Error', `Sign in incomplete. Status: ${result.status}`);
+        console.warn('⚠️ Sign in incomplete. Status:', createResult.status);
+        Alert.alert('Error', `Sign in incomplete. Status: ${createResult.status}`);
       }
     } catch (error: any) {
       console.error('Sign in error:', error);

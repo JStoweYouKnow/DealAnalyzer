@@ -10,7 +10,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { useAuth, useSignUp } from '@clerk/clerk-expo';
+import { useAuth, useSignUp, useClerk } from '@clerk/clerk-expo';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
@@ -18,17 +18,29 @@ import { RootStackParamList } from '../types';
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function SignUpScreen() {
-  const auth = useAuth();
-  const { setActive, isLoaded } = auth || {};
+  const { isLoaded } = useAuth();
+  const clerk = useClerk();
   const { signUp, isLoaded: signUpLoaded } = useSignUp();
   
-  // Log available methods from useAuth
+  // Get setActive from useClerk (it's not in useAuth in this version)
+  const setActive = clerk?.setActive;
+
+  // Log available methods from useAuth and useClerk
   useEffect(() => {
     if (isLoaded) {
-      console.log('useAuth() returned:', Object.keys(auth || {}));
-      console.log('setActive available:', typeof setActive === 'function');
+      // Don't call useAuth() here - it's already called at the top level
+      console.log('[SignUp] useClerk() returned:', clerk ? Object.keys(clerk) : 'clerk is null');
+      console.log('[SignUp] setActive from useClerk:', typeof clerk?.setActive === 'function');
+      console.log('[SignUp] Final setActive available:', typeof setActive === 'function');
+      if (setActive) {
+        console.log('[SignUp] ✅ setActive is available from useClerk()');
+      } else {
+        console.error('[SignUp] ❌ setActive is NOT available from useClerk()!');
+        console.error('[SignUp] Clerk object:', clerk);
+        console.error('[SignUp] This is a critical issue. Check Clerk configuration.');
+      }
     }
-  }, [isLoaded, auth, setActive]);
+  }, [isLoaded, clerk, setActive]);
   const navigation = useNavigation<NavigationProp>();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -67,16 +79,121 @@ export default function SignUpScreen() {
 
     setLoading(true);
     try {
+      console.log('[SignUp] Creating account with:', {
+        email: email.trim(),
+        username: username.trim(),
+        hasPassword: !!password,
+      });
+
       const result = await signUp.create({
         emailAddress: email.trim(),
         username: username.trim(),
         password,
       });
 
-      // Send email verification code
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      console.log('[SignUp] Account creation result:', {
+        status: result.status,
+        createdSessionId: result.createdSessionId,
+        supportedFirstFactors: (result as any)?.supportedFirstFactors,
+      });
 
-      if (result.status === 'complete') {
+      // Check what verification is needed
+      console.log('[SignUp] Checking verification requirements...');
+      console.log('[SignUp] Result status:', result.status);
+      console.log('[SignUp] SignUp status:', signUp.status);
+      console.log('[SignUp] Missing fields:', signUp.missingFields);
+      console.log('[SignUp] Unverified fields:', signUp.unverifiedFields);
+      console.log('[SignUp] Supported first factors:', (result as any)?.supportedFirstFactors);
+      
+      // Check if email verification is needed
+      const needsEmailVerification = 
+        result.status === 'missing_requirements' ||
+        result.status === 'missing_fields' ||
+        signUp.unverifiedFields?.includes('email_address') ||
+        signUp.missingFields?.includes('email_address');
+
+      if (needsEmailVerification || result.status !== 'complete') {
+        try {
+          console.log('[SignUp] Preparing email verification...');
+          console.log('[SignUp] Email address:', email.trim());
+          console.log('[SignUp] Strategy: email_code');
+          console.log('[SignUp] Network check - testing connectivity...');
+          
+          // Prepare email verification with timeout
+          const verifyPromise = signUp.prepareEmailAddressVerification({ 
+            strategy: 'email_code' 
+          });
+          
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Email verification request timed out after 30 seconds. This may indicate a network or DNS issue.')), 30000);
+          });
+          
+          let verifyResult;
+          try {
+            verifyResult = await Promise.race([verifyPromise, timeoutPromise]);
+            console.log('[SignUp] ✅ Email verification preparation result:', verifyResult);
+            console.log('[SignUp] ✅ Email verification code should be sent to:', email.trim());
+            console.log('[SignUp] ✅ Network connectivity confirmed - request completed successfully');
+          } catch (timeoutError: any) {
+            if (timeoutError.message.includes('timed out')) {
+              console.error('[SignUp] ❌ Network/DNS Issue: Request timed out');
+              console.error('[SignUp] This could indicate:');
+              console.error('  1. DNS resolution problem');
+              console.error('  2. Network connectivity issue');
+              console.error('  3. Firewall blocking Clerk servers');
+              console.error('  4. Slow network connection');
+              throw new Error('Network timeout: Unable to reach Clerk servers. Please check your internet connection and try again.');
+            }
+            throw timeoutError;
+          }
+          
+          // Check if code was actually sent
+          const emailVerification = signUp.emailAddress || (signUp as any).emailAddresses?.[0];
+          console.log('[SignUp] Email verification status:', {
+            email: emailVerification?.emailAddress,
+            verified: emailVerification?.verification?.status,
+            strategy: emailVerification?.verification?.strategy,
+          });
+          
+          // Show verification code input
+          setNeedsVerification(true);
+          Alert.alert(
+            'Verification Code Sent',
+            `A verification code has been sent to:\n${email.trim()}\n\nPlease check your email (including spam folder) and enter the code below.`
+          );
+          return; // Exit early after showing verification screen
+        } catch (verifyError: any) {
+          console.error('[SignUp] ❌ Error preparing email verification:', verifyError);
+          console.error('[SignUp] Full error object:', JSON.stringify(verifyError, null, 2));
+          console.error('[SignUp] Error details:', {
+            message: verifyError.message,
+            errors: verifyError.errors,
+            code: verifyError.code,
+            status: verifyError.status,
+            name: verifyError.name,
+            stack: verifyError.stack,
+          });
+          
+          let errorMsg = verifyError.errors?.[0]?.message || 
+                        verifyError.message || 
+                        'Failed to send verification code.';
+          
+          // Add more context to error message
+          if (errorMsg.includes('email') && errorMsg.includes('not')) {
+            errorMsg += '\n\nPlease check:\n1. Email verification is enabled in Clerk dashboard\n2. Email provider is configured\n3. Your email address is valid';
+          } else if (errorMsg.includes('network') || errorMsg.includes('connection')) {
+            errorMsg += '\n\nPlease check your internet connection and try again.';
+          }
+          
+          Alert.alert(
+            'Verification Code Error',
+            errorMsg
+          );
+          return;
+        }
+      } else if (result.status === 'complete') {
+        // Account created without verification needed
+        console.log('[SignUp] ✅ Account created without email verification');
         if (setActive && typeof setActive === 'function') {
           await setActive({ session: result.createdSessionId });
         } else {
@@ -87,16 +204,30 @@ export default function SignUpScreen() {
           );
           navigation.navigate('SignIn');
         }
-      } else {
-        // Show verification code input
-        setNeedsVerification(true);
-        Alert.alert(
-          'Verification Code Sent',
-          'Please check your email and enter the verification code below.'
-        );
       }
     } catch (error: any) {
-      Alert.alert('Error', error.errors?.[0]?.message || 'Failed to sign up');
+      console.error('[SignUp] ❌ Sign up error:', error);
+      console.error('[SignUp] Error details:', {
+        message: error.message,
+        errors: error.errors,
+        code: error.code,
+        status: error.status,
+      });
+      
+      let errorMessage = error.errors?.[0]?.message || 
+                        error.message || 
+                        'Failed to sign up. Please try again.';
+      
+      // Make error messages more user-friendly
+      if (errorMessage.includes('email') && errorMessage.includes('already')) {
+        errorMessage = 'An account with this email already exists. Please sign in instead.';
+      } else if (errorMessage.includes('username') && errorMessage.includes('already')) {
+        errorMessage = 'This username is already taken. Please choose another.';
+      } else if (errorMessage.includes('email') && errorMessage.includes('invalid')) {
+        errorMessage = 'Please enter a valid email address.';
+      }
+      
+      Alert.alert('Sign Up Failed', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -296,15 +427,35 @@ export default function SignUpScreen() {
     }
 
     try {
-      console.log('Resending verification code to:', email);
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-      Alert.alert('Code Resent', 'A new verification code has been sent to your email.');
+      console.log('[SignUp] Resending verification code to:', email);
+      console.log('[SignUp] Current signUp status:', signUp.status);
+      console.log('[SignUp] Email address:', signUp.emailAddress);
+      
+      const result = await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      console.log('[SignUp] ✅ Resend code result:', result);
+      console.log('[SignUp] ✅ New verification code should be sent to:', email);
+      
+      Alert.alert(
+        'Code Resent', 
+        `A new verification code has been sent to:\n${email}\n\nPlease check your email (including spam folder).`
+      );
       setVerificationCode('');
     } catch (error: any) {
-      console.error('Resend code error:', error);
-      const errorMessage = error.errors?.[0]?.message || 
-                           error.message || 
-                           'Failed to resend code. Please try again.';
+      console.error('[SignUp] ❌ Resend code error:', error);
+      console.error('[SignUp] Error details:', {
+        message: error.message,
+        errors: error.errors,
+        code: error.code,
+      });
+      
+      let errorMessage = error.errors?.[0]?.message || 
+                         error.message || 
+                         'Failed to resend code. Please try again.';
+      
+      if (errorMessage.includes('rate limit') || errorMessage.includes('too many')) {
+        errorMessage = 'Too many requests. Please wait a few minutes before requesting another code.';
+      }
+      
       Alert.alert('Error', errorMessage);
     }
   };

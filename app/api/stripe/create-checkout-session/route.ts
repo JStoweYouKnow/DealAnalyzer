@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
     const plan = PLANS[planId as keyof typeof PLANS];
     const baseUrl = process.env.NEXT_PUBLIC_APP_DOMAIN || 
                    request.headers.get("origin") || 
-                   "https://comfort-finder-analyzer.vercel.app";
+                   "https://comfortfinder.projcomfort.com";
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({

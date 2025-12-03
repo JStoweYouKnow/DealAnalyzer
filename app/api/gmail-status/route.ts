@@ -100,8 +100,14 @@ export async function GET(request: NextRequest) {
     let isConnected = false;
     let tokenSource: 'cookie' | 'database' | 'none' = 'none';
     
-    // Check if cookie exists and contains valid tokens
-    if (gmailTokensCookie) {
+    // For mobile apps, cookies might not be accessible, so always check database if userId is available
+    // For web apps, check cookies first for faster response
+    const isMobileRequest = request.headers.get('user-agent')?.includes('Mobile') || 
+                           request.headers.get('origin')?.includes('localhost') ||
+                           !gmailTokensCookie; // If no cookie, likely mobile
+    
+    // Check if cookie exists and contains valid tokens (for web requests)
+    if (gmailTokensCookie && !isMobileRequest) {
       try {
         const tokens = JSON.parse(gmailTokensCookie.value);
         // Validate that tokens exist and are not empty
@@ -112,7 +118,7 @@ export async function GET(request: NextRequest) {
             tokens.refresh_token.trim() !== '') {
           isConnected = true;
           tokenSource = 'cookie';
-          console.log('[Gmail Status Check] Valid tokens found in cookie');
+          console.log('[Gmail Status Check] ✅ Valid tokens found in cookie');
         } else {
           console.log('[Gmail Status Check] Cookie exists but tokens are invalid/empty');
         }
@@ -121,10 +127,11 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // If no valid cookie but we have userId, check database
+    // Always check database if userId is available (especially for mobile apps)
     // SECURITY: Use server-side action to retrieve tokens - never expose tokens to clients
     if (!isConnected && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
       try {
+        console.log('[Gmail Status Check] Checking database for tokens, userId:', userId.substring(0, 20) + '...');
         const { ConvexHttpClient } = await import('convex/browser');
         const apiModule = await import('../../../convex/_generated/api');
         const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
@@ -133,6 +140,12 @@ export async function GET(request: NextRequest) {
         // This ensures tokens are never exposed to client code
         const dbTokens = await convexClient.action(apiModule.api.userOAuthTokens.retrieveTokensForServer, { userId });
         
+        console.log('[Gmail Status Check] Database query result:', {
+          hasDbTokens: !!dbTokens,
+          hasAccessToken: !!dbTokens?.accessToken,
+          hasRefreshToken: !!dbTokens?.refreshToken,
+        });
+        
         if (dbTokens && 
             dbTokens.accessToken && 
             dbTokens.accessToken.trim() !== '' &&
@@ -140,7 +153,7 @@ export async function GET(request: NextRequest) {
             dbTokens.refreshToken.trim() !== '') {
           isConnected = true;
           tokenSource = 'database';
-          console.log('[Gmail Status Check] Valid tokens found in database');
+          console.log('[Gmail Status Check] ✅ Valid tokens found in database');
           
           // Refresh the cookie with tokens from database for faster access next time
           // SECURITY: Tokens are stored in httpOnly cookie, not exposed to client JavaScript
@@ -162,11 +175,19 @@ export async function GET(request: NextRequest) {
           
           console.log('[Gmail Status Check] Refreshed cookie with tokens from database');
         } else {
-          console.log('[Gmail Status Check] No valid tokens in database');
+          console.log('[Gmail Status Check] ⚠️ No valid tokens in database', {
+            dbTokens: dbTokens ? 'exists but missing tokens' : 'null/undefined',
+          });
         }
       } catch (error) {
-        console.error('[Gmail Status Check] Error checking database:', error);
+        console.error('[Gmail Status Check] ❌ Error checking database:', error);
+        console.error('[Gmail Status Check] Error details:', {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
       }
+    } else if (!isConnected && !userId) {
+      console.log('[Gmail Status Check] ⚠️ No userId available - cannot check database');
     }
 
     console.log('[Gmail Status Check]', {
@@ -175,8 +196,14 @@ export async function GET(request: NextRequest) {
       hasCookie: !!gmailTokensCookie,
       cookieExists: !!gmailTokensCookie,
       cookieValue: gmailTokensCookie ? 'PRESENT' : 'MISSING',
-      userId: userId ? 'PRESENT' : 'MISSING',
-      hasConvexUrl: !!process.env.NEXT_PUBLIC_CONVEX_URL
+      userId: userId ? userId.substring(0, 20) + '...' : 'MISSING',
+      hasConvexUrl: !!process.env.NEXT_PUBLIC_CONVEX_URL,
+      requestOrigin: request.headers.get('origin'),
+      requestHost: request.headers.get('host'),
+      cookieHasTokens: gmailTokensCookie ? {
+        hasAccess: !!JSON.parse(gmailTokensCookie.value || '{}').access_token,
+        hasRefresh: !!JSON.parse(gmailTokensCookie.value || '{}').refresh_token,
+      } : null,
     });
 
     return NextResponse.json({

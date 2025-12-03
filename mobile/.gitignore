@@ -61,5 +61,9 @@ web-build/
 .env.local
 .env.*.local
 
+# App Store Connect API Key (sensitive)
+asc-api-key.p8
+*.p8
+
 # TypeScript
 *.tsbuildinfo

@@ -27,8 +27,16 @@ const nextConfig = {
     ],
   },
   images: {
-    domains: ['images.unsplash.com', 'maps.googleapis.com'],
+    // domains is deprecated in Next.js 16 - use remotePatterns instead
     remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'maps.googleapis.com',
+      },
       {
         protocol: 'https',
         hostname: '**',
@@ -77,6 +85,7 @@ const nextConfig = {
       },
     ];
   },
+  // Webpack config for Leaflet fallbacks (used when --webpack flag is set)
   webpack: (config, { isServer, webpack }) => {
     // Fix for Leaflet in serverless environments
     // Only apply to client builds (not server-side)
@@ -96,8 +105,15 @@ const nextConfig = {
     
     return config;
   },
+  // Turbopack config for Next.js 16 (Turbopack is default in Next.js 16)
+  // Add empty config to silence the warning, or migrate webpack config here
+  turbopack: {
+    // Turbopack handles most cases automatically, but we can add config here if needed
+    // For now, empty config allows builds to proceed with Turbopack
+    // If you need the webpack fallbacks, use --webpack flag: npm run build:next -- --webpack
+  },
   // Path aliases are configured in tsconfig.json
-  // Webpack will automatically use them
+  // Both webpack and Turbopack will automatically use them
 };
 
 // Wrap with bundle analyzer if ANALYZE env var is set

@@ -1,10 +1,12 @@
 import 'react-native-url-polyfill/auto';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text } from 'react-native';
+import { View, Text, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import * as SecureStore from 'expo-secure-store';
+import * as Linking from 'expo-linking';
+import { useEffect } from 'react';
 
 // Create a token cache for Clerk using SecureStore
 const tokenCache = {
@@ -28,21 +30,44 @@ import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import Constants from 'expo-constants';
 import AppNavigator from './src/navigation/AppNavigator';
 
-// Get Clerk publishable key from environment
-const clerkPublishableKey = Constants.expoConfig?.extra?.clerkPublishableKey || 
-  process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
+// Get environment variables (prioritize EXPO_PUBLIC_ env vars for security)
+const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  Constants.expoConfig?.extra?.clerkPublishableKey || '';
 
-// Get Convex URL from environment
-const convexUrl = Constants.expoConfig?.extra?.convexUrl || 
-  process.env.EXPO_PUBLIC_CONVEX_URL || '';
+const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL ||
+  Constants.expoConfig?.extra?.convexUrl || '';
 
-// Validate Clerk key
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ||
+  Constants.expoConfig?.extra?.apiUrl || '';
+
+// Validate configuration
 if (!clerkPublishableKey || clerkPublishableKey.trim() === '') {
   console.error('❌ Clerk publishable key is not configured. Authentication will not work.');
-  console.error('Please set clerkPublishableKey in app.json extra section.');
+  console.error('Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in eas.json or .env file');
 } else {
-  console.log('✅ Clerk publishable key is configured');
+  const keyType = clerkPublishableKey.startsWith('pk_live') ? 'PRODUCTION' : 'TEST';
+  console.log(`✅ Clerk ${keyType} key configured`);
+
+  // Warn if using test key in production build
+  if (keyType === 'TEST' && process.env.NODE_ENV === 'production') {
+    console.warn('⚠️ WARNING: Using TEST Clerk key in production build!');
+  }
 }
+
+if (!convexUrl) {
+  console.warn('⚠️ Convex URL not configured. Database features may not work.');
+}
+
+if (!apiUrl) {
+  console.warn('⚠️ API URL not configured. Some features may not work.');
+}
+
+// Export for use in other parts of the app
+export const CONFIG = {
+  clerkPublishableKey,
+  convexUrl,
+  apiUrl,
+};
 
 // Create Convex client only if URL is provided
 // If not provided, Convex will be disabled (components should handle this gracefully)
@@ -62,6 +87,71 @@ const queryClient = new QueryClient({
 });
 
 export default function App() {
+  // Log configuration on startup
+  useEffect(() => {
+    console.log('[App] ========== INITIALIZATION ==========');
+    console.log('[App] Initializing...');
+    console.log('[App] Clerk key loaded:', !!clerkPublishableKey);
+    console.log('[App] Clerk key type:', clerkPublishableKey?.startsWith('pk_live') ? 'PRODUCTION' : 'TEST');
+    console.log('[App] Clerk key length:', clerkPublishableKey?.length);
+    console.log('[App] Clerk key preview:', clerkPublishableKey?.substring(0, 30) + '...');
+    console.log('[App] Full Clerk key:', clerkPublishableKey);
+    console.log('[App] Platform:', Platform.OS);
+    console.log('[App] Is Expo Go:', __DEV__ && !Constants.expoConfig?.ios?.bundleIdentifier);
+    console.log('[App] ====================================');
+    
+    // Test network connectivity from mobile app
+    if (clerkPublishableKey) {
+      console.log('[App] Testing network connectivity to Clerk...');
+      fetch('https://clerk.com', { method: 'HEAD', mode: 'no-cors' })
+        .then(() => {
+          console.log('[App] ✅ Network connectivity test: SUCCESS');
+        })
+        .catch((error) => {
+          console.error('[App] ❌ Network connectivity test: FAILED', error);
+        });
+    }
+  }, []);
+
+  // Handle deep links for Gmail OAuth callback
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      const { url } = event;
+      console.log('[Deep Link] Received:', url);
+      
+      // Handle Gmail OAuth callback
+      if (url.includes('gmail-callback')) {
+        const urlObj = Linking.parse(url);
+        console.log('[Deep Link] Gmail callback detected:', {
+          url,
+          queryParams: urlObj.queryParams,
+          success: urlObj.queryParams?.success,
+        });
+        
+        if (urlObj.queryParams?.success === 'true') {
+          console.log('[Deep Link] ✅ Gmail OAuth successful, status will be refreshed');
+          // The EmailSettingsScreen will automatically refetch status when it comes into focus
+        } else {
+          console.log('[Deep Link] Gmail callback received but success param not set');
+        }
+      }
+    };
+
+    // Listen for deep links when app is already open
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Check if app was opened via deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   // Ensure we have a valid publishable key before rendering ClerkProvider
   if (!clerkPublishableKey || clerkPublishableKey.trim() === '') {
     return (
@@ -76,10 +166,39 @@ export default function App() {
     );
   }
 
+  // Validate key format before passing to ClerkProvider
+  const trimmedKey = clerkPublishableKey.trim();
+  if (!trimmedKey.startsWith('pk_')) {
+    console.error('[App] ❌ Invalid Clerk key format. Key must start with "pk_"');
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Text style={{ color: 'red', fontSize: 16, textAlign: 'center' }}>
+            Error: Invalid Clerk publishable key format.{'\n'}
+            Key must start with "pk_"
+          </Text>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
+  console.log('[App] Rendering ClerkProvider with key:', trimmedKey.substring(0, 30) + '...');
+  console.log('[App] Key validation:', {
+    startsWithPk: trimmedKey.startsWith('pk_'),
+    isProduction: trimmedKey.startsWith('pk_live'),
+    keyLength: trimmedKey.length,
+    keyPreview: trimmedKey.substring(0, 50) + '...',
+  });
+
+  // Try to validate the key format more thoroughly
+  if (trimmedKey.length < 50) {
+    console.error('[App] ❌ Clerk key seems too short. Expected 50+ characters, got:', trimmedKey.length);
+  }
+
   return (
     <SafeAreaProvider>
-      <ClerkProvider 
-        publishableKey={clerkPublishableKey.trim()}
+      <ClerkProvider
+        publishableKey={trimmedKey}
         tokenCache={tokenCache}
       >
         <ConvexProvider client={convex}>

@@ -1,5 +1,6 @@
 {
   "expo": {
+    "owner": "project-comfort-dev",
     "name": "The Comfort Finder",
     "slug": "deal-analyzer-mobile",
     "version": "1.0.0",
@@ -18,17 +19,23 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select property images for analysis.",
         "NSCameraUsageDescription": "This app needs access to your camera to take photos of property documents."
+      },
+      "associatedDomains": ["applinks:comfortfinder.projcomfort.com"],
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
+    "scheme": "dealanalyzer",
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#6B806B"
       },
       "package": "com.comfortfinder.dealanalyzer",
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -50,9 +57,10 @@
       "expo-font"
     ],
     "extra": {
-      "clerkPublishableKey": "pk_test_c3BlY2lhbC1ib2FyLTE3LmNsZXJrLmFjY291bnRzLmRldiQ",
-      "convexUrl": "https://mild-bullfrog-475.convex.cloud",
-      "apiUrl": "https://comfort-finder-analyzer.vercel.app"
+      "eas": {
+        "projectId": "256e912e-3a30-479d-8524-c2c92a08f80a"
+      },
+      "clerkPublishableKey": "pk_live_Y2xlcmsuY29tZm9ydGZpbmRlci5wcm9qY29tZm9ydC5jb20k"
     }
   }
 }

@@ -34,6 +34,7 @@ const safePublicRoutes = [
   '/terms',
   '/api/health',               // Health check - monitoring
   '/api/gmail-callback',       // OAuth callback - required for Gmail auth
+  '/api/gmail-callback/test',  // Test endpoint for callback route verification
   '/api/receive-email',        // SendGrid webhook - email forwarding
   '/api/stripe/webhook',       // Stripe webhook - payment processing (must be public for Stripe to call)
   '/api/og-image',             // Open Graph images - social sharing (query params only)
@@ -167,9 +168,14 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   const pathname = request.nextUrl.pathname;
   const method = request.method;
   
-  // Explicitly check for /api/criteria GET requests FIRST (before any other checks)
-  // This ensures criteria endpoint is always accessible for GET requests
+  // Explicitly check for public API endpoints FIRST (before any other checks)
+  // This ensures these endpoints are always accessible
   if (pathname === '/api/criteria' && method === 'GET') {
+    return NextResponse.next();
+  }
+  
+  // Allow gmail-callback routes (including test endpoint) through without authentication
+  if (pathname.startsWith('/api/gmail-callback')) {
     return NextResponse.next();
   }
   

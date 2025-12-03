@@ -9,6 +9,7 @@ import {
   Linking,
   Switch,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
@@ -17,13 +18,35 @@ import { Input } from '../components/ui/Input';
 import { useAuth } from '@clerk/clerk-expo';
 import { useApiClient } from '../services/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 export default function EmailSettingsScreen() {
   const { user } = useAuth();
   const authenticatedClient = useApiClient();
   const queryClient = useQueryClient();
+  const navigation = useNavigation();
   const [isConnecting, setIsConnecting] = useState(false);
+  
+  // Hide tab bar when this screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.setOptions({
+          tabBarStyle: { display: 'none' },
+        });
+      }
+      
+      // Show tab bar again when screen is unfocused
+      return () => {
+        if (parent) {
+          parent.setOptions({
+            tabBarStyle: undefined,
+          });
+        }
+      };
+    }, [navigation])
+  );
   const [emailSettings, setEmailSettings] = useState({
     forwardingEmail: user?.emailAddresses[0]?.emailAddress || '',
     autoForward: false,
@@ -35,13 +58,92 @@ export default function EmailSettingsScreen() {
   const { data: gmailStatus, isLoading: isLoadingStatus, refetch: refetchStatus } = useQuery({
     queryKey: ['gmail-status'],
     queryFn: async () => {
+      // Default return value to ensure we never return undefined
+      const defaultResult = { success: false, connected: false };
+      
       try {
+        console.log('[Gmail Status] Fetching status...');
+        console.log('[Gmail Status] User available:', !!user);
+        console.log('[Gmail Status] Authenticated client:', !!authenticatedClient);
+        
         const response = await authenticatedClient.get('/gmail-status');
-        console.log('[Gmail Status] API response:', response.data);
-        return response.data;
+        
+        // If response is falsy, return default
+        if (!response) {
+          console.warn('[Gmail Status] No response received, returning default');
+          return defaultResult;
+        }
+        
+        // Log the raw response for debugging
+        console.log('[Gmail Status] Raw response:', {
+          response: response,
+          responseType: typeof response,
+          isAxiosResponse: response?.status !== undefined,
+          status: response?.status,
+          statusText: response?.statusText,
+          headers: response?.headers,
+        });
+        
+        // Handle different response structures
+        // Axios wraps the response in response.data, but sometimes the data might be the response itself
+        let responseData = response;
+        if (response && typeof response === 'object' && 'data' in response) {
+          responseData = response.data;
+        } else if (response && typeof response === 'object' && 'status' in response) {
+          // This is an axios response object, get the data
+          responseData = (response as any).data;
+        }
+        
+        console.log('[Gmail Status] Extracted response data:', {
+          responseData,
+          responseDataType: typeof responseData,
+          responseDataKeys: responseData ? Object.keys(responseData) : [],
+          isArray: Array.isArray(responseData),
+        });
+        
+        // Ensure we return a valid object
+        if (!responseData || typeof responseData !== 'object') {
+          console.warn('[Gmail Status] Invalid response format, returning default. ResponseData:', responseData);
+          return defaultResult;
+        }
+        
+        // Validate the response has expected structure
+        const result = {
+          success: responseData.success !== undefined ? responseData.success : true,
+          connected: responseData.connected === true,
+          error: responseData.error,
+        };
+        
+        console.log('[Gmail Status] Parsed result:', result);
+        
+        // Final safety check - ensure we never return undefined
+        return result || defaultResult;
       } catch (error: any) {
-        console.error('Error checking Gmail status:', error);
-        return { success: false, connected: false };
+        console.error('[Gmail Status] Error checking Gmail status:', error);
+        // Log detailed error information
+        if (error.response) {
+          console.error('[Gmail Status] Error response details:', {
+            status: error.response.status,
+            statusText: error.response.statusText,
+            data: error.response.data,
+            headers: error.response.headers,
+          });
+        } else if (error.request) {
+          console.error('[Gmail Status] No response received:', {
+            message: error.message,
+            code: error.code,
+          });
+        } else {
+          console.error('[Gmail Status] Request setup error:', error.message);
+        }
+        // Return default disconnected state on error
+        const errorResult = { 
+          success: false, 
+          connected: false, 
+          error: error.response?.data?.error || error.message 
+        };
+        console.log('[Gmail Status] Returning error result:', errorResult);
+        return errorResult;
       }
     },
     refetchInterval: isConnecting ? 2000 : false,
@@ -50,33 +152,73 @@ export default function EmailSettingsScreen() {
     gcTime: 0, // Don't cache to ensure fresh data (React Query v5 uses gcTime instead of cacheTime)
     refetchOnMount: true, // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window regains focus
+    retry: 1, // Retry once on failure
+    retryDelay: 1000, // Wait 1 second before retry
+    // Provide a default value to prevent undefined
+    placeholderData: { success: false, connected: false },
   });
 
-  const isConnected = gmailStatus?.connected === true;
+  // Safely extract connection status with fallback
+  // Use nullish coalescing to ensure we always have a boolean
+  const isConnected = (gmailStatus?.connected === true) ?? false;
   
   // Log status changes for debugging
   React.useEffect(() => {
     console.log('[Gmail Status] Status changed:', {
       connected: isConnected,
       isLoading: isLoadingStatus,
+      hasData: !!gmailStatus,
       data: gmailStatus,
+      dataType: typeof gmailStatus,
+      dataKeys: gmailStatus ? Object.keys(gmailStatus) : [],
     });
+    
+    // Warn if data is undefined but not loading
+    if (!isLoadingStatus && !gmailStatus) {
+      console.warn('[Gmail Status] ⚠️ Status data is undefined after loading completed');
+    }
   }, [isConnected, isLoadingStatus, gmailStatus]);
 
   // Refetch status when screen comes into focus (e.g., after OAuth redirect)
   useFocusEffect(
     React.useCallback(() => {
       if (user && !isConnecting) {
+        console.log('[Gmail Status] Screen focused, will refetch status...');
         // Small delay to ensure OAuth callback has processed
         const timer = setTimeout(() => {
-          console.log('[Gmail Status] Screen focused, refetching status...');
+          console.log('[Gmail Status] Refetching status after focus...');
+          // Clear cache and force refetch
           queryClient.removeQueries({ queryKey: ['gmail-status'] });
           refetchStatus();
-        }, 500);
+        }, 1000); // Increased delay to ensure callback has processed
+        
+        // Also refetch immediately in case the delay isn't needed
+        refetchStatus();
+        
         return () => clearTimeout(timer);
       }
     }, [user, isConnecting, queryClient, refetchStatus])
   );
+  
+  // Also listen for app state changes to refetch when app comes to foreground
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active' && user && !isConnecting) {
+        console.log('[Gmail Status] App became active, refetching status...');
+        // Refetch status when app comes to foreground (e.g., after OAuth)
+        setTimeout(() => {
+          queryClient.removeQueries({ queryKey: ['gmail-status'] });
+          refetchStatus();
+        }, 500);
+      }
+    };
+    
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      subscription.remove();
+    };
+  }, [user, isConnecting, queryClient, refetchStatus]);
 
   const handleConnectGmail = async () => {
     if (isConnecting) return;
@@ -92,58 +234,73 @@ export default function EmailSettingsScreen() {
         throw new Error('Failed to get Gmail authorization URL');
       }
 
-      // Open the OAuth URL in the browser
-      const result = await WebBrowser.openAuthSessionAsync(
-        authUrl,
-        'dealanalyzer://gmail-callback'
-      );
+      // Parse and log the redirect URI from the auth URL
+      let redirectUriFromAuth = 'unknown';
+      try {
+        const urlObj = new URL(authUrl);
+        redirectUriFromAuth = urlObj.searchParams.get('redirect_uri') || 'not found in URL';
+      } catch (e) {
+        console.warn('[Gmail Connect] Could not parse auth URL:', e);
+      }
+      
+      console.log('[Gmail Connect] Opening OAuth URL...', { 
+        authUrlLength: authUrl.length,
+        authUrlPreview: authUrl.substring(0, 100) + '...',
+        redirectUri: redirectUriFromAuth,
+        fullAuthUrl: authUrl, // Log full URL for debugging
+      });
+      
+      // Use WebBrowser.openAuthSessionAsync for proper OAuth flow
+      // This creates an in-app browser that properly handles OAuth redirects
+      try {
+        console.log('[Gmail Connect] Opening OAuth session with WebBrowser.openAuthSessionAsync...');
 
-      // Check if user completed the auth flow
-      if (result.type === 'success' || result.type === 'dismiss') {
-        // Wait a moment for the server to process the callback
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Force a complete refetch by removing from cache and refetching
-        queryClient.removeQueries({ queryKey: ['gmail-status'] });
-        const { data: statusData } = await refetchStatus();
-        
-        console.log('[Gmail Connect] Initial status check:', statusData);
-        
-        if (statusData?.connected) {
-          Alert.alert('Success', 'Gmail account connected successfully!');
-          // Force UI update by removing and refetching
-          queryClient.removeQueries({ queryKey: ['gmail-status'] });
-          await refetchStatus();
-        } else {
-          // Poll a few more times in case the server is still processing
-          let attempts = 0;
-          const maxAttempts = 5;
-          let connected = false;
-          
-          while (attempts < maxAttempts && !connected) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            // Remove from cache and force fresh fetch
+        const result = await WebBrowser.openAuthSessionAsync(authUrl, 'dealanalyzer://gmail-callback');
+
+        console.log('[Gmail Connect] WebBrowser result:', result);
+
+        if (result.type === 'success') {
+          console.log('[Gmail Connect] ✅ OAuth completed successfully');
+          console.log('[Gmail Connect] Redirect URL:', result.url);
+
+          // The redirect URL should be dealanalyzer://gmail-callback?success=true
+          // This will automatically trigger our deep link handler in App.tsx
+
+          // Force a status check after successful OAuth
+          setTimeout(() => {
+            console.log('[Gmail Connect] Forcing status check after successful OAuth...');
             queryClient.removeQueries({ queryKey: ['gmail-status'] });
-            const { data: pollData } = await refetchStatus();
-            console.log('[Gmail Connect] Poll attempt', attempts + 1, ':', pollData);
-            connected = pollData?.connected === true;
-            attempts++;
-          }
-          
-          if (connected) {
-            Alert.alert('Success', 'Gmail account connected successfully!');
-            // Final removal and refetch to ensure UI updates
-            queryClient.removeQueries({ queryKey: ['gmail-status'] });
-            await refetchStatus();
-          } else {
-            Alert.alert(
-              'Connection Status',
-              'Please check if the authorization completed. You can verify the connection status below.'
-            );
-          }
+            refetchStatus();
+          }, 1000);
+
+          Alert.alert(
+            'Gmail Connected!',
+            'Your Gmail account has been successfully connected. Deal notifications will be sent to your email.',
+            [{ text: 'OK' }]
+          );
+        } else if (result.type === 'cancel') {
+          console.log('[Gmail Connect] User cancelled OAuth');
+          Alert.alert(
+            'Authorization Cancelled',
+            'Gmail authorization was cancelled. You can try again when ready.',
+            [{ text: 'OK' }]
+          );
+        } else if (result.type === 'dismiss') {
+          console.log('[Gmail Connect] Browser dismissed');
+          Alert.alert(
+            'Authorization Incomplete',
+            'The authorization browser was closed. Please try again.',
+            [{ text: 'OK' }]
+          );
         }
-      } else if (result.type === 'cancel') {
-        Alert.alert('Cancelled', 'Gmail connection was cancelled.');
+      } catch (webBrowserError: any) {
+        console.error('[Gmail Connect] Error with WebBrowser:', webBrowserError);
+        Alert.alert(
+          'Error',
+          'Failed to open browser for authorization. Please check your internet connection and try again.',
+          [{ text: 'OK' }]
+        );
+        return;
       }
     } catch (error: any) {
       console.error('Error connecting Gmail:', error);

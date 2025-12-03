@@ -127,7 +127,7 @@ export default function PrivacyPage() {
           </p>
           <ul className="list-none space-y-1">
             <li><strong>Email</strong>: support@yourdomain.com</li>
-            <li><strong>Website</strong>: https://comfort-finder-analyzer.vercel.app</li>
+            <li><strong>Website</strong>: https://comfortfinder.projcomfort.com</li>
           </ul>
         </section>
       </div>

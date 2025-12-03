@@ -28,12 +28,62 @@ export default function SubscriptionScreen() {
   const apiClient = useApiClient();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
+  // Fallback plans in case the API is unavailable or not yet configured
+  const FALLBACK_PLANS: Plan[] = [
+    {
+      id: 'basic',
+      name: 'Basic',
+      amount: 9.99,
+      features: [
+        'Up to 10 property analyses per month',
+        'Email deal monitoring',
+        'Basic market intelligence',
+        'Standard support',
+      ],
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      amount: 29.99,
+      features: [
+        'Unlimited property analyses',
+        'Email deal monitoring',
+        'Advanced market intelligence',
+        'Neighborhood trends',
+        'Property comparison',
+        'Priority support',
+      ],
+    },
+    {
+      id: 'enterprise',
+      name: 'Enterprise',
+      amount: 99.99,
+      features: [
+        'Everything in Pro',
+        'API access',
+        'Custom integrations',
+        'Dedicated account manager',
+        'SLA guarantee',
+      ],
+    },
+  ];
+
   // Fetch available plans
   const { data: plansData, isLoading: isLoadingPlans } = useQuery({
     queryKey: ['stripe-plans'],
     queryFn: async () => {
-      const response = await apiClient.get('/api/stripe/create-checkout-session');
-      return response.data;
+      try {
+        const response = await apiClient.get('/api/stripe/create-checkout-session');
+        return response.data;
+      } catch (error: any) {
+        console.error(
+          'Error fetching Stripe plans:',
+          error?.response?.status,
+          error?.response?.data || error?.message
+        );
+        // Fall back to hard-coded plans so the UI is still usable
+        return { plans: FALLBACK_PLANS };
+      }
     },
     enabled: !!user,
   });
@@ -41,7 +91,10 @@ export default function SubscriptionScreen() {
   // Fetch subscription status using the utility hook
   const { data: subscriptionStatus, isLoading: isLoadingStatus } = useSubscriptionStatus();
 
-  const plans: Plan[] = plansData?.plans || [];
+  const plans: Plan[] =
+    (plansData?.plans as Plan[] | undefined)?.length
+      ? (plansData.plans as Plan[])
+      : FALLBACK_PLANS;
   const hasSubscription = subscriptionStatus?.hasSubscription === true;
   const currentPlan = subscriptionStatus?.plan;
 
@@ -54,7 +107,7 @@ export default function SubscriptionScreen() {
     try {
       setLoadingPlan(planId);
 
-      const baseUrl = 'https://comfort-finder-analyzer.vercel.app';
+      const baseUrl = 'https://comfortfinder.projcomfort.com';
       const response = await apiClient.post('/api/stripe/create-checkout-session', {
         planId,
         successUrl: `${baseUrl}/subscription/success`,

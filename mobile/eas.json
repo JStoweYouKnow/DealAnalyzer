@@ -1,0 +1,52 @@
+{
+  "cli": {
+    "version": ">= 7.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bGFyZ2Utd29sZi01LmNsZXJrLmFjY291bnRzLmRldiQ",
+        "EXPO_PUBLIC_CONVEX_URL": "https://oceanic-dotterel-702.convex.cloud",
+        "EXPO_PUBLIC_API_URL": "http://localhost:3000"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release",
+        "resourceClass": "m-medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuY29tZm9ydGZpbmRlci5wcm9qY29tZm9ydC5jb20k",
+        "EXPO_PUBLIC_CONVEX_URL": "https://oceanic-dotterel-702.convex.cloud",
+        "EXPO_PUBLIC_API_URL": "https://comfortfinder.projcomfort.com"
+      }
+    },
+    "production": {
+      "ios": {
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuY29tZm9ydGZpbmRlci5wcm9qY29tZm9ydC5jb20k",
+        "EXPO_PUBLIC_CONVEX_URL": "https://oceanic-dotterel-702.convex.cloud",
+        "EXPO_PUBLIC_API_URL": "https://comfortfinder.projcomfort.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascApiKeyId": "3V85XXH32R",
+        "ascApiKeyIssuerId": "adb920a3-6abd-4ddd-a30e-58e8ac2d28a5",
+        "ascApiKeyPath": "./asc-api-key.p8",
+        "ascAppId": "6756039028"
+      }
+    }
+  }
+}
