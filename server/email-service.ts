@@ -311,6 +311,121 @@ export class EmailMonitoringService {
     }
   }
 
+  /**
+   * Fetch recent emails from Gmail and store them in the database
+   * This method loads OAuth tokens for the user, fetches emails, and stores new ones
+   */
+  async fetchRecentEmails(userId: string, maxResults: number = 50): Promise<{ emailCount: number; newDeals: number }> {
+    try {
+      console.log(`[Gmail Fetch] Starting email fetch for user ${userId.substring(0, 20)}...`);
+
+      // Load OAuth tokens for this user from database
+      const hasTokens = await this.loadUserTokensFromDatabase(userId);
+
+      if (!hasTokens) {
+        throw new Error('Gmail not connected. No OAuth tokens found for this user.');
+      }
+
+      console.log(`[Gmail Fetch] Tokens loaded, searching for real estate emails...`);
+
+      // Search for real estate emails using the Gmail API
+      const emailDeals = await this.searchRealEstateEmails(maxResults);
+
+      console.log(`[Gmail Fetch] Found ${emailDeals.length} emails from Gmail API`);
+
+      // Store emails in database (skip duplicates)
+      let newDealsCreated = 0;
+
+      // Import storage dynamically to avoid circular dependencies
+      const { storage } = await import('./storage');
+
+      for (const emailDeal of emailDeals) {
+        try {
+          // Generate content hash for deduplication
+          const contentHash = this.generateContentHash(
+            emailDeal.subject,
+            emailDeal.sender,
+            emailDeal.emailContent
+          );
+
+          // Check if this email already exists
+          const existingDeal = await storage.findEmailDealByContentHash(contentHash);
+
+          if (!existingDeal) {
+            // Create new deal
+            await storage.createEmailDeal({
+              ...emailDeal,
+              userId,
+              contentHash,
+              status: emailDeal.status || 'new',
+            });
+            newDealsCreated++;
+            console.log(`[Gmail Fetch] Created new deal: ${emailDeal.subject.substring(0, 50)}...`);
+          } else {
+            console.log(`[Gmail Fetch] Skipped duplicate: ${emailDeal.subject.substring(0, 50)}...`);
+          }
+        } catch (error) {
+          console.error(`[Gmail Fetch] Error storing email deal:`, error);
+          // Continue with next email even if one fails
+        }
+      }
+
+      console.log(`[Gmail Fetch] Complete: ${newDealsCreated} new deals created out of ${emailDeals.length} emails`);
+
+      return {
+        emailCount: emailDeals.length,
+        newDeals: newDealsCreated,
+      };
+    } catch (error) {
+      console.error('[Gmail Fetch] Error fetching emails:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load OAuth tokens for a user from the database
+   * Returns true if tokens were loaded successfully
+   */
+  private async loadUserTokensFromDatabase(userId: string): Promise<boolean> {
+    try {
+      if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
+        console.error('[Gmail Fetch] NEXT_PUBLIC_CONVEX_URL not configured');
+        return false;
+      }
+
+      const initialized = await initializeConvexForTokens();
+      if (!initialized || !convexClient || !convexApi) {
+        console.error('[Gmail Fetch] Failed to initialize Convex');
+        return false;
+      }
+
+      // Retrieve tokens from database
+      const dbTokens = await convexClient.action(
+        convexApi.userOAuthTokens.retrieveTokensForServer,
+        { userId }
+      );
+
+      if (!dbTokens || !dbTokens.accessToken) {
+        console.error('[Gmail Fetch] No Gmail tokens found for user');
+        return false;
+      }
+
+      // Set credentials in Gmail API client
+      await this.setCredentials(
+        dbTokens.accessToken,
+        dbTokens.refreshToken,
+        dbTokens.expiryDate,
+        userId
+      );
+
+      console.log(`[Gmail Fetch] Successfully loaded tokens for user ${userId.substring(0, 20)}`);
+      return true;
+    } catch (error) {
+      console.error('[Gmail Fetch] Error loading user tokens:', error);
+      return false;
+    }
+  }
+
   // Get detailed email information
   private async getEmailDetails(messageId: string): Promise<EmailDeal | null> {
     try {

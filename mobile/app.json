@@ -60,7 +60,8 @@
       "eas": {
         "projectId": "256e912e-3a30-479d-8524-c2c92a08f80a"
       },
-      "clerkPublishableKey": "pk_live_Y2xlcmsuY29tZm9ydGZpbmRlci5wcm9qY29tZm9ydC5jb20k"
+      "clerkPublishableKey": "pk_live_Y2xlcmsuY29tZm9ydGZpbmRlci5wcm9qY29tZm9ydC5jb20k",
+      "apiUrl": "https://comfortfinder.projcomfort.com"
     }
   }
 }

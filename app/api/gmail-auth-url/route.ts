@@ -93,19 +93,22 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const clearSession = url.searchParams.get('clear') === 'true';
     
-    // Dynamically construct the redirect URI based on the request
-    // For mobile apps, use the API URL from the request origin
-    // Allow overriding with NEXT_PUBLIC_APP_DOMAIN for production if needed
+    // Always use web redirect URI (required by Google OAuth)
+    // The web callback will then redirect to the mobile app via deep link
+    // This is the standard OAuth flow for mobile apps
     const forwardedProto = request.headers.get('x-forwarded-proto');
     let protocol = forwardedProto || url.protocol.replace(':', '') || 'https';
     let host = request.headers.get('host') || url.hostname;
 
-    // Check if request is from mobile app (has API URL in origin or referer)
+    // Check if request is from mobile app
     const origin = request.headers.get('origin') || request.headers.get('referer') || '';
     const isMobileRequest = origin.includes('api.comfortfinder.com') || 
                            origin.includes('comfortfinder.projcomfort.com') ||
                            url.hostname.includes('api.comfortfinder.com') ||
-                           url.hostname.includes('comfortfinder.projcomfort.com');
+                           url.hostname.includes('comfortfinder.projcomfort.com') ||
+                           url.searchParams.get('platform') === 'mobile' ||
+                           request.headers.get('user-agent')?.includes('Expo') ||
+                           request.headers.get('user-agent')?.includes('ReactNative');
 
     // If NEXT_PUBLIC_APP_DOMAIN is set, use it (for production consistency)
     if (DEFAULT_PROJECT_DOMAIN) {
@@ -133,7 +136,12 @@ export async function GET(request: NextRequest) {
       throw new Error('Unable to determine host for Gmail redirect');
     }
 
+    // Always use web callback - it will redirect to mobile app via deep link
     const redirectUri = `${protocol}://${host}/api/gmail-callback`;
+    
+    if (isMobileRequest) {
+      console.log('[Gmail Auth URL] Mobile app request - using web callback (will redirect to deep link)');
+    }
     
     console.log('[Gmail Auth URL] Redirect URI determination:', {
       requestHost: request.headers.get('host'),

@@ -200,6 +200,9 @@ export default function App() {
       <ClerkProvider
         publishableKey={trimmedKey}
         tokenCache={tokenCache}
+        // Enable native API support for mobile apps
+        // If you get "native api disabled" error, enable Native API in Clerk Dashboard
+        // Settings → API Keys → Enable "Native API" or "Mobile SDK Support"
       >
         <ConvexProvider client={convex}>
           <QueryClientProvider client={queryClient}>

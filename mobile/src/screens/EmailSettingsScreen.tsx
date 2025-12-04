@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Switch,
   ActivityIndicator,
   AppState,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
@@ -26,6 +27,8 @@ export default function EmailSettingsScreen() {
   const queryClient = useQueryClient();
   const navigation = useNavigation();
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const previousConnectionStatus = useRef<boolean>(false);
   
   // Hide tab bar when this screen is focused
   useFocusEffect(
@@ -191,14 +194,62 @@ export default function EmailSettingsScreen() {
           queryClient.removeQueries({ queryKey: ['gmail-status'] });
           refetchStatus();
         }, 1000); // Increased delay to ensure callback has processed
-        
+
         // Also refetch immediately in case the delay isn't needed
         refetchStatus();
-        
+
         return () => clearTimeout(timer);
       }
     }, [user, isConnecting, queryClient, refetchStatus])
   );
+
+  // Watch for connection status changes and trigger automatic sync when newly connected
+  useEffect(() => {
+    const currentlyConnected = gmailStatus?.connected === true;
+
+    // If we just became connected (wasn't connected before, but is now)
+    if (!previousConnectionStatus.current && currentlyConnected && !isSyncing) {
+      console.log('[Gmail Status] Newly connected - triggering automatic email sync...');
+
+      // Trigger automatic sync after a short delay
+      const syncTimer = setTimeout(async () => {
+        try {
+          setIsSyncing(true);
+          console.log('[Gmail Sync] Auto-sync: Fetching emails...');
+
+          const response = await authenticatedClient.post('/fetch-gmail-emails');
+          const { emailCount, newDeals } = response.data;
+
+          console.log('[Gmail Sync] Auto-sync complete:', { emailCount, newDeals });
+
+          Alert.alert(
+            'Gmail Connected!',
+            `Successfully fetched ${emailCount} emails. ${newDeals} new deals added.`,
+            [{ text: 'OK' }]
+          );
+
+          // Refresh the deals list
+          queryClient.invalidateQueries({ queryKey: ['email-deals'] });
+        } catch (error: any) {
+          console.error('[Gmail Sync] Auto-sync failed:', error);
+
+          // Still show success for OAuth, but mention sync issue
+          Alert.alert(
+            'Gmail Connected',
+            'Gmail connected successfully, but failed to fetch emails. Please try the Sync button.',
+            [{ text: 'OK' }]
+          );
+        } finally {
+          setIsSyncing(false);
+        }
+      }, 1500);
+
+      return () => clearTimeout(syncTimer);
+    }
+
+    // Update the ref to track current status
+    previousConnectionStatus.current = currentlyConnected;
+  }, [gmailStatus?.connected, isSyncing, authenticatedClient, queryClient]);
   
   // Also listen for app state changes to refetch when app comes to foreground
   useEffect(() => {
@@ -227,7 +278,9 @@ export default function EmailSettingsScreen() {
       setIsConnecting(true);
 
       // Get the OAuth URL from the API
-      const response = await authenticatedClient.get('/gmail-auth-url');
+      // Note: Server uses web redirect URI (required by Google OAuth)
+      // The web callback will redirect to dealanalyzer://gmail-callback deep link
+      const response = await authenticatedClient.get('/gmail-auth-url?platform=mobile');
       const { authUrl } = response.data;
 
       if (!authUrl) {
@@ -250,57 +303,62 @@ export default function EmailSettingsScreen() {
         fullAuthUrl: authUrl, // Log full URL for debugging
       });
       
-      // Use WebBrowser.openAuthSessionAsync for proper OAuth flow
-      // This creates an in-app browser that properly handles OAuth redirects
+      // For mobile OAuth with web redirect URI, use Linking.openURL
+      // The flow is: OAuth URL -> Google Auth -> Web Callback -> Deep Link -> App
+      // WebBrowser.openAuthSessionAsync requires redirect URI to match, but we use web callback
+      // which then redirects to the deep link, so we use Linking.openURL instead
       try {
-        console.log('[Gmail Connect] Opening OAuth session with WebBrowser.openAuthSessionAsync...');
+        console.log('[Gmail Connect] Opening OAuth URL with Linking (web callback will redirect to app)...');
+        console.log('[Gmail Connect] Platform:', Platform.OS);
+        console.log('[Gmail Connect] Auth URL redirect URI will be web callback (standard OAuth flow)');
 
-        const result = await WebBrowser.openAuthSessionAsync(authUrl, 'dealanalyzer://gmail-callback');
-
-        console.log('[Gmail Connect] WebBrowser result:', result);
-
-        if (result.type === 'success') {
-          console.log('[Gmail Connect] ✅ OAuth completed successfully');
-          console.log('[Gmail Connect] Redirect URL:', result.url);
-
-          // The redirect URL should be dealanalyzer://gmail-callback?success=true
-          // This will automatically trigger our deep link handler in App.tsx
-
-          // Force a status check after successful OAuth
-          setTimeout(() => {
-            console.log('[Gmail Connect] Forcing status check after successful OAuth...');
-            queryClient.removeQueries({ queryKey: ['gmail-status'] });
-            refetchStatus();
-          }, 1000);
-
-          Alert.alert(
-            'Gmail Connected!',
-            'Your Gmail account has been successfully connected. Deal notifications will be sent to your email.',
-            [{ text: 'OK' }]
-          );
-        } else if (result.type === 'cancel') {
-          console.log('[Gmail Connect] User cancelled OAuth');
-          Alert.alert(
-            'Authorization Cancelled',
-            'Gmail authorization was cancelled. You can try again when ready.',
-            [{ text: 'OK' }]
-          );
-        } else if (result.type === 'dismiss') {
-          console.log('[Gmail Connect] Browser dismissed');
-          Alert.alert(
-            'Authorization Incomplete',
-            'The authorization browser was closed. Please try again.',
-            [{ text: 'OK' }]
-          );
+        // Use Linking.openURL - the web callback will handle redirecting to deep link
+        const canOpen = await Linking.canOpenURL(authUrl);
+        if (!canOpen) {
+          throw new Error('Cannot open OAuth URL');
         }
-      } catch (webBrowserError: any) {
-        console.error('[Gmail Connect] Error with WebBrowser:', webBrowserError);
+
+        await Linking.openURL(authUrl);
+        
+        // Show helpful message - user will complete OAuth in browser
+        // The web callback will redirect back to the app via deep link
         Alert.alert(
-          'Error',
-          'Failed to open browser for authorization. Please check your internet connection and try again.',
+          'Complete Authorization',
+          'Please complete the Gmail authorization in your browser. When you return to the app, your connection will be verified automatically.',
           [{ text: 'OK' }]
         );
-        return;
+
+        // Status will be automatically checked when:
+        // 1. Deep link is triggered (handled in App.tsx)
+        // 2. Screen comes into focus (useFocusEffect)
+        // 3. App becomes active (AppState listener)
+        
+        return; // Exit early - don't wait for result
+      } catch (linkingError: any) {
+        console.error('[Gmail Connect] Error with Linking.openURL:', linkingError);
+        
+        // Fallback: Try WebBrowser.openBrowserAsync (doesn't require matching redirect URI)
+        console.log('[Gmail Connect] Trying WebBrowser.openBrowserAsync as fallback...');
+        
+        try {
+          const result = await WebBrowser.openBrowserAsync(authUrl, {
+            showInRecents: true,
+            enableBarCollapsing: false,
+          });
+          
+          console.log('[Gmail Connect] WebBrowser.openBrowserAsync result:', result);
+          
+          Alert.alert(
+            'Complete Authorization',
+            'Please complete the Gmail authorization in your browser. When you return to the app, your connection will be verified automatically.',
+            [{ text: 'OK' }]
+          );
+          
+          return; // Exit early
+        } catch (webBrowserError: any) {
+          console.error('[Gmail Connect] WebBrowser.openBrowserAsync also failed:', webBrowserError);
+          throw new Error('Failed to open browser for authorization. Please check your internet connection and try again.');
+        }
       }
     } catch (error: any) {
       console.error('Error connecting Gmail:', error);
@@ -310,6 +368,36 @@ export default function EmailSettingsScreen() {
       );
     } finally {
       setIsConnecting(false);
+    }
+  };
+
+  const handleSyncEmails = async () => {
+    if (isSyncing) return;
+
+    try {
+      setIsSyncing(true);
+      console.log('[Gmail Sync] Triggering manual email sync...');
+
+      const response = await authenticatedClient.post('/fetch-gmail-emails');
+      const { emailCount, newDeals } = response.data;
+
+      console.log('[Gmail Sync] Sync complete:', { emailCount, newDeals });
+
+      Alert.alert(
+        'Sync Complete',
+        `Fetched ${emailCount} emails, ${newDeals} new deals added.`,
+        [{ text: 'OK' }]
+      );
+
+      // Refresh the deals list
+      queryClient.invalidateQueries({ queryKey: ['email-deals'] });
+    } catch (error: any) {
+      console.error('[Gmail Sync] Sync failed:', error);
+
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to sync emails';
+      Alert.alert('Sync Failed', errorMessage, [{ text: 'OK' }]);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -372,6 +460,26 @@ export default function EmailSettingsScreen() {
                   <Ionicons name="checkmark-circle" size={20} color="#34C759" />
                   <Text style={styles.statusText}>Gmail account connected</Text>
                 </View>
+
+                <TouchableOpacity
+                  style={[styles.syncButton, isSyncing && styles.syncButtonDisabled]}
+                  onPress={handleSyncEmails}
+                  disabled={isSyncing}
+                  activeOpacity={0.7}
+                >
+                  {isSyncing ? (
+                    <>
+                      <ActivityIndicator size="small" color="#007AFF" />
+                      <Text style={styles.syncButtonText}>Syncing...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="refresh" size={18} color="#007AFF" />
+                      <Text style={styles.syncButtonText}>Sync Emails from Gmail</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   style={styles.disconnectButton}
                   onPress={handleDisconnectGmail}
@@ -548,6 +656,26 @@ const styles = StyleSheet.create({
   connectButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  syncButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 12,
+    gap: 8,
+  },
+  syncButtonDisabled: {
+    opacity: 0.6,
+  },
+  syncButtonText: {
+    color: '#007AFF',
+    fontSize: 14,
     fontWeight: '600',
   },
   disconnectButton: {

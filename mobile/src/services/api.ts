@@ -8,16 +8,26 @@ const getApiBaseUrl = (): string => {
   const apiUrl = Constants.expoConfig?.extra?.apiUrl || 
     process.env.EXPO_PUBLIC_API_URL;
   
+  // Log configuration for debugging
+  console.log('[API Config] Checking API URL configuration:', {
+    fromExtra: Constants.expoConfig?.extra?.apiUrl,
+    fromEnv: process.env.EXPO_PUBLIC_API_URL,
+    isDev: __DEV__,
+  });
+  
   // Validate and return if provided (and not empty string)
   if (apiUrl && typeof apiUrl === 'string') {
     const trimmed = apiUrl.trim();
     if (trimmed !== '' && trimmed !== 'undefined' && trimmed !== 'null') {
       // Ensure it's an absolute URL
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        console.log('[API Config] ✅ Using configured API URL:', trimmed);
         return trimmed;
       }
       // If it doesn't have a protocol, add https://
-      return `https://${trimmed}`;
+      const urlWithProtocol = `https://${trimmed}`;
+      console.log('[API Config] ✅ Using configured API URL (added https://):', urlWithProtocol);
+      return urlWithProtocol;
     }
   }
   
@@ -28,14 +38,21 @@ const getApiBaseUrl = (): string => {
     // Try to get the local IP from Constants, fallback to localhost
     const debuggerHost = Constants.expoConfig?.hostUri?.split(':')[0];
     if (debuggerHost && debuggerHost !== 'localhost' && debuggerHost !== '127.0.0.1') {
-      return `http://${debuggerHost}:3002`;
+      const localUrl = `http://${debuggerHost}:3002`;
+      console.warn('[API Config] ⚠️ Using localhost with debugger host:', localUrl);
+      console.warn('[API Config] ⚠️ This may not work on physical devices. Set EXPO_PUBLIC_API_URL in .env.local');
+      return localUrl;
     }
-    return 'http://localhost:3002';
+    const localhostUrl = 'http://localhost:3002';
+    console.warn('[API Config] ⚠️ Using localhost:', localhostUrl);
+    console.warn('[API Config] ⚠️ This will NOT work on physical devices. Set EXPO_PUBLIC_API_URL in .env.local');
+    return localhostUrl;
   }
   
-  // Production fallback
-  console.warn('API URL not configured. Using localhost. Please set apiUrl in app.json extra section for production.');
-  return 'http://localhost:3002';
+  // Production fallback - this is an error condition
+  console.error('[API Config] ❌ API URL not configured for production!');
+  console.error('[API Config] Set apiUrl in app.json extra section or EXPO_PUBLIC_API_URL in eas.json');
+  throw new Error('API URL not configured. Please set apiUrl in app.json or EXPO_PUBLIC_API_URL environment variable.');
 };
 
 // Check if API is configured
@@ -113,9 +130,36 @@ const createApiClient = (getToken?: () => Promise<string | null>): AxiosInstance
   client.interceptors.response.use(
     (response) => response,
     async (error) => {
-      if (error.response?.status === 401) {
+      // Log detailed error information
+      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.message?.includes('Network Error')) {
+        console.error('[API Error] ❌ Server not found or connection refused');
+        console.error('[API Error] Base URL:', cleanBaseURL);
+        console.error('[API Error] Request URL:', error.config?.url);
+        console.error('[API Error] Full URL:', `${cleanBaseURL}${error.config?.url}`);
+        console.error('[API Error] Error code:', error.code);
+        console.error('[API Error] Error message:', error.message);
+        console.error('[API Error] This usually means:');
+        console.error('  1. API server is not running');
+        console.error('  2. API URL is incorrect');
+        console.error('  3. Network connectivity issue');
+        console.error('  4. Firewall blocking the connection');
+        console.error('[API Error] Check your API URL configuration in app.json or .env.local');
+      } else if (error.response?.status === 401) {
         // Handle unauthorized - could redirect to login
-        console.warn('Unauthorized request');
+        console.warn('[API Error] Unauthorized request (401)');
+      } else if (error.response) {
+        // Server responded with error status
+        console.error('[API Error] Server error:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          url: error.config?.url,
+        });
+      } else if (error.request) {
+        // Request was made but no response received
+        console.error('[API Error] No response received:', {
+          url: error.config?.url,
+          baseURL: cleanBaseURL,
+        });
       }
       return Promise.reject(error);
     }
