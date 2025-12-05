@@ -1,77 +1,45 @@
-# Exclude unnecessary files from EAS builds
+# EAS Build Ignore
+# Files to exclude from EAS build uploads to reduce size and speed up builds
 
-# Dependencies and build artifacts
+# iOS
+ios/build/
+ios/Pods/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+ios/DerivedData/
+
+# Android
+android/build/
+android/.gradle/
+android/app/build/
+android/gradle/
+android/.idea/
+
+# Node
 node_modules/
-.git/
+
+# Expo
 .expo/
-dist/
-web-build/
-build/
-coverage/
+.expo-shared/
+
+# Misc
 *.log
-*.tsbuildinfo
-
-# Documentation files (not needed for builds)
-*.md
-README.md
-CHANGELOG.md
-LICENSE
-*.txt
-
-# Configuration examples and templates
-*.example
-*.template
-*.sample
-
-# Shell scripts (not needed in build)
-*.sh
-prepare-build.sh
-update-icon.sh
-link-shared.sh
-
-# Environment files (use EAS secrets instead)
-.env
-.env.local
-.env.*.local
-.env.production
-.env.development
-
-# IDE and editor files
-.vscode/
-.idea/
+*.tmp
+.DS_Store
 *.swp
 *.swo
 *~
-.DS_Store
-
-# App Store Connect API Key (sensitive - use EAS secrets)
-asc-api-key.p8
-*.p8
-
-# Temporary and cache files
-*.tmp
-*.temp
-*.bak
-*.cache
-.metro-health-check*
+.vscode/
+.idea/
 
 # Test files
 __tests__/
-*.test.ts
-*.test.tsx
-*.spec.ts
-*.spec.tsx
-jest.config.*
-*.test.js
-*.spec.js
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
 
-# Exclude parent directory files
-../node_modules/
-../.git/
-../*.md
-../dist/
-../temp_uploads/
-../python_modules/
-../attached_assets/
-../assets/nutrient-viewer-lib/
-
+# Documentation
+*.md
+docs/

@@ -149,13 +149,18 @@ export default function EmailSettingsScreen() {
         return errorResult;
       }
     },
-    refetchInterval: isConnecting ? 2000 : false,
+    refetchInterval: (query) => {
+      // Poll every 3 seconds if not connected (to catch OAuth completion)
+      // Stop polling if connected
+      const isConnected = query.state.data?.connected === true;
+      return isConnected ? false : 3000;
+    },
     enabled: !!user, // Only check status if user is logged in
     staleTime: 0, // Always consider data stale to allow refetching
     gcTime: 0, // Don't cache to ensure fresh data (React Query v5 uses gcTime instead of cacheTime)
     refetchOnMount: true, // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window regains focus
-    retry: 1, // Retry once on failure
+    retry: 2, // Retry twice on failure
     retryDelay: 1000, // Wait 1 second before retry
     // Provide a default value to prevent undefined
     placeholderData: { success: false, connected: false },
@@ -187,18 +192,31 @@ export default function EmailSettingsScreen() {
     React.useCallback(() => {
       if (user && !isConnecting) {
         console.log('[Gmail Status] Screen focused, will refetch status...');
-        // Small delay to ensure OAuth callback has processed
-        const timer = setTimeout(() => {
-          console.log('[Gmail Status] Refetching status after focus...');
-          // Clear cache and force refetch
+        
+        // Clear cache and force refetch immediately
+        queryClient.removeQueries({ queryKey: ['gmail-status'] });
+        queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
+        
+        // Refetch with multiple attempts to ensure we get fresh data
+        refetchStatus();
+        
+        // Also refetch after delays to catch tokens that might be stored asynchronously
+        const timer1 = setTimeout(() => {
+          console.log('[Gmail Status] Refetching status after 1s delay...');
           queryClient.removeQueries({ queryKey: ['gmail-status'] });
           refetchStatus();
-        }, 1000); // Increased delay to ensure callback has processed
+        }, 1000);
+        
+        const timer2 = setTimeout(() => {
+          console.log('[Gmail Status] Refetching status after 3s delay...');
+          queryClient.removeQueries({ queryKey: ['gmail-status'] });
+          refetchStatus();
+        }, 3000);
 
-        // Also refetch immediately in case the delay isn't needed
-        refetchStatus();
-
-        return () => clearTimeout(timer);
+        return () => {
+          clearTimeout(timer1);
+          clearTimeout(timer2);
+        };
       }
     }, [user, isConnecting, queryClient, refetchStatus])
   );
@@ -209,7 +227,11 @@ export default function EmailSettingsScreen() {
 
     // If we just became connected (wasn't connected before, but is now)
     if (!previousConnectionStatus.current && currentlyConnected && !isSyncing) {
-      console.log('[Gmail Status] Newly connected - triggering automatic email sync...');
+      console.log('[Gmail Status] ✅ Newly connected - invalidating queries and triggering sync...');
+
+      // Immediately invalidate deals query to refresh the deals list
+      queryClient.invalidateQueries({ queryKey: ['email-deals'] });
+      console.log('[Gmail Status] ✅ Email deals query invalidated');
 
       // Trigger automatic sync after a short delay
       const syncTimer = setTimeout(async () => {
@@ -228,7 +250,7 @@ export default function EmailSettingsScreen() {
             [{ text: 'OK' }]
           );
 
-          // Refresh the deals list
+          // Refresh the deals list again after sync
           queryClient.invalidateQueries({ queryKey: ['email-deals'] });
         } catch (error: any) {
           console.error('[Gmail Sync] Auto-sync failed:', error);
@@ -256,11 +278,24 @@ export default function EmailSettingsScreen() {
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === 'active' && user && !isConnecting) {
         console.log('[Gmail Status] App became active, refetching status...');
-        // Refetch status when app comes to foreground (e.g., after OAuth)
+        
+        // Clear cache and refetch immediately
+        queryClient.removeQueries({ queryKey: ['gmail-status'] });
+        queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
+        refetchStatus();
+        
+        // Also refetch after delays
         setTimeout(() => {
+          console.log('[Gmail Status] Refetching after app became active (1s delay)...');
           queryClient.removeQueries({ queryKey: ['gmail-status'] });
           refetchStatus();
-        }, 500);
+        }, 1000);
+        
+        setTimeout(() => {
+          console.log('[Gmail Status] Refetching after app became active (3s delay)...');
+          queryClient.removeQueries({ queryKey: ['gmail-status'] });
+          refetchStatus();
+        }, 3000);
       }
     };
     
@@ -459,6 +494,16 @@ export default function EmailSettingsScreen() {
                 <View style={styles.statusRow}>
                   <Ionicons name="checkmark-circle" size={20} color="#34C759" />
                   <Text style={styles.statusText}>Gmail account connected</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      console.log('[Gmail Status] Manual refresh triggered');
+                      queryClient.removeQueries({ queryKey: ['gmail-status'] });
+                      refetchStatus();
+                    }}
+                    style={{ marginLeft: 'auto', padding: 8 }}
+                  >
+                    <Ionicons name="refresh" size={20} color="#007AFF" />
+                  </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity

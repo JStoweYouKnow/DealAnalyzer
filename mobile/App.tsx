@@ -2,7 +2,7 @@ import 'react-native-url-polyfill/auto';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import * as SecureStore from 'expo-secure-store';
 import * as Linking from 'expo-linking';
@@ -86,6 +86,66 @@ const queryClient = new QueryClient({
   },
 });
 
+// Component to handle deep links with query client access
+function DeepLinkHandler() {
+  const queryClient = useQueryClient();
+
+  // Handle deep links for Gmail OAuth callback
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      const { url } = event;
+      console.log('[Deep Link] Received:', url);
+      
+      // Handle Gmail OAuth callback
+      if (url.includes('gmail-callback')) {
+        const urlObj = Linking.parse(url);
+        console.log('[Deep Link] Gmail callback detected:', {
+          url,
+          queryParams: urlObj.queryParams,
+          success: urlObj.queryParams?.success,
+        });
+        
+        // Always invalidate queries when gmail-callback is received
+        // The callback might not have success param, but if we got here, OAuth likely succeeded
+        console.log('[Deep Link] ✅ Gmail callback received, invalidating queries...');
+        
+        // Remove queries from cache first to force fresh fetch
+        queryClient.removeQueries({ queryKey: ['gmail-status'] });
+        queryClient.removeQueries({ queryKey: ['email-deals'] });
+        
+        // Invalidate queries to trigger refetch
+        queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
+        queryClient.invalidateQueries({ queryKey: ['email-deals'] });
+        
+        // Wait a moment for tokens to be stored, then refetch
+        setTimeout(() => {
+          console.log('[Deep Link] Refetching queries after delay...');
+          queryClient.refetchQueries({ queryKey: ['gmail-status'] });
+          queryClient.refetchQueries({ queryKey: ['email-deals'] });
+        }, 2000);
+        
+        console.log('[Deep Link] ✅ Queries invalidated and will refetch');
+      }
+    };
+
+    // Listen for deep links when app is already open
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Check if app was opened via deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [queryClient]);
+
+  return null;
+}
+
 export default function App() {
   // Log configuration on startup
   useEffect(() => {
@@ -113,44 +173,6 @@ export default function App() {
     }
   }, []);
 
-  // Handle deep links for Gmail OAuth callback
-  useEffect(() => {
-    const handleDeepLink = async (event: { url: string }) => {
-      const { url } = event;
-      console.log('[Deep Link] Received:', url);
-      
-      // Handle Gmail OAuth callback
-      if (url.includes('gmail-callback')) {
-        const urlObj = Linking.parse(url);
-        console.log('[Deep Link] Gmail callback detected:', {
-          url,
-          queryParams: urlObj.queryParams,
-          success: urlObj.queryParams?.success,
-        });
-        
-        if (urlObj.queryParams?.success === 'true') {
-          console.log('[Deep Link] ✅ Gmail OAuth successful, status will be refreshed');
-          // The EmailSettingsScreen will automatically refetch status when it comes into focus
-        } else {
-          console.log('[Deep Link] Gmail callback received but success param not set');
-        }
-      }
-    };
-
-    // Listen for deep links when app is already open
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Check if app was opened via deep link
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
 
   // Ensure we have a valid publishable key before rendering ClerkProvider
   if (!clerkPublishableKey || clerkPublishableKey.trim() === '') {
@@ -206,6 +228,7 @@ export default function App() {
       >
         <ConvexProvider client={convex}>
           <QueryClientProvider client={queryClient}>
+            <DeepLinkHandler />
             <AppNavigator />
             <StatusBar style="auto" />
           </QueryClientProvider>

@@ -40,6 +40,10 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   
   // Get Clerk key for debugging
   const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
@@ -201,7 +205,161 @@ export default function SignInScreen() {
           text: 'Sign Up',
           onPress: () => navigation.navigate('SignUp'),
         } : undefined,
+        errorMessage.includes("password") || errorMessage.includes("incorrect") ? {
+          text: 'Reset Password',
+          onPress: () => handleForgotPassword(),
+        } : undefined,
       ].filter(Boolean));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email || !email.trim()) {
+      Alert.alert('Error', 'Please enter your email address first.');
+      return;
+    }
+
+    if (!isLoaded || !signInLoaded || !signIn) {
+      Alert.alert('Error', 'Authentication is not ready. Please wait a moment and try again.');
+      return;
+    }
+
+    setIsResettingPassword(true);
+    setLoading(true);
+
+    try {
+      console.log('[Password Reset] Initiating password reset for:', email.trim());
+
+      // Create a sign-in attempt with just the email
+      const signInAttempt = await signIn.create({
+        identifier: email.trim(),
+      });
+
+      console.log('[Password Reset] Sign-in attempt created:', {
+        status: signInAttempt.status,
+        supportedFirstFactors: (signInAttempt as any)?.supportedFirstFactors,
+      });
+
+      // Check if password reset is supported
+      const supportedFactors = (signInAttempt as any)?.supportedFirstFactors || [];
+      const passwordResetStrategy = supportedFactors.find(
+        (f: any) => f.strategy === 'reset_password_email_code'
+      );
+
+      if (!passwordResetStrategy) {
+        // Fallback: try to prepare password reset directly
+        try {
+          await signIn.preparePasswordReset({
+            strategy: 'email_code',
+          });
+          console.log('[Password Reset] ✅ Password reset code sent');
+          Alert.alert(
+            'Reset Code Sent',
+            `A password reset code has been sent to:\n${email.trim()}\n\nPlease check your email and enter the code below.`,
+            [{ text: 'OK' }]
+          );
+        } catch (resetError: any) {
+          console.error('[Password Reset] Error preparing reset:', resetError);
+          throw new Error(
+            resetError.errors?.[0]?.message ||
+            resetError.message ||
+            'Failed to send password reset code. Please try again.'
+          );
+        }
+      } else {
+        // Use the supported strategy
+        await signIn.preparePasswordReset({
+          strategy: 'reset_password_email_code',
+        });
+        console.log('[Password Reset] ✅ Password reset code sent');
+        Alert.alert(
+          'Reset Code Sent',
+          `A password reset code has been sent to:\n${email.trim()}\n\nPlease check your email and enter the code below.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error: any) {
+      console.error('[Password Reset] Error:', error);
+      const errorMessage =
+        error.errors?.[0]?.message ||
+        error.message ||
+        'Failed to send password reset code. Please check your email and try again.';
+
+      Alert.alert('Password Reset Failed', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetCode || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters');
+      return;
+    }
+
+    if (!signIn) {
+      Alert.alert('Error', 'Sign in service is not available');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      console.log('[Password Reset] Attempting to reset password...');
+
+      // Attempt password reset with the code
+      const result = await signIn.attemptPasswordReset({
+        code: resetCode.trim(),
+        password: newPassword,
+      });
+
+      console.log('[Password Reset] Reset result:', {
+        status: result.status,
+        createdSessionId: result.createdSessionId,
+      });
+
+      if (result.status === 'complete' && result.createdSessionId) {
+        // Password reset successful, sign in automatically
+        if (setActive && typeof setActive === 'function') {
+          await setActive({ session: result.createdSessionId });
+          Alert.alert('Success', 'Password reset successful! You are now signed in.');
+          setIsResettingPassword(false);
+          setResetCode('');
+          setNewPassword('');
+          setConfirmPassword('');
+        } else {
+          Alert.alert(
+            'Success',
+            'Password reset successful! Please sign in with your new password.'
+          );
+          setIsResettingPassword(false);
+          setResetCode('');
+          setNewPassword('');
+          setConfirmPassword('');
+        }
+      } else {
+        throw new Error('Password reset incomplete. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('[Password Reset] Error resetting password:', error);
+      const errorMessage =
+        error.errors?.[0]?.message ||
+        error.message ||
+        'Failed to reset password. Please check your code and try again.';
+
+      Alert.alert('Password Reset Failed', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -232,7 +390,15 @@ export default function SignInScreen() {
               autoComplete="email"
             />
 
-            <Text style={styles.label}>Password</Text>
+            <View style={styles.passwordRow}>
+              <Text style={styles.label}>Password</Text>
+              <TouchableOpacity
+                onPress={handleForgotPassword}
+                style={styles.forgotPasswordButton}
+              >
+                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               style={styles.input}
               placeholder="Enter your password"
@@ -271,14 +437,79 @@ export default function SignInScreen() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.linkButton}
-              onPress={() => navigation.navigate('SignUp')}
-            >
-              <Text style={styles.linkText}>
-                Don't have an account? Sign up
-              </Text>
-            </TouchableOpacity>
+            {!isResettingPassword ? (
+              <TouchableOpacity
+                style={styles.linkButton}
+                onPress={() => navigation.navigate('SignUp')}
+              >
+                <Text style={styles.linkText}>
+                  Don't have an account? Sign up
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <View style={styles.resetSection}>
+                  <Text style={styles.resetTitle}>Reset Your Password</Text>
+                  
+                  <Text style={styles.label}>Reset Code</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter 6-digit code from email"
+                    value={resetCode}
+                    onChangeText={setResetCode}
+                    keyboardType="number-pad"
+                    autoCapitalize="none"
+                    maxLength={6}
+                  />
+
+                  <Text style={styles.label}>New Password</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry
+                    autoCapitalize="none"
+                  />
+
+                  <Text style={styles.label}>Confirm Password</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry
+                    autoCapitalize="none"
+                  />
+
+                  <TouchableOpacity
+                    style={[
+                      styles.button,
+                      (loading || !resetCode || !newPassword || !confirmPassword) &&
+                        styles.buttonDisabled,
+                    ]}
+                    onPress={handleResetPassword}
+                    disabled={loading || !resetCode || !newPassword || !confirmPassword}
+                  >
+                    <Text style={styles.buttonText}>
+                      {loading ? 'Resetting...' : 'Reset Password'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.linkButton}
+                    onPress={() => {
+                      setIsResettingPassword(false);
+                      setResetCode('');
+                      setNewPassword('');
+                      setConfirmPassword('');
+                    }}
+                  >
+                    <Text style={styles.linkText}>Back to Sign In</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -323,6 +554,34 @@ const styles = StyleSheet.create({
     color: '#000000',
     marginBottom: 8,
     marginTop: 16,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  forgotPasswordButton: {
+    padding: 4,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  resetSection: {
+    marginTop: 24,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  resetTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   input: {
     borderWidth: 1,

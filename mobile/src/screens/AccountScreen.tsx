@@ -5,17 +5,20 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth, useClerk } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { clearClerkCache } from '../utils/clearClerkCache';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function AccountScreen() {
   const { signOut, user } = useAuth();
+  const clerk = useClerk();
   const navigation = useNavigation<NavigationProp>();
 
   const handleSignOut = async () => {
@@ -24,6 +27,36 @@ export default function AccountScreen() {
     } catch (error) {
       console.error('Sign out error:', error);
     }
+  };
+
+  const handleClearCache = () => {
+    Alert.alert(
+      'Clear Cache',
+      'This will sign you out and clear all cached authentication data. You will need to sign in again. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear Cache',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Sign out first
+              if (clerk) {
+                await clerk.signOut();
+              }
+              
+              // Clear SecureStore cache
+              await clearClerkCache();
+              
+              Alert.alert('Success', 'Cache cleared. Please sign in again.');
+            } catch (error) {
+              console.error('Clear cache error:', error);
+              Alert.alert('Error', 'Failed to clear cache. Please try signing out manually.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -84,6 +117,15 @@ export default function AccountScreen() {
               <Ionicons name="mail-outline" size={24} color="#000000" />
               <Text style={styles.menuText}>Email Settings</Text>
               <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handleClearCache}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="refresh-outline" size={24} color="#FF3B30" />
+              <Text style={[styles.menuText, { color: '#FF3B30' }]}>Clear Cache & Sign Out</Text>
             </TouchableOpacity>
           </View>
 
