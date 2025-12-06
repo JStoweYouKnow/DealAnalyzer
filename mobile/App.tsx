@@ -7,6 +7,13 @@ import { ClerkProvider } from '@clerk/clerk-expo';
 import * as SecureStore from 'expo-secure-store';
 import * as Linking from 'expo-linking';
 import { useEffect } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
+import { setupGlobalErrorHandlers } from './src/utils/crashPrevention';
+import { initializeScreens } from './src/screens/ScreensConfig';
+
+// Initialize react-native-screens BEFORE any navigation
+// This prevents the RNSScreen.setViewToSnapshot crash
+initializeScreens();
 
 // Create a token cache for Clerk using SecureStore
 const tokenCache = {
@@ -146,7 +153,44 @@ function DeepLinkHandler() {
   return null;
 }
 
+// Error Fallback Component for crashes
+function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
+  return (
+    <SafeAreaProvider>
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        padding: 20,
+        backgroundColor: '#fff'
+      }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 10, color: '#e74c3c' }}>
+          Something went wrong
+        </Text>
+        <Text style={{ fontSize: 14, color: '#666', marginBottom: 20, textAlign: 'center' }}>
+          {error.message}
+        </Text>
+        <Text 
+          style={{ 
+            color: '#3498db', 
+            fontSize: 16, 
+            textDecorationLine: 'underline' 
+          }}
+          onPress={resetErrorBoundary}
+        >
+          Try Again
+        </Text>
+      </View>
+    </SafeAreaProvider>
+  );
+}
+
 export default function App() {
+  // Setup global error handlers to catch unhandled errors
+  useEffect(() => {
+    setupGlobalErrorHandlers();
+  }, []);
+
   // Log configuration on startup
   useEffect(() => {
     console.log('[App] ========== INITIALIZATION ==========');
@@ -218,22 +262,31 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <ClerkProvider
-        publishableKey={trimmedKey}
-        tokenCache={tokenCache}
-        // Enable native API support for mobile apps
-        // If you get "native api disabled" error, enable Native API in Clerk Dashboard
-        // Settings → API Keys → Enable "Native API" or "Mobile SDK Support"
-      >
-        <ConvexProvider client={convex}>
-          <QueryClientProvider client={queryClient}>
-            <DeepLinkHandler />
-            <AppNavigator />
-            <StatusBar style="auto" />
-          </QueryClientProvider>
-        </ConvexProvider>
-      </ClerkProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary
+      FallbackComponent={ErrorFallback}
+      onError={(error, errorInfo) => {
+        console.error('🚨 Error Boundary Caught:', error);
+        console.error('Error Info:', errorInfo);
+        // TODO: Send to crash reporting service (Sentry, etc.)
+      }}
+    >
+      <SafeAreaProvider>
+        <ClerkProvider
+          publishableKey={trimmedKey}
+          tokenCache={tokenCache}
+          // Enable native API support for mobile apps
+          // If you get "native api disabled" error, enable Native API in Clerk Dashboard
+          // Settings → API Keys → Enable "Native API" or "Mobile SDK Support"
+        >
+          <ConvexProvider client={convex}>
+            <QueryClientProvider client={queryClient}>
+              <DeepLinkHandler />
+              <AppNavigator />
+              <StatusBar style="auto" />
+            </QueryClientProvider>
+          </ConvexProvider>
+        </ClerkProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

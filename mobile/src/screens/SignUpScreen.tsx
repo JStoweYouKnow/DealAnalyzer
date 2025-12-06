@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
@@ -10,6 +9,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { SafeTextInput } from '../components/SafeTextInput';
 import { useAuth, useSignUp, useClerk } from '@clerk/clerk-expo';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -477,7 +477,7 @@ export default function SignUpScreen() {
 
               <View style={styles.form}>
                 <Text style={styles.label}>Email</Text>
-                <TextInput
+                <SafeTextInput
                   style={styles.input}
                   placeholder="Enter your email"
                   value={email}
@@ -489,7 +489,7 @@ export default function SignUpScreen() {
                 />
 
                 <Text style={styles.label}>Username</Text>
-                <TextInput
+                <SafeTextInput
                   style={styles.input}
                   placeholder="Choose a username"
                   value={username}
@@ -500,7 +500,7 @@ export default function SignUpScreen() {
                 />
 
                 <Text style={styles.label}>Password</Text>
-                <TextInput
+                <SafeTextInput
                   style={styles.input}
                   placeholder="Enter your password"
                   value={password}
@@ -511,7 +511,7 @@ export default function SignUpScreen() {
                 />
 
                 <Text style={styles.label}>Confirm Password</Text>
-                <TextInput
+                <SafeTextInput
                   style={styles.input}
                   placeholder="Confirm your password"
                   value={confirmPassword}
@@ -551,7 +551,7 @@ export default function SignUpScreen() {
 
               <View style={styles.form}>
                 <Text style={styles.label}>Verification Code</Text>
-                <TextInput
+                <SafeTextInput
                   style={styles.input}
                   placeholder="Enter 6-digit code"
                   value={verificationCode}

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
@@ -10,6 +9,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { SafeTextInput } from '../components/SafeTextInput';
 import { useAuth, useSignIn, useClerk } from '@clerk/clerk-expo';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -196,20 +196,28 @@ export default function SignInScreen() {
         errorMessage = "Incorrect password. Please try again or reset your password.";
       }
       
-      Alert.alert('Sign In Failed', errorMessage, [
+      const alertButtons = [
         {
           text: 'OK',
-          style: 'default',
+          style: 'default' as const,
         },
-        errorMessage.includes("Account not found") ? {
+      ];
+
+      if (errorMessage.includes("Account not found")) {
+        alertButtons.push({
           text: 'Sign Up',
           onPress: () => navigation.navigate('SignUp'),
-        } : undefined,
-        errorMessage.includes("password") || errorMessage.includes("incorrect") ? {
+        } as any);
+      }
+
+      if (errorMessage.includes("password") || errorMessage.includes("incorrect")) {
+        alertButtons.push({
           text: 'Reset Password',
           onPress: () => handleForgotPassword(),
-        } : undefined,
-      ].filter(Boolean));
+        } as any);
+      }
+
+      Alert.alert('Sign In Failed', errorMessage, alertButtons);
     } finally {
       setLoading(false);
     }
@@ -226,70 +234,112 @@ export default function SignInScreen() {
       return;
     }
 
-    setIsResettingPassword(true);
     setLoading(true);
 
     try {
+      console.log('[Password Reset] ========================================');
       console.log('[Password Reset] Initiating password reset for:', email.trim());
+      console.log('[Password Reset] Available signIn methods:', Object.keys(signIn));
+      console.log('[Password Reset] signIn type:', typeof signIn);
 
       // Create a sign-in attempt with just the email
+      console.log('[Password Reset] Step 1: Creating sign-in attempt...');
       const signInAttempt = await signIn.create({
         identifier: email.trim(),
       });
 
-      console.log('[Password Reset] Sign-in attempt created:', {
-        status: signInAttempt.status,
-        supportedFirstFactors: (signInAttempt as any)?.supportedFirstFactors,
-      });
+      console.log('[Password Reset] Step 2: Sign-in attempt created successfully');
+      console.log('[Password Reset] Status:', signInAttempt.status);
+      console.log('[Password Reset] Full signInAttempt object keys:', Object.keys(signInAttempt));
 
       // Check if password reset is supported
       const supportedFactors = (signInAttempt as any)?.supportedFirstFactors || [];
+      console.log('[Password Reset] Step 3: Checking supported factors...');
+      console.log('[Password Reset] Number of supported factors:', supportedFactors.length);
+      console.log('[Password Reset] Supported factor strategies:', supportedFactors.map((f: any) => f.strategy));
+
       const passwordResetStrategy = supportedFactors.find(
         (f: any) => f.strategy === 'reset_password_email_code'
       );
+      console.log('[Password Reset] Password reset strategy found:', !!passwordResetStrategy);
+      console.log('[Password Reset] prepareFirstFactor available:', typeof signIn.prepareFirstFactor);
 
-      if (!passwordResetStrategy) {
-        // Fallback: try to prepare password reset directly
-        try {
-          await signIn.preparePasswordReset({
-            strategy: 'email_code',
-          });
-          console.log('[Password Reset] ✅ Password reset code sent');
-          Alert.alert(
-            'Reset Code Sent',
-            `A password reset code has been sent to:\n${email.trim()}\n\nPlease check your email and enter the code below.`,
-            [{ text: 'OK' }]
-          );
-        } catch (resetError: any) {
-          console.error('[Password Reset] Error preparing reset:', resetError);
-          throw new Error(
-            resetError.errors?.[0]?.message ||
-            resetError.message ||
-            'Failed to send password reset code. Please try again.'
-          );
-        }
-      } else {
-        // Use the supported strategy
-        await signIn.preparePasswordReset({
+      // Use prepareFirstFactor with reset_password_email_code strategy
+      if (passwordResetStrategy && typeof signIn.prepareFirstFactor === 'function') {
+        // Use prepareFirstFactor with reset strategy (Clerk v2.19+)
+        console.log('[Password Reset] Step 4: Using prepareFirstFactor with reset_password_email_code');
+        console.log('[Password Reset] Password reset strategy details:', passwordResetStrategy);
+
+        // Extract emailAddressId from the strategy object
+        const emailAddressId = (passwordResetStrategy as any)?.emailAddressId;
+        console.log('[Password Reset] Email address ID:', emailAddressId);
+
+        const prepareResult = await signIn.prepareFirstFactor({
           strategy: 'reset_password_email_code',
-        });
-        console.log('[Password Reset] ✅ Password reset code sent');
+          emailAddressId: emailAddressId,
+        } as any);
+        console.log('[Password Reset] Step 5: prepareFirstFactor result:', prepareResult);
+        console.log('[Password Reset] ✅ Password reset code sent successfully');
+
+        // Set the resetting password state ONLY after successful code send
+        setIsResettingPassword(true);
+
         Alert.alert(
           'Reset Code Sent',
           `A password reset code has been sent to:\n${email.trim()}\n\nPlease check your email and enter the code below.`,
           [{ text: 'OK' }]
         );
+      } else {
+        // Fallback error with detailed logging
+        console.error('[Password Reset] ❌ No password reset method available');
+        console.error('[Password Reset] Available methods:', Object.keys(signIn));
+        console.error('[Password Reset] Supported factors:', supportedFactors);
+        console.error('[Password Reset] passwordResetStrategy found:', !!passwordResetStrategy);
+        console.error('[Password Reset] prepareFirstFactor exists:', typeof signIn.prepareFirstFactor);
+
+        // Check if password reset is enabled in Clerk dashboard
+        if (supportedFactors.length === 0) {
+          throw new Error(
+            'No authentication methods available for this email. Please check your email address or contact support.'
+          );
+        } else if (!passwordResetStrategy) {
+          throw new Error(
+            'Password reset is not enabled for this account. Please enable password reset in the Clerk dashboard or contact support.'
+          );
+        } else {
+          throw new Error(
+            'Password reset method not available. Please contact support.'
+          );
+        }
       }
     } catch (error: any) {
-      console.error('[Password Reset] Error:', error);
-      const errorMessage =
-        error.errors?.[0]?.message ||
-        error.message ||
-        'Failed to send password reset code. Please check your email and try again.';
+      console.error('[Password Reset] ❌❌❌ ERROR CAUGHT ❌❌❌');
+      console.error('[Password Reset] Error type:', typeof error);
+      console.error('[Password Reset] Error object:', error);
+      console.error('[Password Reset] Error message:', error.message);
+      console.error('[Password Reset] Error errors array:', error.errors);
+      console.error('[Password Reset] Error stack:', error.stack);
 
+      let errorMessage = 'Failed to send password reset code. Please try again.';
+
+      // Extract the most specific error message
+      if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
+        const clerkError = error.errors[0];
+        errorMessage = clerkError.longMessage || clerkError.message || errorMessage;
+        console.error('[Password Reset] Clerk error code:', clerkError.code);
+        console.error('[Password Reset] Clerk error message:', clerkError.message);
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      console.error('[Password Reset] Final error message to user:', errorMessage);
       Alert.alert('Password Reset Failed', errorMessage);
+
+      // Reset the state if it failed - DON'T show reset form
+      setIsResettingPassword(false);
     } finally {
       setLoading(false);
+      console.log('[Password Reset] ========================================');
     }
   };
 
@@ -317,29 +367,52 @@ export default function SignInScreen() {
     setLoading(true);
 
     try {
+      console.log('[Password Reset] ========================================');
       console.log('[Password Reset] Attempting to reset password...');
+      console.log('[Password Reset] Available methods on signIn:', Object.keys(signIn));
+      console.log('[Password Reset] Code length:', resetCode.trim().length);
 
-      // Attempt password reset with the code
-      const result = await signIn.attemptPasswordReset({
-        code: resetCode.trim(),
-        password: newPassword,
-      });
+      // Use attemptFirstFactor with reset_password_email_code strategy
+      let result;
 
-      console.log('[Password Reset] Reset result:', {
-        status: result.status,
-        createdSessionId: result.createdSessionId,
-      });
+      if (typeof signIn.attemptFirstFactor === 'function') {
+        console.log('[Password Reset] Using attemptFirstFactor method with reset_password_email_code strategy');
+        result = await signIn.attemptFirstFactor({
+          strategy: 'reset_password_email_code',
+          code: resetCode.trim(),
+          password: newPassword,
+        } as any);
+      } else if (typeof (signIn as any).resetPassword === 'function') {
+        // Fallback: Use resetPassword method (if available in newer versions)
+        console.log('[Password Reset] Using resetPassword method');
+        result = await (signIn as any).resetPassword({
+          code: resetCode.trim(),
+          password: newPassword,
+        });
+      } else {
+        console.error('[Password Reset] No password reset method available');
+        console.error('[Password Reset] Available methods:', Object.keys(signIn));
+        throw new Error('Password reset method not available. Please contact support.');
+      }
 
-      if (result.status === 'complete' && result.createdSessionId) {
+      console.log('[Password Reset] Reset result status:', result?.status);
+      console.log('[Password Reset] Reset result keys:', Object.keys(result || {}));
+      console.log('[Password Reset] Created session ID:', result?.createdSessionId);
+
+      if (result?.status === 'complete' && result?.createdSessionId) {
+        console.log('[Password Reset] ✅ Password reset complete!');
         // Password reset successful, sign in automatically
         if (setActive && typeof setActive === 'function') {
+          console.log('[Password Reset] Activating session...');
           await setActive({ session: result.createdSessionId });
+          console.log('[Password Reset] ✅ Session activated successfully');
           Alert.alert('Success', 'Password reset successful! You are now signed in.');
           setIsResettingPassword(false);
           setResetCode('');
           setNewPassword('');
           setConfirmPassword('');
         } else {
+          console.warn('[Password Reset] ⚠️ setActive not available, user must sign in manually');
           Alert.alert(
             'Success',
             'Password reset successful! Please sign in with your new password.'
@@ -350,18 +423,35 @@ export default function SignInScreen() {
           setConfirmPassword('');
         }
       } else {
-        throw new Error('Password reset incomplete. Please try again.');
+        console.error('[Password Reset] ❌ Password reset incomplete');
+        console.error('[Password Reset] Result status:', result?.status);
+        console.error('[Password Reset] Full result:', result);
+        throw new Error(`Password reset incomplete. Status: ${result?.status || 'unknown'}`);
       }
     } catch (error: any) {
-      console.error('[Password Reset] Error resetting password:', error);
-      const errorMessage =
-        error.errors?.[0]?.message ||
-        error.message ||
-        'Failed to reset password. Please check your code and try again.';
+      console.error('[Password Reset] ❌❌❌ ERROR CAUGHT ❌❌❌');
+      console.error('[Password Reset] Error type:', typeof error);
+      console.error('[Password Reset] Error object:', error);
+      console.error('[Password Reset] Error message:', error.message);
+      console.error('[Password Reset] Error errors array:', error.errors);
 
+      let errorMessage = 'Failed to reset password. Please check your code and try again.';
+
+      // Extract the most specific error message
+      if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
+        const clerkError = error.errors[0];
+        errorMessage = clerkError.longMessage || clerkError.message || errorMessage;
+        console.error('[Password Reset] Clerk error code:', clerkError.code);
+        console.error('[Password Reset] Clerk error message:', clerkError.message);
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      console.error('[Password Reset] Final error message to user:', errorMessage);
       Alert.alert('Password Reset Failed', errorMessage);
     } finally {
       setLoading(false);
+      console.log('[Password Reset] ========================================');
     }
   };
 
@@ -380,7 +470,7 @@ export default function SignInScreen() {
 
           <View style={styles.form}>
             <Text style={styles.label}>Email</Text>
-            <TextInput
+            <SafeTextInput
               style={styles.input}
               placeholder="Enter your email"
               value={email}
@@ -399,7 +489,7 @@ export default function SignInScreen() {
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
             </View>
-            <TextInput
+            <SafeTextInput
               style={styles.input}
               placeholder="Enter your password"
               value={password}
@@ -452,7 +542,7 @@ export default function SignInScreen() {
                   <Text style={styles.resetTitle}>Reset Your Password</Text>
                   
                   <Text style={styles.label}>Reset Code</Text>
-                  <TextInput
+                  <SafeTextInput
                     style={styles.input}
                     placeholder="Enter 6-digit code from email"
                     value={resetCode}
@@ -463,7 +553,7 @@ export default function SignInScreen() {
                   />
 
                   <Text style={styles.label}>New Password</Text>
-                  <TextInput
+                  <SafeTextInput
                     style={styles.input}
                     placeholder="Enter new password"
                     value={newPassword}
@@ -473,7 +563,7 @@ export default function SignInScreen() {
                   />
 
                   <Text style={styles.label}>Confirm Password</Text>
-                  <TextInput
+                  <SafeTextInput
                     style={styles.input}
                     placeholder="Confirm new password"
                     value={confirmPassword}

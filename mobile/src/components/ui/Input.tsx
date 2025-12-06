@@ -1,12 +1,12 @@
 import React from 'react';
 import {
-  TextInput,
   Text,
   View,
   StyleSheet,
   TextInputProps,
   ViewStyle,
 } from 'react-native';
+import { SafeTextInput } from '../SafeTextInput';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -24,7 +24,7 @@ export function Input({
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <TextInput
+      <SafeTextInput
         style={[
           styles.input,
           error && styles.inputError,

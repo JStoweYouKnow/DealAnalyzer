@@ -5,6 +5,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
+import { setupNavigationGuards } from '../utils/navigationGuards';
+import { setupKeyboardDismissOnNavigation } from '../utils/textInputSafety';
+import { Keyboard } from 'react-native';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -194,8 +197,31 @@ export default function AppNavigator() {
 
   console.log('[AppNavigator] Auth state - isLoaded:', isLoaded, 'isSignedIn:', isSignedIn);
 
+  // Setup navigation guards to prevent crashes
+  React.useEffect(() => {
+    if (navigationRef.current) {
+      const unsubscribe = setupNavigationGuards(navigationRef.current);
+      // Also setup keyboard dismissal on navigation
+      const keyboardUnsubscribe = setupKeyboardDismissOnNavigation(navigationRef.current, true);
+      return () => {
+        unsubscribe?.();
+        keyboardUnsubscribe?.();
+      };
+    }
+  }, []);
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer 
+      ref={navigationRef}
+      onReady={() => {
+        console.log('[Navigation] Container ready');
+      }}
+      onStateChange={(state) => {
+        console.log('[Navigation] State changed:', state?.routes[state?.routes.length - 1]?.name);
+        // Dismiss keyboard on navigation state change
+        Keyboard.dismiss();
+      }}
+    >
       <Stack.Navigator
         screenOptions={{
           headerStyle: {

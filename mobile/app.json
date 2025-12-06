@@ -20,7 +20,9 @@
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select property images for analysis.",
         "NSCameraUsageDescription": "This app needs access to your camera to take photos of property documents."
       },
-      "associatedDomains": ["applinks:comfortfinder.projcomfort.com"],
+      "associatedDomains": [
+        "applinks:comfortfinder.projcomfort.com"
+      ],
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -42,7 +44,9 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {
