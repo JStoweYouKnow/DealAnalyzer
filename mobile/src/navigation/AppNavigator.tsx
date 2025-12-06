@@ -118,9 +118,13 @@ export default function AppNavigator() {
       elapsedSeconds: Math.round(elapsed / 1000)
     });
     
+    // Always initialize variables (React requirement)
+    let interval: NodeJS.Timeout | null = null;
+    let timeout: NodeJS.Timeout | null = null;
+    
     // Log every 2 seconds while loading
     if (!isLoaded) {
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         console.log('[AppNavigator] Still loading...', {
           elapsedSeconds: Math.round(elapsed / 1000),
@@ -128,7 +132,7 @@ export default function AppNavigator() {
         });
       }, 2000);
 
-      const timeout = setTimeout(() => {
+      timeout = setTimeout(() => {
         if (!isLoaded) {
           console.error('[AppNavigator] ⚠️ Clerk is taking too long to load (>10s).');
           console.error('[AppNavigator] Possible causes:');
@@ -139,12 +143,13 @@ export default function AppNavigator() {
           setLoadingTimeout(true);
         }
       }, 10000); // 10 second timeout
-
-      return () => {
-        clearInterval(interval);
-        clearTimeout(timeout);
-      };
     }
+
+    // Always return cleanup function (React requirement)
+    return () => {
+      if (interval) clearInterval(interval);
+      if (timeout) clearTimeout(timeout);
+    };
   }, [isLoaded, startTime]);
 
   if (!isLoaded) {
@@ -198,17 +203,31 @@ export default function AppNavigator() {
   console.log('[AppNavigator] Auth state - isLoaded:', isLoaded, 'isSignedIn:', isSignedIn);
 
   // Setup navigation guards to prevent crashes
+  // Only run once when component mounts and navigation is ready
   React.useEffect(() => {
-    if (navigationRef.current) {
-      const unsubscribe = setupNavigationGuards(navigationRef.current);
-      // Also setup keyboard dismissal on navigation
-      const keyboardUnsubscribe = setupKeyboardDismissOnNavigation(navigationRef.current, true);
-      return () => {
-        unsubscribe?.();
-        keyboardUnsubscribe?.();
-      };
-    }
-  }, []);
+    let unsubscribe: (() => void) | undefined;
+    let keyboardUnsubscribe: (() => void) | undefined;
+    
+    // Use a small delay to ensure navigation ref is fully initialized
+    const timer = setTimeout(() => {
+      if (navigationRef.current) {
+        try {
+          unsubscribe = setupNavigationGuards(navigationRef.current);
+          // Also setup keyboard dismissal on navigation
+          keyboardUnsubscribe = setupKeyboardDismissOnNavigation(navigationRef.current, true);
+        } catch (error) {
+          console.error('[AppNavigator] Error setting up navigation guards:', error);
+        }
+      }
+    }, 100);
+
+    // Always return cleanup function (React requirement)
+    return () => {
+      clearTimeout(timer);
+      unsubscribe?.();
+      keyboardUnsubscribe?.();
+    };
+  }, []); // Empty deps - only run once on mount
 
   return (
     <NavigationContainer 
