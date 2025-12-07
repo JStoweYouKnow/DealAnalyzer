@@ -220,11 +220,49 @@ export default function SignUpScreen() {
       
       // Make error messages more user-friendly
       if (errorMessage.includes('email') && errorMessage.includes('already')) {
-        errorMessage = 'An account with this email already exists. Please sign in instead.';
+        // Offer to navigate to sign-in for existing accounts
+        Alert.alert(
+          'Account Already Exists',
+          'An account with this email already exists. Would you like to sign in instead?',
+          [
+            {
+              text: 'Sign In',
+              onPress: () => {
+                console.log('[SignUp] Navigating to sign-in for existing account');
+                navigation.navigate('SignIn');
+              },
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ]
+        );
+        return;
       } else if (errorMessage.includes('username') && errorMessage.includes('already')) {
         errorMessage = 'This username is already taken. Please choose another.';
       } else if (errorMessage.includes('email') && errorMessage.includes('invalid')) {
         errorMessage = 'Please enter a valid email address.';
+      } else if (errorMessage.includes('identifier')) {
+        // Catch identifier-related errors (email/username conflicts)
+        Alert.alert(
+          'Account Already Exists',
+          'An account with this email or username already exists. Would you like to sign in instead?',
+          [
+            {
+              text: 'Sign In',
+              onPress: () => {
+                console.log('[SignUp] Navigating to sign-in for existing identifier');
+                navigation.navigate('SignIn');
+              },
+            },
+            {
+              text: 'Try Different Email',
+              style: 'cancel',
+            },
+          ]
+        );
+        return;
       }
       
       Alert.alert('Sign Up Failed', errorMessage);
