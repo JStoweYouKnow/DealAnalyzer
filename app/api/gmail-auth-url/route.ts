@@ -185,14 +185,10 @@ export async function GET(request: NextRequest) {
       access_type: 'offline',
       scope: scopes,
       include_granted_scopes: true,
-      prompt: 'select_account', // default to account chooser for first-time auth
+      // Always force consent so Google returns a refresh_token (needed after re-auth)
+      prompt: clearSession ? 'select_account consent' : 'consent select_account',
       state, // Include userId in state for callback
     };
-    
-    // Force account selection and consent if requested via `clear=true`
-    if (clearSession) {
-      authUrlConfig.prompt = 'select_account consent';
-    }
 
     const authUrl = auth.generateAuthUrl(authUrlConfig);
     

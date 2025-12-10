@@ -220,6 +220,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Determine if this was a mobile request before proceeding
+    const userAgent = request.headers.get('user-agent') || '';
+    const isMobileRequest = state || /Mobile|Android|iPhone|iPad/i.test(userAgent);
+
+    // If we still don't have a refresh token, fail fast so mobile knows to retry with consent
+    if (!refreshToken) {
+      console.error('[Gmail Callback] ❌ No refresh token available after token exchange and lookup.');
+      const deepLinkFailure = 'dealanalyzer://gmail-callback?success=false&reason=no_refresh_token';
+      if (isMobileRequest) {
+        return NextResponse.redirect(deepLinkFailure, 302);
+      }
+      return NextResponse.json(
+        { success: false, error: 'No refresh token received. Please reconnect Gmail and allow consent.' },
+        { status: 400 }
+      );
+    }
+
     // Store tokens in cookie
     const cookieStore = await cookies();
     const isHttps = forwardedProtoForRedirect
@@ -290,10 +307,6 @@ export async function GET(request: NextRequest) {
   });
   console.log('═══════════════════════════════════════════════════════════');
   console.log('');
-
-  // Check if this is a mobile OAuth request (has state parameter or User-Agent indicates mobile)
-  const userAgent = request.headers.get('user-agent') || '';
-  const isMobileRequest = state || /Mobile|Android|iPhone|iPad/i.test(userAgent);
 
   console.log('[Gmail Callback] Determining response type:', {
     isMobileRequest,
