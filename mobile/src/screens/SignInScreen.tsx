@@ -13,6 +13,7 @@ import { SafeTextInput } from '../components/SafeTextInput';
 import { useAuth, useSignIn, useClerk } from '@clerk/clerk-expo';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useQueryClient } from '@tanstack/react-query';
 import { RootStackParamList } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -21,10 +22,11 @@ export default function SignInScreen() {
   const { setActive: setActiveFromAuth, isLoaded, isSignedIn } = useAuth();
   const clerk = useClerk();
   const { signIn, isLoaded: signInLoaded } = useSignIn();
-  
+  const queryClient = useQueryClient();
+
   // Try to get setActive from multiple sources
   const setActive = setActiveFromAuth || clerk?.setActive || (clerk as any)?.__internal_setActive;
-  
+
   // Log setActive availability
   useEffect(() => {
     if (isLoaded) {
@@ -165,6 +167,11 @@ export default function SignInScreen() {
           }
           await setActive({ session: attemptResult.createdSessionId });
           console.log('✅ Session activated successfully');
+
+          // Invalidate email deals query to fetch fresh data after sign in
+          console.log('[SignIn] Invalidating email-deals query...');
+          queryClient.invalidateQueries({ queryKey: ['email-deals'] });
+
           return; // Success, exit early
         } else {
           throw new Error(`Password verification incomplete. Status: ${attemptResult.status}`);
@@ -178,6 +185,11 @@ export default function SignInScreen() {
         }
         await setActive({ session: createResult.createdSessionId });
         console.log('✅ Session activated successfully');
+
+        // Invalidate email deals query to fetch fresh data after sign in
+        console.log('[SignIn] Invalidating email-deals query...');
+        queryClient.invalidateQueries({ queryKey: ['email-deals'] });
+
         // Navigation will automatically switch to MainTabs
       } else {
         console.warn('⚠️ Sign in incomplete. Status:', createResult.status);
@@ -406,6 +418,11 @@ export default function SignInScreen() {
           console.log('[Password Reset] Activating session...');
           await setActive({ session: result.createdSessionId });
           console.log('[Password Reset] ✅ Session activated successfully');
+
+          // Invalidate email deals query to fetch fresh data after sign in
+          console.log('[Password Reset] Invalidating email-deals query...');
+          queryClient.invalidateQueries({ queryKey: ['email-deals'] });
+
           Alert.alert('Success', 'Password reset successful! You are now signed in.');
           setIsResettingPassword(false);
           setResetCode('');

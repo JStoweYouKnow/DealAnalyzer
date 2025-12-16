@@ -111,17 +111,17 @@ export default function AppNavigator() {
   // Add timeout to detect if Clerk is stuck loading
   React.useEffect(() => {
     const elapsed = Date.now() - startTime;
-    console.log('[AppNavigator] Clerk loading state:', { 
-      isLoaded, 
+    console.log('[AppNavigator] Clerk loading state:', {
+      isLoaded,
       isSignedIn,
       elapsedMs: elapsed,
       elapsedSeconds: Math.round(elapsed / 1000)
     });
-    
+
     // Always initialize variables (React requirement)
     let interval: NodeJS.Timeout | null = null;
     let timeout: NodeJS.Timeout | null = null;
-    
+
     // Log every 2 seconds while loading
     if (!isLoaded) {
       interval = setInterval(() => {
@@ -151,6 +151,37 @@ export default function AppNavigator() {
       if (timeout) clearTimeout(timeout);
     };
   }, [isLoaded, startTime]);
+
+  // Setup navigation guards to prevent crashes
+  // IMPORTANT: This useEffect must be BEFORE any early returns to avoid "rendered more hooks" error
+  // Only run once when component mounts and navigation is ready
+  React.useEffect(() => {
+    // Don't setup guards until loaded
+    if (!isLoaded) return;
+
+    let unsubscribe: (() => void) | undefined;
+    let keyboardUnsubscribe: (() => void) | undefined;
+
+    // Use a small delay to ensure navigation ref is fully initialized
+    const timer = setTimeout(() => {
+      if (navigationRef.current) {
+        try {
+          unsubscribe = setupNavigationGuards(navigationRef.current);
+          // Also setup keyboard dismissal on navigation
+          keyboardUnsubscribe = setupKeyboardDismissOnNavigation(navigationRef.current, true);
+        } catch (error) {
+          console.error('[AppNavigator] Error setting up navigation guards:', error);
+        }
+      }
+    }, 100);
+
+    // Always return cleanup function (React requirement)
+    return () => {
+      clearTimeout(timer);
+      unsubscribe?.();
+      keyboardUnsubscribe?.();
+    };
+  }, [isLoaded]); // Run when isLoaded changes
 
   if (!isLoaded) {
     const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
@@ -201,33 +232,6 @@ export default function AppNavigator() {
   }
 
   console.log('[AppNavigator] Auth state - isLoaded:', isLoaded, 'isSignedIn:', isSignedIn);
-
-  // Setup navigation guards to prevent crashes
-  // Only run once when component mounts and navigation is ready
-  React.useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    let keyboardUnsubscribe: (() => void) | undefined;
-    
-    // Use a small delay to ensure navigation ref is fully initialized
-    const timer = setTimeout(() => {
-      if (navigationRef.current) {
-        try {
-          unsubscribe = setupNavigationGuards(navigationRef.current);
-          // Also setup keyboard dismissal on navigation
-          keyboardUnsubscribe = setupKeyboardDismissOnNavigation(navigationRef.current, true);
-        } catch (error) {
-          console.error('[AppNavigator] Error setting up navigation guards:', error);
-        }
-      }
-    }, 100);
-
-    // Always return cleanup function (React requirement)
-    return () => {
-      clearTimeout(timer);
-      unsubscribe?.();
-      keyboardUnsubscribe?.();
-    };
-  }, []); // Empty deps - only run once on mount
 
   return (
     <NavigationContainer 
