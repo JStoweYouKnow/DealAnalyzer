@@ -102,7 +102,7 @@ function DeepLinkHandler() {
     const handleDeepLink = async (event: { url: string }) => {
       const { url } = event;
       console.log('[Deep Link] Received:', url);
-      
+
       // Handle Gmail OAuth callback
       if (url.includes('gmail-callback')) {
         const urlObj = Linking.parse(url);
@@ -111,27 +111,44 @@ function DeepLinkHandler() {
           queryParams: urlObj.queryParams,
           success: urlObj.queryParams?.success,
         });
-        
+
         // Always invalidate queries when gmail-callback is received
         // The callback might not have success param, but if we got here, OAuth likely succeeded
         console.log('[Deep Link] ✅ Gmail callback received, invalidating queries...');
-        
+
         // Remove queries from cache first to force fresh fetch
         queryClient.removeQueries({ queryKey: ['gmail-status'] });
         queryClient.removeQueries({ queryKey: ['email-deals'] });
-        
+
         // Invalidate queries to trigger refetch
         queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
         queryClient.invalidateQueries({ queryKey: ['email-deals'] });
-        
+
         // Wait a moment for tokens to be stored, then refetch
         setTimeout(() => {
           console.log('[Deep Link] Refetching queries after delay...');
           queryClient.refetchQueries({ queryKey: ['gmail-status'] });
           queryClient.refetchQueries({ queryKey: ['email-deals'] });
         }, 2000);
-        
+
         console.log('[Deep Link] ✅ Queries invalidated and will refetch');
+      } else if (url.includes('gmail-callback') && url.includes('success=false')) {
+        const urlObj = Linking.parse(url);
+        const reason = urlObj.queryParams?.reason || 'Unknown error';
+        console.error('[Deep Link] ❌ Gmail auth failed:', reason);
+
+        // Show alert to user
+        // We need to import Alert first, but since this is a functional component inside App.tsx
+        // and App.tsx imports View, Text, Platform from react-native, we can use require or assume Alert is available
+        // But App.tsx doesn't import Alert at top level. Let's rely on console error for now or add Alert import if possible
+        // Actually simpler: just log it and maybe the UI will reflect "disconnected".
+        // But better: show Alert.
+        const { Alert } = require('react-native');
+        Alert.alert(
+          'Connection Failed',
+          `Gmail connection failed: ${reason}`,
+          [{ text: 'OK' }]
+        );
       }
     };
 
@@ -157,10 +174,10 @@ function DeepLinkHandler() {
 function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
   return (
     <SafeAreaProvider>
-      <View style={{ 
-        flex: 1, 
-        justifyContent: 'center', 
-        alignItems: 'center', 
+      <View style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
         padding: 20,
         backgroundColor: '#fff'
       }}>
@@ -170,11 +187,11 @@ function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetError
         <Text style={{ fontSize: 14, color: '#666', marginBottom: 20, textAlign: 'center' }}>
           {error.message}
         </Text>
-        <Text 
-          style={{ 
-            color: '#3498db', 
-            fontSize: 16, 
-            textDecorationLine: 'underline' 
+        <Text
+          style={{
+            color: '#3498db',
+            fontSize: 16,
+            textDecorationLine: 'underline'
           }}
           onPress={resetErrorBoundary}
         >
@@ -203,7 +220,7 @@ export default function App() {
     console.log('[App] Platform:', Platform.OS);
     console.log('[App] Is Expo Go:', __DEV__ && !Constants.expoConfig?.ios?.bundleIdentifier);
     console.log('[App] ====================================');
-    
+
     // Test network connectivity from mobile app
     if (clerkPublishableKey) {
       console.log('[App] Testing network connectivity to Clerk...');
@@ -274,9 +291,9 @@ export default function App() {
         <ClerkProvider
           publishableKey={trimmedKey}
           tokenCache={tokenCache}
-          // Enable native API support for mobile apps
-          // If you get "native api disabled" error, enable Native API in Clerk Dashboard
-          // Settings → API Keys → Enable "Native API" or "Mobile SDK Support"
+        // Enable native API support for mobile apps
+        // If you get "native api disabled" error, enable Native API in Clerk Dashboard
+        // Settings → API Keys → Enable "Native API" or "Mobile SDK Support"
         >
           <ConvexProvider client={convex}>
             <QueryClientProvider client={queryClient}>

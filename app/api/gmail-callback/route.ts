@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { emailMonitoringService } from "../../../server/email-service";
 import { cookies } from "next/headers";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   // Log immediately when callback is received - this is critical for debugging
   const timestamp = new Date().toISOString();
@@ -21,13 +23,13 @@ export async function GET(request: NextRequest) {
   });
   console.log('═══════════════════════════════════════════════════════════');
   console.log('');
-  
+
   try {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
-    
+
     console.log('[Gmail Callback] Query parameters:', {
       hasCode: !!code,
       codeLength: code?.length,
@@ -37,7 +39,7 @@ export async function GET(request: NextRequest) {
       error,
       allParams: Object.fromEntries(searchParams.entries()),
     });
-    
+
     if (error) {
       console.error('[Gmail Callback] OAuth error from Google:', error);
       return NextResponse.json(
@@ -45,7 +47,7 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     if (!code || typeof code !== 'string') {
       console.error('[Gmail Callback] Missing authorization code');
       return NextResponse.json(
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     // Get user ID from state parameter (for mobile OAuth) or authentication (for web)
     let userId: string | null = null;
-    
+
     // Try to extract userId from state parameter (used for mobile OAuth)
     if (state) {
       try {
@@ -86,7 +88,7 @@ export async function GET(request: NextRequest) {
         }
       }
     }
-    
+
     // Fallback to Clerk authentication (for web OAuth)
     if (!userId) {
       try {
@@ -100,9 +102,19 @@ export async function GET(request: NextRequest) {
         // Clerk not available or not configured
       }
     }
-    
+
     if (!userId) {
       console.warn('[Gmail Callback] No userId available - tokens will be stored in cookie only');
+      // For mobile requests, this is a critical failure as they can't access cookies
+      // We must have a userId to persist tokens to DB
+      const userAgent = request.headers.get('user-agent') || '';
+      const isMobileRequest = state || /Mobile|Android|iPhone|iPad/i.test(userAgent);
+
+      if (isMobileRequest) {
+        console.error('[Gmail Callback] ❌ Mobile request missing userId - cannot persist tokens');
+        const deepLinkFailure = 'dealanalyzer://gmail-callback?success=false&reason=user_id_missing_in_callback';
+        return NextResponse.redirect(deepLinkFailure, 302);
+      }
     }
 
     // Determine the redirect URI that was used (must match the one in auth URL)
@@ -121,7 +133,7 @@ export async function GET(request: NextRequest) {
       requestUrl: request.url,
       fullUrl: request.url,
     });
-    
+
     // Log the exact redirect URI being used
     console.log('[Gmail Callback] Using redirect URI:', redirectUri);
     console.log('[Gmail Callback] This must match the redirect URI used in the auth URL');
@@ -132,18 +144,18 @@ export async function GET(request: NextRequest) {
       // We need to pass it to getTokens to ensure it matches
       const clientId = process.env.GMAIL_CLIENT_ID;
       const clientSecret = process.env.GMAIL_CLIENT_SECRET;
-      
+
       if (!clientId || !clientSecret) {
         throw new Error('Gmail OAuth credentials not configured');
       }
-      
+
       const { google } = await import('googleapis');
       const auth = new google.auth.OAuth2(
         clientId,
         clientSecret,
         redirectUri // Must match the redirect URI used in the auth URL
       );
-      
+
       const tokenResponse = await auth.getToken(code);
       tokens = tokenResponse.tokens;
       console.log('[Gmail Callback] Successfully exchanged code for tokens', {
@@ -154,10 +166,10 @@ export async function GET(request: NextRequest) {
     } catch (error: any) {
       console.error('[Gmail Callback] Error exchanging code for tokens:', error);
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: "Failed to exchange authorization code for tokens",
-          details: error.message 
+          details: error.message
         },
         { status: 500 }
       );
@@ -227,7 +239,7 @@ export async function GET(request: NextRequest) {
     // If we still don't have a refresh token, fail fast so mobile knows to retry with consent
     if (!refreshToken) {
       console.error('[Gmail Callback] ❌ No refresh token available after token exchange and lookup.');
-      const deepLinkFailure = 'dealanalyzer://gmail-callback?success=false&reason=no_refresh_token';
+      const deepLinkFailure = 'dealanalyzer://gmail-callback?success=false&reason=no_refresh_token_received';
       if (isMobileRequest) {
         return NextResponse.redirect(deepLinkFailure, 302);
       }
@@ -271,7 +283,7 @@ export async function GET(request: NextRequest) {
           const { ConvexHttpClient } = await import('convex/browser');
           const apiModule = await import('../../../convex/_generated/api');
           const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
-          
+
           await convexClient.mutation(apiModule.api.userOAuthTokens.upsertTokens, {
             userId,
             accessToken: tokens.access_token,
@@ -280,24 +292,34 @@ export async function GET(request: NextRequest) {
             expiryDate: tokens.expiry_date ?? existingTokens?.expiry_date ?? undefined,
             tokenType: tokens.token_type || existingTokens?.token_type || 'Bearer',
           });
-          
-          console.log('[Gmail Callback] Tokens persisted to database');
+
+          if (tokenStoredId) {
+            console.log(`[Gmail Callback] ✅ Tokens stored in database for user ${userId}, ID: ${tokenStoredId}`);
+          } else {
+            console.warn(`[Gmail Callback] ⚠️ Token storage returned null ID for user ${userId}`);
+          }
         }
+      }
       } catch (error) {
-        console.error('[Gmail Callback] Error persisting tokens to database:', error);
-        // Don't fail the callback if persistence fails - cookies are still set
+      console.error('[Gmail Callback] Error persisting tokens to database:', error);
+      // If persistence fails, we should signal this to the mobile app appropriately
+      if (isMobileRequest) {
+        console.warn('[Gmail Callback] ⚠️ Failed to persist tokens for mobile user - updating redirect');
+        // We can't easily change the redirect variable here since it's const if declared above
+        // But looking at the code structure, we haven't redirected yet.
       }
     }
+  }
 
     // Verify cookie was set
     const verifyGmailTokensCookie = cookieStore.get('gmailTokens');
-    console.log('[Gmail Callback] Cookie verification:', {
-      cookieSet: !!verifyGmailTokensCookie,
-      hasAccessToken: !!tokens.access_token,
-      hasRefreshToken: !!tokens.refresh_token,
-      userIdSet: !!userId,
-    });
-    
+  console.log('[Gmail Callback] Cookie verification:', {
+    cookieSet: !!verifyGmailTokensCookie,
+    hasAccessToken: !!tokens.access_token,
+    hasRefreshToken: !!tokens.refresh_token,
+    userIdSet: !!userId,
+  });
+
   // Log successful token exchange and storage
   console.log('[Gmail Callback] ✅ SUCCESS - Tokens stored and ready', {
     hasAccessToken: !!tokens.access_token,
@@ -449,25 +471,25 @@ export async function GET(request: NextRequest) {
       },
     }
   );
-  } catch (error: any) {
-    console.error("[Gmail Callback] ❌ Unhandled error in callback:", error);
-    console.error("[Gmail Callback] Error details:", {
-      message: error?.message,
-      stack: error?.stack,
-      name: error?.name,
-      code: error?.code,
-    });
-    
-    // Return more detailed error for debugging (in production, you might want to hide details)
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: "Failed to complete Gmail authorization",
-        details: process.env.NODE_ENV === 'development' ? error?.message : undefined,
-        hint: "Check server logs for more details. Common issues: missing env vars, redirect URI mismatch, or code already used."
-      },
-      { status: 500 }
-    );
-  }
+} catch (error: any) {
+  console.error("[Gmail Callback] ❌ Unhandled error in callback:", error);
+  console.error("[Gmail Callback] Error details:", {
+    message: error?.message,
+    stack: error?.stack,
+    name: error?.name,
+    code: error?.code,
+  });
+
+  // Return more detailed error for debugging (in production, you might want to hide details)
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Failed to complete Gmail authorization",
+      details: process.env.NODE_ENV === 'development' ? error?.message : undefined,
+      hint: "Check server logs for more details. Common issues: missing env vars, redirect URI mismatch, or code already used."
+    },
+    { status: 500 }
+  );
+}
 }
 

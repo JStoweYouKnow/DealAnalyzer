@@ -287,3 +287,5 @@ await signIn.resetPassword({ code: '123456', password: 'newpass' });
 
 *Complete fix applied: December 5, 2025*
 
+
+

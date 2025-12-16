@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 import { logger } from "@/lib/logger";
 
-// Helper function to decode base64 with padding
+export const dynamic = 'force-dynamic';
+
+// Helper function to decode base64url with padding
 function decodeBase64(base64: string): string {
+  // Convert from base64url to base64
+  let padded = base64.replace(/-/g, '+').replace(/_/g, '/');
   // Add padding if needed
-  let padded = base64;
   while (padded.length % 4) {
     padded += '=';
   }
@@ -99,23 +102,23 @@ export async function GET(request: NextRequest) {
     const gmailTokensCookie = cookieStore.get('gmailTokens');
     let isConnected = false;
     let tokenSource: 'cookie' | 'database' | 'none' = 'none';
-    
+
     // For mobile apps, cookies might not be accessible, so always check database if userId is available
     // For web apps, check cookies first for faster response
-    const isMobileRequest = request.headers.get('user-agent')?.includes('Mobile') || 
-                           request.headers.get('origin')?.includes('localhost') ||
-                           !gmailTokensCookie; // If no cookie, likely mobile
-    
+    const isMobileRequest = request.headers.get('user-agent')?.includes('Mobile') ||
+      request.headers.get('origin')?.includes('localhost') ||
+      !gmailTokensCookie; // If no cookie, likely mobile
+
     // Check if cookie exists and contains valid tokens (for web requests)
     if (gmailTokensCookie && !isMobileRequest) {
       try {
         const tokens = JSON.parse(gmailTokensCookie.value);
         // Validate that tokens exist and are not empty
-        if (tokens && 
-            tokens.access_token && 
-            tokens.access_token.trim() !== '' &&
-            tokens.refresh_token && 
-            tokens.refresh_token.trim() !== '') {
+        if (tokens &&
+          tokens.access_token &&
+          tokens.access_token.trim() !== '' &&
+          tokens.refresh_token &&
+          tokens.refresh_token.trim() !== '') {
           isConnected = true;
           tokenSource = 'cookie';
           console.log('[Gmail Status Check] ✅ Valid tokens found in cookie');
@@ -126,7 +129,7 @@ export async function GET(request: NextRequest) {
         console.error('[Gmail Status Check] Error parsing cookie:', error);
       }
     }
-    
+
     // Always check database if userId is available (especially for mobile apps)
     // SECURITY: Use server-side action to retrieve tokens - never expose tokens to clients
     if (!isConnected && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
@@ -135,26 +138,26 @@ export async function GET(request: NextRequest) {
         const { ConvexHttpClient } = await import('convex/browser');
         const apiModule = await import('../../../convex/_generated/api');
         const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
-        
+
         // SECURITY: Use action to retrieve tokens server-side only
         // This ensures tokens are never exposed to client code
         const dbTokens = await convexClient.action(apiModule.api.userOAuthTokens.retrieveTokensForServer, { userId });
-        
+
         console.log('[Gmail Status Check] Database query result:', {
           hasDbTokens: !!dbTokens,
           hasAccessToken: !!dbTokens?.accessToken,
           hasRefreshToken: !!dbTokens?.refreshToken,
         });
-        
-        if (dbTokens && 
-            dbTokens.accessToken && 
-            dbTokens.accessToken.trim() !== '' &&
-            dbTokens.refreshToken && 
-            dbTokens.refreshToken.trim() !== '') {
+
+        if (dbTokens &&
+          dbTokens.accessToken &&
+          dbTokens.accessToken.trim() !== '' &&
+          dbTokens.refreshToken &&
+          dbTokens.refreshToken.trim() !== '') {
           isConnected = true;
           tokenSource = 'database';
           console.log('[Gmail Status Check] ✅ Valid tokens found in database');
-          
+
           // Refresh the cookie with tokens from database for faster access next time
           // SECURITY: Tokens are stored in httpOnly cookie, not exposed to client JavaScript
           const tokenData = {
@@ -164,7 +167,7 @@ export async function GET(request: NextRequest) {
             token_type: dbTokens.tokenType || 'Bearer',
             expiry_date: dbTokens.expiryDate,
           };
-          
+
           cookieStore.set('gmailTokens', JSON.stringify(tokenData), {
             httpOnly: true,
             secure: useSecureCookies,
@@ -172,7 +175,7 @@ export async function GET(request: NextRequest) {
             maxAge: 24 * 60 * 60, // 24 hours
             path: '/',
           });
-          
+
           console.log('[Gmail Status Check] Refreshed cookie with tokens from database');
         } else {
           console.log('[Gmail Status Check] ⚠️ No valid tokens in database', {
@@ -208,7 +211,20 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      connected: isConnected
+      connected: isConnected,
+      debug: process.env.NODE_ENV === 'development' || !isConnected ? {
+        userId: userId ? userId.substring(0, 10) + '...' : null,
+        tokenSource,
+        hasCookie: !!gmailTokensCookie,
+        isMobileRequest,
+        dbCheck: {
+          attempted: !isConnected && !!userId && !!process.env.NEXT_PUBLIC_CONVEX_URL,
+          hasConvexUrl: !!process.env.NEXT_PUBLIC_CONVEX_URL,
+          // We can't easily return the dbTokens result here as it was local scope, 
+          // but we can infer if we found tokens if tokenSource === 'database'
+          result: tokenSource === 'database' ? 'tokens_found' : 'no_tokens_found'
+        }
+      } : undefined
     });
   } catch (error) {
     console.error("Error checking Gmail status:", error);

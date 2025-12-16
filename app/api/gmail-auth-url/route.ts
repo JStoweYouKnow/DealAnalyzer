@@ -5,10 +5,11 @@ import { logger } from "@/lib/logger";
 
 const DEFAULT_PROJECT_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN;
 
-// Helper function to decode base64 with padding
+// Helper function to decode base64url with padding
 function decodeBase64(base64: string): string {
+  // Convert from base64url to base64
+  let padded = base64.replace(/-/g, '+').replace(/_/g, '/');
   // Add padding if needed
-  let padded = base64;
   while (padded.length % 4) {
     padded += '=';
   }
@@ -85,14 +86,14 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
-    
+
     console.log('[Gmail Auth URL] ✅ Authenticated request', {
       userId: userId.substring(0, 20),
     });
     // Check for a "clear" parameter to force account selection
     const url = new URL(request.url);
     const clearSession = url.searchParams.get('clear') === 'true';
-    
+
     // Always use web redirect URI (required by Google OAuth)
     // The web callback will then redirect to the mobile app via deep link
     // This is the standard OAuth flow for mobile apps
@@ -102,13 +103,13 @@ export async function GET(request: NextRequest) {
 
     // Check if request is from mobile app
     const origin = request.headers.get('origin') || request.headers.get('referer') || '';
-    const isMobileRequest = origin.includes('api.comfortfinder.com') || 
-                           origin.includes('comfortfinder.projcomfort.com') ||
-                           url.hostname.includes('api.comfortfinder.com') ||
-                           url.hostname.includes('comfortfinder.projcomfort.com') ||
-                           url.searchParams.get('platform') === 'mobile' ||
-                           request.headers.get('user-agent')?.includes('Expo') ||
-                           request.headers.get('user-agent')?.includes('ReactNative');
+    const isMobileRequest = origin.includes('api.comfortfinder.com') ||
+      origin.includes('comfortfinder.projcomfort.com') ||
+      url.hostname.includes('api.comfortfinder.com') ||
+      url.hostname.includes('comfortfinder.projcomfort.com') ||
+      url.searchParams.get('platform') === 'mobile' ||
+      request.headers.get('user-agent')?.includes('Expo') ||
+      request.headers.get('user-agent')?.includes('ReactNative');
 
     // If NEXT_PUBLIC_APP_DOMAIN is set, use it (for production consistency)
     if (DEFAULT_PROJECT_DOMAIN) {
@@ -138,11 +139,11 @@ export async function GET(request: NextRequest) {
 
     // Always use web callback - it will redirect to mobile app via deep link
     const redirectUri = `${protocol}://${host}/api/gmail-callback`;
-    
+
     if (isMobileRequest) {
       console.log('[Gmail Auth URL] Mobile app request - using web callback (will redirect to deep link)');
     }
-    
+
     console.log('[Gmail Auth URL] Redirect URI determination:', {
       requestHost: request.headers.get('host'),
       requestUrl: request.url,
@@ -152,7 +153,7 @@ export async function GET(request: NextRequest) {
       DEFAULT_PROJECT_DOMAIN,
       finalRedirectUri: redirectUri,
     });
-    
+
     // Create auth URL with dynamic redirect URI
     const auth = new google.auth.OAuth2(
       process.env.GMAIL_CLIENT_ID,
@@ -191,7 +192,7 @@ export async function GET(request: NextRequest) {
     };
 
     const authUrl = auth.generateAuthUrl(authUrlConfig);
-    
+
     // Parse the generated auth URL to extract redirect_uri for verification
     let redirectUriInUrl = 'unknown';
     try {
@@ -200,7 +201,7 @@ export async function GET(request: NextRequest) {
     } catch (e) {
       console.warn('[Gmail Auth URL] Could not parse generated auth URL:', e);
     }
-    
+
     console.log('[Gmail Auth URL] Generated OAuth URL', {
       userId: userId ? userId.substring(0, 20) + '...' : 'MISSING',
       redirectUri,
@@ -211,7 +212,7 @@ export async function GET(request: NextRequest) {
       requestUrl: request.url,
       fullAuthUrl: authUrl, // Log full URL for debugging
     });
-    
+
     return NextResponse.json({
       success: true,
       authUrl
