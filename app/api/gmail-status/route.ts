@@ -213,15 +213,14 @@ export async function GET(request: NextRequest) {
       success: true,
       connected: isConnected,
       debug: process.env.NODE_ENV === 'development' || !isConnected ? {
-        userId: userId ? userId.substring(0, 10) + '...' : null,
+        userId: userId || null, // Show full userId for debugging
         tokenSource,
         hasCookie: !!gmailTokensCookie,
         isMobileRequest,
+        convexUrlHost: process.env.NEXT_PUBLIC_CONVEX_URL ? new URL(process.env.NEXT_PUBLIC_CONVEX_URL).hostname : 'missing',
         dbCheck: {
           attempted: !isConnected && !!userId && !!process.env.NEXT_PUBLIC_CONVEX_URL,
           hasConvexUrl: !!process.env.NEXT_PUBLIC_CONVEX_URL,
-          // We can't easily return the dbTokens result here as it was local scope, 
-          // but we can infer if we found tokens if tokenSource === 'database'
           result: tokenSource === 'database' ? 'tokens_found' : 'no_tokens_found'
         }
       } : undefined

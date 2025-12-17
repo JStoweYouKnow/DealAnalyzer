@@ -103,13 +103,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Determine if this is a mobile request early on
+    const userAgent = request.headers.get('user-agent') || '';
+    const isMobileRequest = !!(state || /Mobile|Android|iPhone|iPad/i.test(userAgent) || searchParams.get('platform') === 'mobile');
+
     if (!userId) {
       console.warn('[Gmail Callback] No userId available - tokens will be stored in cookie only');
       // For mobile requests, this is a critical failure as they can't access cookies
-      // We must have a userId to persist tokens to DB
-      const userAgent = request.headers.get('user-agent') || '';
-      const isMobileRequest = state || /Mobile|Android|iPhone|iPad/i.test(userAgent);
-
       if (isMobileRequest) {
         console.error('[Gmail Callback] ❌ Mobile request missing userId - cannot persist tokens');
         const deepLinkFailure = 'dealanalyzer://gmail-callback?success=false&reason=user_id_missing_in_callback';
@@ -232,9 +232,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Determine if this was a mobile request before proceeding
-    const userAgent = request.headers.get('user-agent') || '';
-    const isMobileRequest = state || /Mobile|Android|iPhone|iPad/i.test(userAgent);
+    // We already determined isMobileRequest earlier
 
     // If we still don't have a refresh token, fail fast so mobile knows to retry with consent
     if (!refreshToken) {
@@ -375,6 +373,9 @@ export async function GET(request: NextRequest) {
 
     // For web OAuth, return a success page that closes the popup
     // The main window is already polling for connection status, so we just close this popup
+    const statusParam = persistenceSuccess ? 'success=true' : `success=false&reason=persistence_failed&details=${encodeURIComponent(persistenceError || 'unknown')}`;
+    const deepLink = `dealanalyzer://gmail-callback?${statusParam}`;
+
     return new NextResponse(
       `
     <!DOCTYPE html>
@@ -389,7 +390,7 @@ export async function GET(request: NextRequest) {
             justify-content: center;
             height: 100vh;
             margin: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: ${persistenceSuccess ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f8d7da 0%, #dc3545 100%)'};
             color: white;
           }
           .container {
@@ -399,7 +400,7 @@ export async function GET(request: NextRequest) {
             border-radius: 1rem;
             backdrop-filter: blur(10px);
           }
-          .checkmark {
+          .icon {
             font-size: 4rem;
             margin-bottom: 1rem;
             animation: scaleIn 0.5s ease-in-out;
@@ -414,14 +415,14 @@ export async function GET(request: NextRequest) {
       </head>
       <body>
         <div class="container">
-          <div class="checkmark">✓</div>
-          <h1>Gmail Connected Successfully!</h1>
-          <p>Redirecting back to app...</p>
+          <div class="icon">${persistenceSuccess ? '✓' : '❌'}</div>
+          <h1>${persistenceSuccess ? 'Gmail Connected Successfully!' : 'Connection Failed'}</h1>
+          <p>${persistenceSuccess ? 'Redirecting back to app...' : `Error: ${persistenceError}`}</p>
           <button id="redirectBtn" onclick="redirectToApp()" style="
             margin-top: 1rem;
             padding: 0.75rem 1.5rem;
             background: white;
-            color: #667eea;
+            color: ${persistenceSuccess ? '#667eea' : '#dc3545'};
             border: none;
             border-radius: 0.5rem;
             font-size: 1rem;
@@ -430,64 +431,28 @@ export async function GET(request: NextRequest) {
           ">Return to App</button>
         </div>
         <script>
-          const deepLink = 'dealanalyzer://gmail-callback?success=true';
-          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+          const deepLink = '${deepLink}';
           
           function redirectToApp() {
             console.log('Redirecting to app:', deepLink);
-            
-            // Try multiple methods to ensure redirect works
-            // Method 1: Direct location change (most reliable)
             window.location.href = deepLink;
             
-            // Method 2: Try window.open as fallback
             setTimeout(() => {
               try {
                 window.open(deepLink, '_self');
-              } catch (e) {
-                console.log('window.open failed');
-              }
+              } catch (e) {}
             }, 300);
             
-            // Method 3: Try iframe method (for some browsers)
-            setTimeout(() => {
-              try {
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = deepLink;
-                document.body.appendChild(iframe);
-                setTimeout(() => {
-                  if (iframe.parentNode) {
-                    document.body.removeChild(iframe);
-                  }
-                }, 1000);
-              } catch (e) {
-                console.log('iframe method failed');
-              }
-            }, 600);
-            
-            // Try to close window after redirect
             setTimeout(() => {
               try {
                 window.close();
-              } catch (e) {
-                console.log('Cannot close window (browser may block this)');
-              }
+              } catch (e) {}
             }, 2000);
           }
           
-          // Auto-redirect immediately
           redirectToApp();
-          
-          // Also redirect on any click/touch
           document.addEventListener('click', redirectToApp);
           document.addEventListener('touchstart', redirectToApp);
-          
-          // Make the button work
-          const btn = document.getElementById('redirectBtn');
-          if (btn) {
-            btn.onclick = redirectToApp;
-          }
         </script>
       </body>
     </html>
