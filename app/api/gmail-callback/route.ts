@@ -284,7 +284,7 @@ export async function GET(request: NextRequest) {
           const apiModule = await import('../../../convex/_generated/api');
           const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
 
-          await convexClient.mutation(apiModule.api.userOAuthTokens.upsertTokens, {
+          const tokenStoredId = await convexClient.mutation(apiModule.api.userOAuthTokens.upsertTokens, {
             userId,
             accessToken: tokens.access_token,
             refreshToken,
@@ -299,56 +299,55 @@ export async function GET(request: NextRequest) {
             console.warn(`[Gmail Callback] ⚠️ Token storage returned null ID for user ${userId}`);
           }
         }
-      }
       } catch (error) {
-      console.error('[Gmail Callback] Error persisting tokens to database:', error);
-      // If persistence fails, we should signal this to the mobile app appropriately
-      if (isMobileRequest) {
-        console.warn('[Gmail Callback] ⚠️ Failed to persist tokens for mobile user - updating redirect');
-        // We can't easily change the redirect variable here since it's const if declared above
-        // But looking at the code structure, we haven't redirected yet.
+        console.error('[Gmail Callback] Error persisting tokens to database:', error);
+        // If persistence fails, we should signal this to the mobile app appropriately
+        if (isMobileRequest) {
+          console.warn('[Gmail Callback] ⚠️ Failed to persist tokens for mobile user - updating redirect');
+          // We can't easily change the redirect variable here since it's const if declared above
+          // But looking at the code structure, we haven't redirected yet.
+        }
       }
     }
-  }
 
     // Verify cookie was set
     const verifyGmailTokensCookie = cookieStore.get('gmailTokens');
-  console.log('[Gmail Callback] Cookie verification:', {
-    cookieSet: !!verifyGmailTokensCookie,
-    hasAccessToken: !!tokens.access_token,
-    hasRefreshToken: !!tokens.refresh_token,
-    userIdSet: !!userId,
-  });
+    console.log('[Gmail Callback] Cookie verification:', {
+      cookieSet: !!verifyGmailTokensCookie,
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+      userIdSet: !!userId,
+    });
 
-  // Log successful token exchange and storage
-  console.log('[Gmail Callback] ✅ SUCCESS - Tokens stored and ready', {
-    hasAccessToken: !!tokens.access_token,
-    hasRefreshToken: !!refreshToken,
-    userId: userId ? userId.substring(0, 20) + '...' : 'none',
-    timestamp: new Date().toISOString(),
-  });
-  console.log('═══════════════════════════════════════════════════════════');
-  console.log('');
+    // Log successful token exchange and storage
+    console.log('[Gmail Callback] ✅ SUCCESS - Tokens stored and ready', {
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!refreshToken,
+      userId: userId ? userId.substring(0, 20) + '...' : 'none',
+      timestamp: new Date().toISOString(),
+    });
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('');
 
-  console.log('[Gmail Callback] Determining response type:', {
-    isMobileRequest,
-    hasState: !!state,
-    userAgent: userAgent.substring(0, 100),
-  });
+    console.log('[Gmail Callback] Determining response type:', {
+      isMobileRequest,
+      hasState: !!state,
+      userAgent: userAgent.substring(0, 100),
+    });
 
-  // For mobile OAuth, redirect directly to the app using deep link (HTTP 302)
-  // This is more reliable than JavaScript redirect for in-app browsers
-  if (isMobileRequest) {
-    const deepLink = 'dealanalyzer://gmail-callback?success=true';
-    console.log('[Gmail Callback] Mobile request detected, redirecting to deep link:', deepLink);
+    // For mobile OAuth, redirect directly to the app using deep link (HTTP 302)
+    // This is more reliable than JavaScript redirect for in-app browsers
+    if (isMobileRequest) {
+      const deepLink = 'dealanalyzer://gmail-callback?success=true';
+      console.log('[Gmail Callback] Mobile request detected, redirecting to deep link:', deepLink);
 
-    return NextResponse.redirect(deepLink, 302);
-  }
+      return NextResponse.redirect(deepLink, 302);
+    }
 
-  // For web OAuth, return a success page that closes the popup
-  // The main window is already polling for connection status, so we just close this popup
-  return new NextResponse(
-    `
+    // For web OAuth, return a success page that closes the popup
+    // The main window is already polling for connection status, so we just close this popup
+    return new NextResponse(
+      `
     <!DOCTYPE html>
     <html>
       <head>
@@ -464,32 +463,32 @@ export async function GET(request: NextRequest) {
       </body>
     </html>
     `,
-    {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/html',
-      },
-    }
-  );
-} catch (error: any) {
-  console.error("[Gmail Callback] ❌ Unhandled error in callback:", error);
-  console.error("[Gmail Callback] Error details:", {
-    message: error?.message,
-    stack: error?.stack,
-    name: error?.name,
-    code: error?.code,
-  });
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html',
+        },
+      }
+    );
+  } catch (error: any) {
+    console.error("[Gmail Callback] ❌ Unhandled error in callback:", error);
+    console.error("[Gmail Callback] Error details:", {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name,
+      code: error?.code,
+    });
 
-  // Return more detailed error for debugging (in production, you might want to hide details)
-  return NextResponse.json(
-    {
-      success: false,
-      error: "Failed to complete Gmail authorization",
-      details: process.env.NODE_ENV === 'development' ? error?.message : undefined,
-      hint: "Check server logs for more details. Common issues: missing env vars, redirect URI mismatch, or code already used."
-    },
-    { status: 500 }
-  );
-}
+    // Return more detailed error for debugging (in production, you might want to hide details)
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to complete Gmail authorization",
+        details: process.env.NODE_ENV === 'development' ? error?.message : undefined,
+        hint: "Check server logs for more details. Common issues: missing env vars, redirect URI mismatch, or code already used."
+      },
+      { status: 500 }
+    );
+  }
 }
 
