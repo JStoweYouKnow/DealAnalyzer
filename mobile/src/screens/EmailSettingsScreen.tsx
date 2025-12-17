@@ -116,6 +116,7 @@ export default function EmailSettingsScreen() {
           success: responseData.success !== undefined ? responseData.success : true,
           connected: responseData.connected === true,
           error: responseData.error,
+          debug: responseData.debug, // Preserve debug info for troubleshooting
         };
 
         console.log('[Gmail Status] Parsed result:', result);

@@ -275,14 +275,19 @@ export async function GET(request: NextRequest) {
     console.log('[Gmail Callback] Cookie set successfully');
 
     // Persist tokens to database if userId is available and we have both tokens
-    const hasRefreshToken = !!refreshToken;
+    let persistenceSuccess = true;
+    let persistenceError = null;
+
     if (userId && tokens.access_token && hasRefreshToken) {
       try {
+        console.log('[Gmail Callback] Attempting to persist tokens for user:', userId);
         // Initialize Convex client for token persistence
         if (process.env.NEXT_PUBLIC_CONVEX_URL) {
           const { ConvexHttpClient } = await import('convex/browser');
           const apiModule = await import('../../../convex/_generated/api');
           const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+
+          console.log('[Gmail Callback] Convex Client initialized with URL:', process.env.NEXT_PUBLIC_CONVEX_URL?.substring(0, 30) + '...');
 
           const tokenStoredId = await convexClient.mutation(apiModule.api.userOAuthTokens.upsertTokens, {
             userId,
@@ -297,16 +302,34 @@ export async function GET(request: NextRequest) {
             console.log(`[Gmail Callback] ✅ Tokens stored in database for user ${userId}, ID: ${tokenStoredId}`);
           } else {
             console.warn(`[Gmail Callback] ⚠️ Token storage returned null ID for user ${userId}`);
+            // This might happen if the mutation doesn't return anything or there's an issue
           }
+        } else {
+          console.error('[Gmail Callback] ❌ NEXT_PUBLIC_CONVEX_URL is not configured - CANNOT PERSIST TOKENS');
+          persistenceSuccess = false;
+          persistenceError = 'convex_url_missing';
         }
-      } catch (error) {
-        console.error('[Gmail Callback] Error persisting tokens to database:', error);
-        // If persistence fails, we should signal this to the mobile app appropriately
-        if (isMobileRequest) {
-          console.warn('[Gmail Callback] ⚠️ Failed to persist tokens for mobile user - updating redirect');
-          // We can't easily change the redirect variable here since it's const if declared above
-          // But looking at the code structure, we haven't redirected yet.
-        }
+      } catch (error: any) {
+        persistenceSuccess = false;
+        persistenceError = error?.message || 'convex_mutation_failed';
+        console.error('[Gmail Callback] ❌ Error persisting tokens to database:', error);
+        console.error('[Gmail Callback] Mutation details:', {
+          userId: userId?.substring(0, 10),
+          hasAccessToken: !!tokens.access_token,
+          hasRefreshToken: !!refreshToken,
+          error: error?.message,
+          stack: error?.stack
+        });
+      }
+    } else {
+      console.warn('[Gmail Callback] ⚠️ Skipping persistence - missing requirements:', {
+        hasUserId: !!userId,
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!hasRefreshToken
+      });
+      if (isMobileRequest) {
+        persistenceSuccess = false;
+        persistenceError = !userId ? 'user_id_missing' : 'tokens_missing';
       }
     }
 
@@ -338,8 +361,13 @@ export async function GET(request: NextRequest) {
     // For mobile OAuth, redirect directly to the app using deep link (HTTP 302)
     // This is more reliable than JavaScript redirect for in-app browsers
     if (isMobileRequest) {
-      const deepLink = 'dealanalyzer://gmail-callback?success=true';
-      console.log('[Gmail Callback] Mobile request detected, redirecting to deep link:', deepLink);
+      let deepLink = 'dealanalyzer://gmail-callback?success=true';
+      if (!persistenceSuccess) {
+        deepLink = `dealanalyzer://gmail-callback?success=false&reason=persistence_failed&details=${encodeURIComponent(persistenceError || 'unknown')}`;
+        console.error('[Gmail Callback] Redirecting to failure deep link:', deepLink);
+      } else {
+        console.log('[Gmail Callback] Redirecting to success deep link:', deepLink);
+      }
 
       return NextResponse.redirect(deepLink, 302);
     }
