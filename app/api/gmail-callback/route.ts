@@ -277,6 +277,7 @@ export async function GET(request: NextRequest) {
     // Persist tokens to database if userId is available and we have both tokens
     let persistenceSuccess = true;
     let persistenceError = null;
+    const hasRefreshToken = !!refreshToken;
 
     if (userId && tokens.access_token && hasRefreshToken) {
       try {
