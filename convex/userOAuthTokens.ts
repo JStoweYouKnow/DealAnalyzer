@@ -141,13 +141,20 @@ export const retrieveTokensForServer = action({
   args: {
     userId: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    scope?: string;
+    expiryDate?: number;
+    tokenType?: string;
+  } | null> => {
     const userId = args.userId.trim();
     console.log('[Convex] retrieveTokensForServer action called for userId:', userId);
 
     try {
       console.log('[Convex] Importing internal API from ./_generated/api...');
-      const apiModule = await import("./_generated/api");
+      // Use any to break circular type dependency during compilation
+      const apiModule = (await import("./_generated/api")) as any;
       const internal = apiModule.internal;
       
       if (!internal) {
