@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, action, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // Upsert user OAuth tokens
 export const upsertTokens = mutation({
@@ -80,43 +81,6 @@ export const getTokenMetadata = query({
   },
 });
 
-/**
- * SECURITY CRITICAL: Retrieve OAuth tokens for internal Convex use only.
- *
- * ⚠️ WARNING: This internal query returns sensitive OAuth secrets (accessToken, refreshToken).
- * It can ONLY be called from other Convex functions (mutations/actions), NEVER from clients.
- *
- * DO NOT call this query directly. Use retrieveTokensForServer action from API routes instead.
- *
- * @internal - This is an internal query that can only be called from within Convex functions.
- */
-export const getTokensForServerQuery = internalQuery({
-  args: {
-    userId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const userId = args.userId.trim();
-    console.log('[Convex] getTokensForServerQuery called for userId:', userId);
-
-    const tokens = await ctx.db
-      .query("userOAuthTokens")
-      .withIndex("by_user_id", (q) => q.eq("userId", userId))
-      .first();
-
-    if (!tokens) {
-      return null;
-    }
-
-    // SECURITY: This returns sensitive tokens - only accessible from internal Convex functions
-    return {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      scope: tokens.scope,
-      expiryDate: tokens.expiryDate,
-      tokenType: tokens.tokenType,
-    };
-  },
-});
 
 /**
  * SECURITY CRITICAL: Retrieve OAuth tokens for server-side use only.
@@ -152,27 +116,12 @@ export const retrieveTokensForServer = action({
     console.log('[Convex] retrieveTokensForServer action called for userId:', userId);
 
     try {
-      console.log('[Convex] Importing internal API from ./_generated/api...');
-      // Use any to break circular type dependency during compilation
-      const apiModule = (await import("./_generated/api")) as any;
-      const internal = apiModule.internal;
+      console.log('[Convex] calling ctx.runQuery with internal.userOAuthTokensInternal.getTokensForServerQuery...');
       
-      if (!internal) {
-        console.error('[Convex] internal object is missing from apiModule');
-        throw new Error("Internal API not found");
-      }
-
-      console.log('[Convex] internal object found. Checking for getTokensForServerQuery...');
-      if (!internal.userOAuthTokens || !internal.userOAuthTokens.getTokensForServerQuery) {
-        console.error('[Convex] getTokensForServerQuery is missing from internal.userOAuthTokens');
-        throw new Error("Internal query not found");
-      }
-
-      console.log('[Convex] calling ctx.runQuery with internal.userOAuthTokens.getTokensForServerQuery...');
       // Retrieve full token record including secrets (server-side only)
-      // getTokensForServerQuery is an internal query that can only be called from within Convex
+      // We call the internal query from the NEW file to avoid circular dependencies
       const tokens = await ctx.runQuery(
-        internal.userOAuthTokens.getTokensForServerQuery,
+        internal.userOAuthTokensInternal.getTokensForServerQuery,
         {
           userId: userId,
         }
