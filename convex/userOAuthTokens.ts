@@ -141,31 +141,45 @@ export const retrieveTokensForServer = action({
   args: {
     userId: v.string(),
   },
-  handler: async (ctx, args): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    scope?: string;
-    expiryDate?: number;
-    tokenType?: string;
-  } | null> => {
+  handler: async (ctx, args) => {
     const userId = args.userId.trim();
     console.log('[Convex] retrieveTokensForServer action called for userId:', userId);
 
-    // Import internal API to access the internal query
-    const { internal } = await import("./_generated/api");
-
-    // Retrieve full token record including secrets (server-side only)
-    // getTokensForServerQuery is an internal query that can only be called from within Convex
-    const tokens = await ctx.runQuery(
-      internal.userOAuthTokens.getTokensForServerQuery,
-      {
-        userId: userId,
+    try {
+      console.log('[Convex] Importing internal API from ./_generated/api...');
+      const apiModule = await import("./_generated/api");
+      const internal = apiModule.internal;
+      
+      if (!internal) {
+        console.error('[Convex] internal object is missing from apiModule');
+        throw new Error("Internal API not found");
       }
-    );
 
-    // SECURITY: Only return tokens to server-side callers
-    // This action should never be called from client code
-    return tokens;
+      console.log('[Convex] internal object found. Checking for getTokensForServerQuery...');
+      if (!internal.userOAuthTokens || !internal.userOAuthTokens.getTokensForServerQuery) {
+        console.error('[Convex] getTokensForServerQuery is missing from internal.userOAuthTokens');
+        throw new Error("Internal query not found");
+      }
+
+      console.log('[Convex] calling ctx.runQuery with internal.userOAuthTokens.getTokensForServerQuery...');
+      // Retrieve full token record including secrets (server-side only)
+      // getTokensForServerQuery is an internal query that can only be called from within Convex
+      const tokens = await ctx.runQuery(
+        internal.userOAuthTokens.getTokensForServerQuery,
+        {
+          userId: userId,
+        }
+      );
+
+      console.log('[Convex] getTokensForServerQuery result found:', !!tokens);
+
+      // SECURITY: Only return tokens to server-side callers
+      // This action should never be called from client code
+      return tokens;
+    } catch (error) {
+      console.error('[Convex] Error in retrieveTokensForServer action:', error);
+      throw error;
+    }
   },
 });
 
