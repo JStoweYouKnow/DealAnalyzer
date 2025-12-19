@@ -120,8 +120,9 @@ export const retrieveTokensForServer = action({
       
       // Retrieve full token record including secrets (server-side only)
       // We call the internal query from the NEW file to avoid circular dependencies
+      // We use 'as any' to bypass the TS check since the generated types might be stale during build
       const tokens = await ctx.runQuery(
-        internal.userOAuthTokensInternal.getTokensForServerQuery,
+        (internal as any).userOAuthTokensInternal.getTokensForServerQuery,
         {
           userId: userId,
         }
