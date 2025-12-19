@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, action, internalQuery } from "./_generated/server";
 
 // Upsert user OAuth tokens
 export const upsertTokens = mutation({
@@ -12,6 +12,9 @@ export const upsertTokens = mutation({
     tokenType: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = args.userId.trim();
+    console.log('[Convex] upsertTokens called for userId:', userId);
+    
     // Check if tokens already exist for this user
     const existing = await ctx.db
       .query("userOAuthTokens")
@@ -78,32 +81,33 @@ export const getTokenMetadata = query({
 });
 
 /**
- * SECURITY CRITICAL: Retrieve OAuth tokens for server-side use only.
- * 
- * ⚠️ WARNING: This query returns sensitive OAuth secrets (accessToken, refreshToken).
- * It is marked as public for technical reasons (actions need to call public queries),
- * but it MUST only be called from the retrieveTokensForServer action, NEVER directly from clients.
- * 
- * DO NOT call this query directly from client code. Use getTokenMetadata() instead.
- * This query exists solely to support the retrieveTokensForServer action.
- * 
- * @internal - This is exported only for technical reasons. Use retrieveTokensForServer action instead.
+ * SECURITY CRITICAL: Retrieve OAuth tokens for internal Convex use only.
+ *
+ * ⚠️ WARNING: This internal query returns sensitive OAuth secrets (accessToken, refreshToken).
+ * It can ONLY be called from other Convex functions (mutations/actions), NEVER from clients.
+ *
+ * DO NOT call this query directly. Use retrieveTokensForServer action from API routes instead.
+ *
+ * @internal - This is an internal query that can only be called from within Convex functions.
  */
-export const getTokensForServerQuery = query({
+export const getTokensForServerQuery = internalQuery({
   args: {
     userId: v.string(),
   },
   handler: async (ctx, args) => {
+    const userId = args.userId.trim();
+    console.log('[Convex] getTokensForServerQuery called for userId:', userId);
+
     const tokens = await ctx.db
       .query("userOAuthTokens")
-      .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .first();
-    
+
     if (!tokens) {
       return null;
     }
-    
-    // SECURITY: This returns sensitive tokens - should only be called from server-side action
+
+    // SECURITY: This returns sensitive tokens - only accessible from internal Convex functions
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
@@ -144,24 +148,21 @@ export const retrieveTokensForServer = action({
     expiryDate?: number;
     tokenType?: string;
   } | null> => {
-    // Note: In a production system, you should add additional authentication checks here
-    // to ensure the caller is authorized and the request is coming from server-side code.
-    // For now, we rely on the caller being a server-side API route.
-    
-    // Import API to access the query
-    // Use dynamic import to avoid circular type reference during type checking
-    const api = await import("./_generated/api");
-    
+    const userId = args.userId.trim();
+    console.log('[Convex] retrieveTokensForServer action called for userId:', userId);
+
+    // Import internal API to access the internal query
+    const { internal } = await import("./_generated/api");
+
     // Retrieve full token record including secrets (server-side only)
-    // Note: getTokensForServerQuery is public for technical reasons (actions can only call public queries),
-    // but it should never be called directly from clients - only through this action
+    // getTokensForServerQuery is an internal query that can only be called from within Convex
     const tokens = await ctx.runQuery(
-      (api as any).userOAuthTokens.getTokensForServerQuery,
+      internal.userOAuthTokens.getTokensForServerQuery,
       {
-        userId: args.userId,
+        userId: userId,
       }
     );
-    
+
     // SECURITY: Only return tokens to server-side callers
     // This action should never be called from client code
     return tokens;
