@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { api } from "@/convex/_generated/api";
 import { fetchMutation } from "convex/nextjs";
 import { logger } from "@/lib/logger";
 
@@ -51,7 +50,8 @@ export async function POST(request: NextRequest) {
     logger.info("Gmail disconnect triggered", { userId: userId.substring(0, 20) });
 
     // Delete the OAuth tokens from Convex
-    const result = await fetchMutation(api.userOAuthTokens.deleteTokens, {
+    const apiModule = await import('../../../convex/_generated/api');
+    const result = await fetchMutation(apiModule.api.userOAuthTokens.deleteTokens, {
       userId,
     });
 
