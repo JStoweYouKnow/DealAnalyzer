@@ -227,7 +227,16 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
     authMethod: clerkUserId ? 'cookie' : 'bearer',
   });
 
-  return NextResponse.next();
+  // Add userId to request headers so storage layer can access it
+  // This is needed for bearer token auth (mobile apps) where there's no Clerk session
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-user-id', userId);
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 });
 
 export const config = {
