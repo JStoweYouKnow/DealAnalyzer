@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         const stateData = JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'));
         if (stateData?.userId && typeof stateData.userId === 'string') {
           userId = stateData.userId.trim();
-          console.log('[Gmail Callback] ✅ Retrieved and trimmed userId from state parameter:', userId.substring(0, 20) || 'unknown');
+          console.log('[Gmail Callback] ✅ Retrieved and trimmed userId from state parameter:', userId?.substring(0, 20) || 'unknown');
         } else {
           // Fallback: if state is just the userId (for backwards compatibility)
           if (!userId && state.length > 10 && !state.includes('{')) {
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
         userId = authResult?.userId || null;
         if (userId) {
           userId = userId.trim();
-          console.log('[Gmail Callback] Retrieved and trimmed userId from Clerk session:', userId.substring(0, 20));
+          console.log('[Gmail Callback] Retrieved and trimmed userId from Clerk session:', userId?.substring(0, 20));
         }
       } catch (error) {
         // Clerk not available or not configured
@@ -354,7 +354,7 @@ export async function GET(request: NextRequest) {
     console.log('[Gmail Callback] ✅ SUCCESS - Tokens stored and ready', {
       hasAccessToken: !!tokens.access_token,
       hasRefreshToken: !!refreshToken,
-      userId: userId ? userId.substring(0, 20) + '...' : 'none',
+      userId: userId ? userId?.substring(0, 20) + '...' : 'none',
       timestamp: new Date().toISOString(),
     });
     console.log('═══════════════════════════════════════════════════════════');
