@@ -41,10 +41,11 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
           if (payload?.sub) {
             // Verify it's a Clerk token by checking the issuer
             if (payload.iss?.includes('clerk') || payload.iss?.includes('clerk.accounts')) {
-              logger.info("✅ Authenticated via Clerk bearer token for Gmail status", {
-                userId: payload.sub.substring(0, 20),
+              const userId = payload.sub.trim();
+              logger.info("✅ Authenticated and trimmed via Clerk bearer token for Gmail status", {
+                userId: userId.substring(0, 20),
               });
-              return payload.sub;
+              return userId;
             } else {
               logger.warn("⚠️ Token issuer is not Clerk", {
                 issuer: payload.iss,
@@ -138,6 +139,8 @@ export async function GET(request: NextRequest) {
         const { ConvexHttpClient } = await import('convex/browser');
         const apiModule = await import('../../../convex/_generated/api');
         const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+
+        console.log('[Gmail Status Check] Calling retrieveTokensForServer action for userId:', userId);
 
         // SECURITY: Use action to retrieve tokens server-side only
         // This ensures tokens are never exposed to client code

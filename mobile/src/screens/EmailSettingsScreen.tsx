@@ -449,11 +449,28 @@ export default function EmailSettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // TODO: Implement disconnect endpoint
-              Alert.alert('Info', 'Disconnect functionality coming soon!');
+              console.log('[Gmail Disconnect] Disconnecting Gmail account...');
+
+              const response = await authenticatedClient.post('/gmail-disconnect');
+              const { deleted } = response.data;
+
+              console.log('[Gmail Disconnect] Disconnect complete:', { deleted });
+
+              Alert.alert(
+                'Success',
+                deleted
+                  ? 'Gmail account disconnected successfully'
+                  : 'Gmail account was not connected',
+                [{ text: 'OK' }]
+              );
+
+              // Refresh the connection status
               await refetchStatus();
             } catch (error: any) {
-              Alert.alert('Error', 'Failed to disconnect Gmail account.');
+              console.error('[Gmail Disconnect] Disconnect failed:', error);
+
+              const errorMessage = error.response?.data?.error || error.message || 'Failed to disconnect Gmail account';
+              Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
             }
           },
         },

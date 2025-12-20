@@ -70,21 +70,21 @@ export async function GET(request: NextRequest) {
         }
         const stateData = JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'));
         if (stateData?.userId && typeof stateData.userId === 'string') {
-          userId = stateData.userId;
-          console.log('[Gmail Callback] ✅ Retrieved userId from state parameter:', stateData.userId?.substring(0, 20) || 'unknown');
+          userId = stateData.userId.trim();
+          console.log('[Gmail Callback] ✅ Retrieved and trimmed userId from state parameter:', userId.substring(0, 20) || 'unknown');
         } else {
           // Fallback: if state is just the userId (for backwards compatibility)
           if (!userId && state.length > 10 && !state.includes('{')) {
-            userId = state;
-            console.log('[Gmail Callback] ✅ Using state as userId directly (fallback)');
+            userId = state.trim();
+            console.log('[Gmail Callback] ✅ Using trimmed state as userId directly (fallback)');
           }
         }
       } catch (error) {
         console.warn('[Gmail Callback] Failed to parse state parameter:', error);
         // Fallback: if state looks like a userId, use it directly
         if (state && state.length > 10 && !state.includes('{')) {
-          userId = state;
-          console.log('[Gmail Callback] ✅ Using state as userId directly (error fallback)');
+          userId = state.trim();
+          console.log('[Gmail Callback] ✅ Using trimmed state as userId directly (error fallback)');
         }
       }
     }
@@ -96,7 +96,8 @@ export async function GET(request: NextRequest) {
         const authResult = await auth();
         userId = authResult?.userId || null;
         if (userId) {
-          console.log('[Gmail Callback] Retrieved userId from Clerk session:', userId.substring(0, 20));
+          userId = userId.trim();
+          console.log('[Gmail Callback] Retrieved and trimmed userId from Clerk session:', userId.substring(0, 20));
         }
       } catch (error) {
         // Clerk not available or not configured
@@ -158,6 +159,11 @@ export async function GET(request: NextRequest) {
 
       const tokenResponse = await auth.getToken(code);
       tokens = tokenResponse.tokens;
+      console.log('[Gmail Callback] 🏁 Token exchange complete. Access Token present:', !!tokens.access_token);
+      console.log('[Gmail Callback] Google returned Refresh Token:', !!tokens.refresh_token);
+      if (!tokens.refresh_token) {
+        console.warn('[Gmail Callback] ⚠️ Google did NOT provide a refresh token in this exchange.');
+      }
       console.log('[Gmail Callback] Successfully exchanged code for tokens', {
         hasAccessToken: !!tokens?.access_token,
         hasRefreshToken: !!tokens?.refresh_token,
@@ -225,7 +231,9 @@ export async function GET(request: NextRequest) {
             token_type: dbTokens.tokenType,
             expiry_date: dbTokens.expiryDate,
           };
-          console.log('[Gmail Callback] Retrieved refresh token from database');
+          console.log('[Gmail Callback] ✅ Retrieved refresh token from database');
+        } else {
+          console.log('[Gmail Callback] ⚠️ No refresh token found in database for user:', userId);
         }
       } catch (error) {
         console.error('[Gmail Callback] Error retrieving refresh token from database:', error);
@@ -279,7 +287,7 @@ export async function GET(request: NextRequest) {
 
     if (userId && tokens.access_token && hasRefreshToken) {
       try {
-        console.log('[Gmail Callback] Attempting to persist tokens for user:', userId);
+        console.log('[Gmail Callback] 💾 Attempting to persist tokens to Convex for user:', userId);
         // Initialize Convex client for token persistence
         if (process.env.NEXT_PUBLIC_CONVEX_URL) {
           const { ConvexHttpClient } = await import('convex/browser');
@@ -287,6 +295,7 @@ export async function GET(request: NextRequest) {
           const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
 
           console.log('[Gmail Callback] Convex Client initialized with URL:', process.env.NEXT_PUBLIC_CONVEX_URL?.substring(0, 30) + '...');
+          console.log('[Gmail Callback] Calling upsertTokens for userId:', userId);
 
           const tokenStoredId = await convexClient.mutation(apiModule.api.userOAuthTokens.upsertTokens, {
             userId,
@@ -313,7 +322,7 @@ export async function GET(request: NextRequest) {
         persistenceError = error?.message || 'convex_mutation_failed';
         console.error('[Gmail Callback] ❌ Error persisting tokens to database:', error);
         console.error('[Gmail Callback] Mutation details:', {
-          userId: userId?.substring(0, 10),
+          userId: userId?.substring(0, 10) + '...',
           hasAccessToken: !!tokens.access_token,
           hasRefreshToken: !!refreshToken,
           error: error?.message,

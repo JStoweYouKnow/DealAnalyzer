@@ -186,8 +186,9 @@ export async function GET(request: NextRequest) {
       access_type: 'offline',
       scope: scopes,
       include_granted_scopes: true,
-      // Always force consent so Google returns a refresh_token (needed after re-auth)
-      prompt: clearSession ? 'select_account consent' : 'consent select_account',
+      // Force refresh token by using 'consent' prompt.
+      // This is crucial if tokens were previously deleted from our DB but not revoked from Google.
+      prompt: 'consent',
       state, // Include userId in state for callback
     };
 

@@ -106,10 +106,11 @@ const publicRoutes = [...safePublicRoutes, ...devOnlyPublicRoutes];
 
 const isPublicRoute = createRouteMatcher(publicRoutes);
 
-// Helper function to decode base64 with padding
+// Helper function to decode base64url with padding
 function decodeBase64(base64: string): string {
+  // Convert from base64url to base64
+  let padded = base64.replace(/-/g, '+').replace(/_/g, '/');
   // Add padding if needed
-  let padded = base64;
   while (padded.length % 4) {
     padded += '=';
   }

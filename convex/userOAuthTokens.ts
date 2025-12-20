@@ -82,19 +82,46 @@ export const getTokenMetadata = query({
 });
 
 
+// Delete user OAuth tokens
+export const deleteTokens = mutation({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId.trim();
+    console.log('[Convex] deleteTokens called for userId:', userId);
+
+    // Find existing tokens for this user
+    const existing = await ctx.db
+      .query("userOAuthTokens")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (existing) {
+      // Delete the token record
+      await ctx.db.delete(existing._id);
+      console.log('[Convex] Deleted tokens for userId:', userId);
+      return { success: true, deleted: true };
+    } else {
+      console.log('[Convex] No tokens found to delete for userId:', userId);
+      return { success: true, deleted: false };
+    }
+  },
+});
+
 /**
  * SECURITY CRITICAL: Retrieve OAuth tokens for server-side use only.
- * 
+ *
  * ⚠️ WARNING: This action returns sensitive OAuth secrets (accessToken, refreshToken).
  * It MUST only be called from server-side API routes, NEVER from client-side code.
- * 
+ *
  * Tokens must remain server-side to prevent security breaches. Client code should
  * use getTokenMetadata() instead to check connection status without exposing secrets.
- * 
+ *
  * This action is intended for use in:
  * - Next.js API routes in the app/api directory
  * - Server-side functions only
- * 
+ *
  * DO NOT call this from:
  * - React components
  * - Client-side hooks
@@ -117,7 +144,7 @@ export const retrieveTokensForServer = action({
 
     try {
       console.log('[Convex] calling ctx.runQuery with internal.userOAuthTokensInternal.getTokensForServerQuery...');
-      
+
       // Retrieve full token record including secrets (server-side only)
       // We call the internal query from the NEW file to avoid circular dependencies
       // We use 'as any' to bypass the TS check since the generated types might be stale during build

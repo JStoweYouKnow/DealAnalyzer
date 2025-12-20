@@ -11,7 +11,10 @@
 import type * as emailDeals from "../emailDeals.js";
 import type * as messages from "../messages.js";
 import type * as properties from "../properties.js";
+import type * as subscriptions from "../subscriptions.js";
+import type * as userCriteria from "../userCriteria.js";
 import type * as userOAuthTokens from "../userOAuthTokens.js";
+import type * as userOAuthTokensInternal from "../userOAuthTokensInternal.js";
 import type * as userPreferences from "../userPreferences.js";
 import type * as weeklyDigest from "../weeklyDigest.js";
 
@@ -33,7 +36,10 @@ declare const fullApi: ApiFromModules<{
   emailDeals: typeof emailDeals;
   messages: typeof messages;
   properties: typeof properties;
+  subscriptions: typeof subscriptions;
+  userCriteria: typeof userCriteria;
   userOAuthTokens: typeof userOAuthTokens;
+  userOAuthTokensInternal: typeof userOAuthTokensInternal;
   userPreferences: typeof userPreferences;
   weeklyDigest: typeof weeklyDigest;
 }>;
