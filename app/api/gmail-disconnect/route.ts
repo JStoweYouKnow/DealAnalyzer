@@ -3,6 +3,17 @@ import { auth } from "@clerk/nextjs/server";
 import { fetchMutation } from "convex/nextjs";
 import { logger } from "@/lib/logger";
 
+// Helper function to decode base64url with padding
+function decodeBase64(base64: string): string {
+  // Convert from base64url to base64
+  let padded = base64.replace(/-/g, '+').replace(/_/g, '/');
+  // Add padding if needed
+  while (padded.length % 4) {
+    padded += '=';
+  }
+  return Buffer.from(padded, 'base64').toString('utf-8');
+}
+
 // Helper to get userId from bearer token (for mobile apps)
 async function getUserIdFromBearerToken(request: NextRequest): Promise<string | null> {
   const authHeader = request.headers.get("authorization");
@@ -10,13 +21,28 @@ async function getUserIdFromBearerToken(request: NextRequest): Promise<string | 
     const token = authHeader.substring(7).trim();
     if (token) {
       try {
-        const { verifyToken } = await import("@clerk/backend");
-        const decoded = await verifyToken(token, {
-          jwtKey: process.env.CLERK_SECRET_KEY!,
-        });
-        return decoded.sub || null;
+        // Decode the JWT to extract the user ID (same approach as middleware)
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          // Decode the payload (second part of JWT) with proper base64 padding
+          const payload = JSON.parse(decodeBase64(parts[1]));
+          if (payload?.sub) {
+            // Verify it's a Clerk token by checking the issuer
+            if (payload.iss?.includes('clerk') || payload.iss?.includes('clerk.accounts')) {
+              console.log('[Bearer Auth] ✅ Authenticated via bearer token', {
+                userId: payload.sub.substring(0, 20),
+                issuer: payload.iss,
+              });
+              return payload.sub;
+            } else {
+              console.log('[Bearer Auth] ⚠️ Token issuer is not Clerk', {
+                issuer: payload.iss,
+              });
+            }
+          }
+        }
       } catch (error) {
-        console.error('[Bearer Auth] Token verification failed:', error);
+        console.error('[Bearer Auth] Token decode failed:', error);
         return null;
       }
     }

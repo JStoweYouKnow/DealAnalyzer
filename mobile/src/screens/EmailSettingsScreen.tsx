@@ -30,6 +30,7 @@ export default function EmailSettingsScreen() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const previousConnectionStatus = useRef<boolean>(false);
+  const hasShownConnectedAlert = useRef<boolean>(false);
 
   // Hide tab bar when this screen is focused
   useFocusEffect(
@@ -199,25 +200,15 @@ export default function EmailSettingsScreen() {
         queryClient.removeQueries({ queryKey: ['gmail-status'] });
         queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
 
-        // Refetch with multiple attempts to ensure we get fresh data
-        refetchStatus();
-
-        // Also refetch after delays to catch tokens that might be stored asynchronously
-        const timer1 = setTimeout(() => {
-          console.log('[Gmail Status] Refetching status after 1s delay...');
+        // Single refetch with short delay to catch async token storage
+        const timer = setTimeout(() => {
+          console.log('[Gmail Status] Refetching status after focus...');
           queryClient.removeQueries({ queryKey: ['gmail-status'] });
           refetchStatus();
         }, 1000);
 
-        const timer2 = setTimeout(() => {
-          console.log('[Gmail Status] Refetching status after 3s delay...');
-          queryClient.removeQueries({ queryKey: ['gmail-status'] });
-          refetchStatus();
-        }, 3000);
-
         return () => {
-          clearTimeout(timer1);
-          clearTimeout(timer2);
+          clearTimeout(timer);
         };
       }
     }, [user, isConnecting, queryClient, refetchStatus])
@@ -228,8 +219,12 @@ export default function EmailSettingsScreen() {
     const currentlyConnected = gmailStatus?.connected === true;
 
     // If we just became connected (wasn't connected before, but is now)
-    if (!previousConnectionStatus.current && currentlyConnected && !isSyncing) {
+    // AND we haven't already shown the alert
+    if (!previousConnectionStatus.current && currentlyConnected && !isSyncing && !hasShownConnectedAlert.current) {
       console.log('[Gmail Status] ✅ Newly connected - invalidating queries and triggering sync...');
+
+      // Mark that we're showing the alert to prevent duplicates
+      hasShownConnectedAlert.current = true;
 
       // Immediately invalidate deals query to refresh the deals list
       queryClient.invalidateQueries({ queryKey: ['email-deals'] });
@@ -271,6 +266,11 @@ export default function EmailSettingsScreen() {
       return () => clearTimeout(syncTimer);
     }
 
+    // If we disconnected, reset the alert flag
+    if (previousConnectionStatus.current && !currentlyConnected) {
+      hasShownConnectedAlert.current = false;
+    }
+
     // Update the ref to track current status
     previousConnectionStatus.current = currentlyConnected;
   }, [gmailStatus?.connected, isSyncing, authenticatedClient, queryClient]);
@@ -281,23 +281,15 @@ export default function EmailSettingsScreen() {
       if (nextAppState === 'active' && user && !isConnecting) {
         console.log('[Gmail Status] App became active, refetching status...');
 
-        // Clear cache and refetch immediately
+        // Clear cache and refetch with single delay
         queryClient.removeQueries({ queryKey: ['gmail-status'] });
         queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
-        refetchStatus();
 
-        // Also refetch after delays
         setTimeout(() => {
-          console.log('[Gmail Status] Refetching after app became active (1s delay)...');
+          console.log('[Gmail Status] Refetching after app became active...');
           queryClient.removeQueries({ queryKey: ['gmail-status'] });
           refetchStatus();
         }, 1000);
-
-        setTimeout(() => {
-          console.log('[Gmail Status] Refetching after app became active (3s delay)...');
-          queryClient.removeQueries({ queryKey: ['gmail-status'] });
-          refetchStatus();
-        }, 3000);
       }
     };
 
@@ -357,13 +349,10 @@ export default function EmailSettingsScreen() {
 
         await Linking.openURL(authUrl);
 
-        // Show helpful message - user will complete OAuth in browser
-        // The web callback will redirect back to the app via deep link
-        Alert.alert(
-          'Complete Authorization',
-          'Please complete the Gmail authorization in your browser. When you return to the app, your connection will be verified automatically.',
-          [{ text: 'OK' }]
-        );
+        // Note: We don't show an alert here because:
+        // 1. User can see the browser opening
+        // 2. Auto-sync will show a success alert when done
+        // 3. Avoiding alert spam/confusion
 
         // Status will be automatically checked when:
         // 1. Deep link is triggered (handled in App.tsx)
@@ -385,11 +374,7 @@ export default function EmailSettingsScreen() {
 
           console.log('[Gmail Connect] WebBrowser.openBrowserAsync result:', result);
 
-          Alert.alert(
-            'Complete Authorization',
-            'Please complete the Gmail authorization in your browser. When you return to the app, your connection will be verified automatically.',
-            [{ text: 'OK' }]
-          );
+          // Note: Not showing alert - auto-sync will show success when done
 
           return; // Exit early
         } catch (webBrowserError: any) {
