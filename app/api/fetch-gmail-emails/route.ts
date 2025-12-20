@@ -3,17 +3,44 @@ import { auth } from "@clerk/nextjs/server";
 import { emailMonitoringService } from "../../../server/email-service";
 import { logger } from "@/lib/logger";
 
+// Helper to get userId from bearer token (for mobile apps)
+async function getUserIdFromBearerToken(request: NextRequest): Promise<string | null> {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7).trim();
+    if (token) {
+      try {
+        const { verifyToken } = await import("@clerk/backend");
+        const decoded = await verifyToken(token, {
+          jwtKey: process.env.CLERK_SECRET_KEY!,
+        });
+        return decoded.sub || null;
+      } catch (error) {
+        console.error('[Bearer Auth] Token verification failed:', error);
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Manually fetch emails from Gmail
  * This endpoint triggers a one-time fetch of emails from the user's connected Gmail account
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get userId from Clerk auth
-    const { userId } = await auth();
+    // Get userId from Clerk auth (cookie-based for web) or bearer token (for mobile)
+    const { userId: clerkUserId } = await auth();
+    let userId = clerkUserId;
+
+    // If no cookie-based userId, try bearer token (mobile apps)
+    if (!userId) {
+      userId = await getUserIdFromBearerToken(request);
+    }
 
     if (!userId) {
-      logger.warn("Unauthorized: No userId from Clerk auth");
+      logger.warn("Unauthorized: No userId from Clerk auth or bearer token");
       return NextResponse.json(
         { error: "Unauthorized. Please sign in." },
         { status: 401 }
