@@ -19,6 +19,30 @@ import type { EmailDeal } from '../types';
 type DealDetailRouteProp = RouteProp<RootStackParamList, 'DealDetail'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
+// Helper function to strip HTML tags from email content
+function stripHtml(html: string): string {
+  if (!html) return '';
+
+  // Remove HTML tags
+  let text = html.replace(/<[^>]*>/g, '');
+
+  // Decode common HTML entities
+  text = text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–');
+
+  // Remove excessive whitespace
+  text = text.replace(/\s+/g, ' ').trim();
+
+  return text;
+}
+
 export default function DealDetailScreen() {
   const route = useRoute<DealDetailRouteProp>();
   const navigation = useNavigation<NavigationProp>();
@@ -77,7 +101,7 @@ export default function DealDetailScreen() {
 
           <View style={styles.section}>
             <Text style={styles.label}>Email Content:</Text>
-            <Text style={styles.emailContent}>{deal.emailContent}</Text>
+            <Text style={styles.emailContent}>{stripHtml(deal.emailContent)}</Text>
           </View>
 
           <Button
