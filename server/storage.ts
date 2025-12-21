@@ -20,7 +20,7 @@ export interface IStorage {
   
   // Email deal methods
   getEmailDeals(userId?: string): Promise<EmailDeal[]>;
-  getEmailDeal(id: string): Promise<EmailDeal | undefined>;
+  getEmailDeal(id: string, userId?: string): Promise<EmailDeal | undefined>;
   createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
   updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>): Promise<EmailDeal | undefined>;
   deleteEmailDeal(id: string): Promise<boolean>;
@@ -239,7 +239,7 @@ export class MemStorage implements IStorage {
       .sort((a, b) => b.receivedDate.getTime() - a.receivedDate.getTime());
   }
 
-  async getEmailDeal(id: string): Promise<EmailDeal | undefined> {
+  async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | undefined> {
     return this.emailDeals.get(id);
   }
 
@@ -1401,9 +1401,9 @@ function createConvexStorageWrapper(): IStorage {
       return await convexStorage.getEmailDeals(userId);
     },
     
-    async getEmailDeal(id: string) {
+    async getEmailDeal(id: string, userId?: string) {
       const convexStorage = await getConvexStorage();
-      const result = await convexStorage.getEmailDeal(id);
+      const result = await convexStorage.getEmailDeal(id, userId);
       return result ?? undefined;
     },
     

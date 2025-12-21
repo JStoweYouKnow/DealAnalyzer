@@ -1,5 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../../server/storage";
+import { auth } from "@clerk/nextjs/server";
+
+// Helper to decode JWT payload (for mobile bearer tokens)
+function decodeBase64(base64: string): string {
+  let padded = base64.replace(/-/g, '+').replace(/_/g, '/');
+  while (padded.length % 4) {
+    padded += '=';
+  }
+  return Buffer.from(padded, 'base64').toString('utf-8');
+}
+
+// Helper to get userId from bearer token or Clerk session
+async function getUserId(request: NextRequest): Promise<string | null> {
+  // Try bearer token first (for mobile)
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7).trim();
+    if (token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(decodeBase64(parts[1]));
+          if (payload?.sub && payload.iss?.includes('clerk')) {
+            return payload.sub;
+          }
+        }
+      } catch (error) {
+        console.error('[Bearer Auth] Token decode failed:', error);
+      }
+    }
+  }
+
+  // Fallback to Clerk session (for web)
+  const { userId } = await auth();
+  return userId;
+}
 
 export async function GET(
   request: NextRequest,
@@ -7,7 +43,16 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const emailDeal = await storage.getEmailDeal(id);
+    const userId = await getUserId(request);
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const emailDeal = await storage.getEmailDeal(id, userId);
     
     if (!emailDeal) {
       return NextResponse.json(
@@ -32,10 +77,19 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+    const userId = await getUserId(request);
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const updates = await request.json();
-    
+
     // Get existing deal to verify it exists
-    const existingDeal = await storage.getEmailDeal(id);
+    const existingDeal = await storage.getEmailDeal(id, userId);
     if (!existingDeal) {
       // Debug: Let's see what email deals exist
       const allDeals = await storage.getEmailDeals();
@@ -71,9 +125,17 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    
+    const userId = await getUserId(request);
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     // Verify deal exists before deleting
-    const existingDeal = await storage.getEmailDeal(id);
+    const existingDeal = await storage.getEmailDeal(id, userId);
     if (!existingDeal) {
       return NextResponse.json(
         { error: "Email deal not found" },

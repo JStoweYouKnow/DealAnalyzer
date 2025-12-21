@@ -148,9 +148,11 @@ class ConvexStorageImpl implements ConvexStorage {
     return deals.map(this.mapConvexEmailDealToEmailDeal);
   }
 
-  async getEmailDeal(id: string): Promise<EmailDeal | null> {
+  async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null> {
     await this.ensureInitialized();
-    const userId = await this.getRequestUserId();
+    // Use passed userId if available, otherwise try to get from request context
+    const finalUserId = userId || await this.getRequestUserId();
+
     // First try to get by Gmail ID (for backward compatibility)
     let deal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
 
@@ -160,7 +162,7 @@ class ConvexStorageImpl implements ConvexStorage {
     }
 
     // Enforce ownership
-    if (deal && deal.userId !== userId) {
+    if (deal && deal.userId !== finalUserId) {
       return null;
     }
     return deal ? this.mapConvexEmailDealToEmailDeal(deal) : null;
