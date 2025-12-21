@@ -1396,9 +1396,9 @@ async function getConvexStorage() {
 function createConvexStorageWrapper(): IStorage {
   return {
     // Email deal methods - delegate to Convex
-    async getEmailDeals() {
+    async getEmailDeals(userId?: string) {
       const convexStorage = await getConvexStorage();
-      return await convexStorage.getEmailDeals();
+      return await convexStorage.getEmailDeals(userId);
     },
     
     async getEmailDeal(id: string) {
