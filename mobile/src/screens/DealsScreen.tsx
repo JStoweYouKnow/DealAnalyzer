@@ -27,7 +27,7 @@ export default function DealsScreen() {
   const apiClient = useApiClient();
 
   const { data: deals = [], isLoading, refetch, error } = useQuery<EmailDeal[]>({
-    queryKey: ['email-deals', isSignedIn],
+    queryKey: ['email-deals'],
     queryFn: async () => {
       // Don't make API call if user is not signed in
       if (!isLoaded || !isSignedIn) {

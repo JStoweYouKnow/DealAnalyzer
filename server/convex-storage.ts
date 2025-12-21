@@ -52,7 +52,7 @@ export interface ConvexStorage {
   createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
   updateEmailDeal(id: string, updates: Partial<EmailDeal>): Promise<EmailDeal>;
   deleteEmailDeal(id: string): Promise<void>;
-  findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | null>;
+  findEmailDealByContentHash(contentHash: string, userId?: string): Promise<EmailDeal | null>;
   bulkCreateEmailDeals(deals: Omit<EmailDeal, 'createdAt' | 'updatedAt'>[]): Promise<EmailDeal[]>;
 
   // Property Analyses
@@ -140,10 +140,11 @@ class ConvexStorageImpl implements ConvexStorage {
   }
 
   // Email Deals Implementation
-  async getEmailDeals(): Promise<EmailDeal[]> {
+  async getEmailDeals(userId?: string): Promise<EmailDeal[]> {
     await this.ensureInitialized();
-    const userId = await this.getRequestUserId();
-    const deals = await this.convex.query(api.emailDeals.list, { userId });
+    // Use passed userId if available, otherwise try to get from request context
+    const finalUserId = userId || await this.getRequestUserId();
+    const deals = await this.convex.query(api.emailDeals.list, { userId: finalUserId });
     return deals.map(this.mapConvexEmailDealToEmailDeal);
   }
 
@@ -168,7 +169,14 @@ class ConvexStorageImpl implements ConvexStorage {
   async createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal> {
     await this.ensureInitialized();
     const gmailId = 'id' in deal ? deal.id : `temp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-    const userId = await this.getRequestUserId();
+
+    // Use userId from deal object if provided (for email sync), otherwise get from request context
+    let userId: string;
+    if ('userId' in deal && deal.userId) {
+      userId = deal.userId;
+    } else {
+      userId = await this.getRequestUserId();
+    }
 
     const convexDeal = {
       userId,
@@ -248,13 +256,15 @@ class ConvexStorageImpl implements ConvexStorage {
     await this.convex.mutation(api.emailDeals.remove, { id: convexDeal._id });
   }
 
-  async findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | null> {
+  async findEmailDealByContentHash(contentHash: string, userId?: string): Promise<EmailDeal | null> {
     await this.ensureInitialized();
-    const userId = await this.getRequestUserId();
+
+    // Use provided userId or get from request context
+    const effectiveUserId = userId || await this.getRequestUserId();
     const deal = await this.convex.query(api.emailDeals.findByContentHash, { contentHash });
 
     // Enforce ownership
-    if (deal && deal.userId !== userId) {
+    if (deal && deal.userId !== effectiveUserId) {
       return null;
     }
     return deal ? this.mapConvexEmailDealToEmailDeal(deal) : null;

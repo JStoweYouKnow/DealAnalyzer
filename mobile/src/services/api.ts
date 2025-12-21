@@ -80,7 +80,7 @@ const createApiClient = (getToken?: () => Promise<string | null>): AxiosInstance
     headers: {
       'Content-Type': 'application/json',
     },
-    timeout: 30000, // 30 seconds
+    timeout: 120000, // 120 seconds (increased for email sync operations)
     withCredentials: true, // Include cookies in cross-origin requests
   });
   

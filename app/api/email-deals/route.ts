@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
 
     const requestLogger = logger.withContext({ userId: userId.substring(0, 20) });
     requestLogger.info("Fetching email deals for user");
-    const emailDeals = await storage.getEmailDeals();
+    const emailDeals = await storage.getEmailDeals(userId);
     requestLogger.info(`Retrieved ${emailDeals.length} email deals for user`, {
       count: emailDeals.length,
     });

@@ -19,12 +19,12 @@ export interface IStorage {
   getAnalysisHistory(): Promise<DealAnalysis[]>;
   
   // Email deal methods
-  getEmailDeals(): Promise<EmailDeal[]>;
+  getEmailDeals(userId?: string): Promise<EmailDeal[]>;
   getEmailDeal(id: string): Promise<EmailDeal | undefined>;
   createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
   updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>): Promise<EmailDeal | undefined>;
   deleteEmailDeal(id: string): Promise<boolean>;
-  findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | undefined>;
+  findEmailDealByContentHash(contentHash: string, userId?: string): Promise<EmailDeal | undefined>;
   
   // Comparison methods
   createComparison(propertyIds: string[], name?: string): Promise<PropertyComparison | null>;
@@ -234,7 +234,7 @@ export class MemStorage implements IStorage {
   }
 
   // Email deal methods implementation
-  async getEmailDeals(): Promise<EmailDeal[]> {
+  async getEmailDeals(userId?: string): Promise<EmailDeal[]> {
     return Array.from(this.emailDeals.values())
       .sort((a, b) => b.receivedDate.getTime() - a.receivedDate.getTime());
   }
@@ -279,9 +279,9 @@ export class MemStorage implements IStorage {
     return this.emailDeals.delete(id);
   }
 
-  async findEmailDealByContentHash(contentHash: string): Promise<EmailDeal | undefined> {
+  async findEmailDealByContentHash(contentHash: string, userId?: string): Promise<EmailDeal | undefined> {
     const deals = Array.from(this.emailDeals.values());
-    return deals.find(deal => deal.contentHash === contentHash);
+    return deals.find(deal => deal.contentHash === contentHash && (!userId || deal.userId === userId));
   }
 
   // Market Intelligence methods implementation
@@ -1428,9 +1428,9 @@ function createConvexStorageWrapper(): IStorage {
       }
     },
     
-    async findEmailDealByContentHash(contentHash: string) {
+    async findEmailDealByContentHash(contentHash: string, userId?: string) {
       const convexStorage = await getConvexStorage();
-      const result = await convexStorage.findEmailDealByContentHash(contentHash);
+      const result = await convexStorage.findEmailDealByContentHash(contentHash, userId);
       return result ?? undefined;
     },
 
