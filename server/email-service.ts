@@ -296,7 +296,7 @@ export class EmailMonitoringService {
         console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(messages.length / BATCH_SIZE)} (${batch.length} emails)`);
 
         const batchResults = await Promise.allSettled(
-          batch.map(message => this.getEmailDetails(message.id, true)) // Skip AI scoring for speed
+          batch.map((message: any) => this.getEmailDetails(message.id, true)) // Skip AI scoring for speed
         );
 
         for (let j = 0; j < batchResults.length; j++) {
