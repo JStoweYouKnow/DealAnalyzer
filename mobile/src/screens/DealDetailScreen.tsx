@@ -23,36 +23,11 @@ import type { EmailDeal } from '../types';
 type DealDetailRouteProp = RouteProp<RootStackParamList, 'DealDetail'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-// Helper function to strip HTML tags from email content
-function stripHtml(html: string): string {
-  if (!html) return '';
-
-  // Remove HTML tags
-  let text = html.replace(/<[^>]*>/g, '');
-
-  // Decode common HTML entities
-  text = text
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&mdash;/g, '—')
-    .replace(/&ndash;/g, '–');
-
-  // Remove excessive whitespace
-  text = text.replace(/\s+/g, ' ').trim();
-
-  return text;
-}
-
 export default function DealDetailScreen() {
   const route = useRoute<DealDetailRouteProp>();
   const navigation = useNavigation<NavigationProp>();
   const { dealId } = route.params;
   const apiClient = useApiClient();
-  const [showFullEmail, setShowFullEmail] = React.useState(false);
 
   const { data: deal, isLoading } = useQuery<EmailDeal>({
     queryKey: ['email-deal', dealId],
@@ -119,34 +94,6 @@ export default function DealDetailScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header Card */}
-      <Card style={styles.headerCard}>
-        <CardHeader>
-          <Text style={styles.title}>{deal.subject}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(deal.status)}20` }]}>
-            <Text style={[styles.statusText, { color: getStatusColor(deal.status) }]}>
-              {deal.status.toUpperCase()}
-            </Text>
-          </View>
-        </CardHeader>
-        <CardContent>
-          <View style={styles.metaRow}>
-            <Ionicons name="person-outline" size={16} color="#8E8E93" />
-            <Text style={styles.metaText}>{deal.sender}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Ionicons name="calendar-outline" size={16} color="#8E8E93" />
-            <Text style={styles.metaText}>
-              {new Date(deal.receivedDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-              })}
-            </Text>
-          </View>
-        </CardContent>
-      </Card>
-
       {/* Property Details Card */}
       {deal.extractedProperty && (
         <Card style={styles.propertyCard}>
@@ -349,31 +296,6 @@ export default function DealDetailScreen() {
         </Card>
       )}
 
-      {/* Email Content Card */}
-      <Card style={styles.emailCard}>
-        <CardHeader>
-          <Text style={styles.sectionTitle}>Email Content</Text>
-        </CardHeader>
-        <CardContent>
-          <Text style={styles.emailContent} numberOfLines={showFullEmail ? undefined : 4}>
-            {stripHtml(deal.emailContent)}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setShowFullEmail(!showFullEmail)}
-            style={styles.showMoreButton}
-          >
-            <Text style={styles.showMoreText}>
-              {showFullEmail ? 'Show Less' : 'Show More'}
-            </Text>
-            <Ionicons
-              name={showFullEmail ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color="#007AFF"
-            />
-          </TouchableOpacity>
-        </CardContent>
-      </Card>
-
       {/* Action Buttons */}
       <View style={styles.actionsContainer}>
         {!deal.analysis && deal.extractedProperty && (
@@ -397,49 +319,16 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  headerCard: {
-    marginBottom: 12,
-  },
   propertyCard: {
     marginBottom: 12,
   },
   analysisCard: {
     marginBottom: 12,
   },
-  emailCard: {
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000000',
-    marginBottom: 8,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#000000',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  metaText: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginLeft: 8,
   },
   propertySection: {
     marginBottom: 20,
@@ -597,24 +486,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: '#000000',
-  },
-  emailContent: {
-    fontSize: 14,
-    color: '#000000',
-    lineHeight: 22,
-  },
-  showMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    paddingVertical: 8,
-  },
-  showMoreText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#007AFF',
-    marginRight: 4,
   },
   actionsContainer: {
     gap: 12,
