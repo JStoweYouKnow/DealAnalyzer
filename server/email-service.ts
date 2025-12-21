@@ -288,18 +288,30 @@ export class EmailMonitoringService {
       const emailDeals: EmailDeal[] = [];
       let filteredCount = 0;
 
-      for (const message of messages) {
-        try {
-          const email = await this.getEmailDetails(message.id);
-          if (email) {
-            console.log(`✓ Email ${message.id} passed filters: "${email.subject.substring(0, 50)}..."`);
-            emailDeals.push(email);
-          } else {
+      // Process emails in parallel batches of 10 for better performance
+      // Skip AI scoring during initial sync for faster processing
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+        const batch = messages.slice(i, i + BATCH_SIZE);
+        console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(messages.length / BATCH_SIZE)} (${batch.length} emails)`);
+
+        const batchResults = await Promise.allSettled(
+          batch.map(message => this.getEmailDetails(message.id, true)) // Skip AI scoring for speed
+        );
+
+        for (let j = 0; j < batchResults.length; j++) {
+          const result = batchResults[j];
+          const message = batch[j];
+
+          if (result.status === 'fulfilled' && result.value) {
+            console.log(`✓ Email ${message.id} passed filters: "${result.value.subject.substring(0, 50)}..."`);
+            emailDeals.push(result.value);
+          } else if (result.status === 'fulfilled' && !result.value) {
             filteredCount++;
             console.log(`✗ Email ${message.id} filtered out by isRealEstateEmail check`);
+          } else if (result.status === 'rejected') {
+            console.error(`Error processing email ${message.id}:`, result.reason);
           }
-        } catch (error) {
-          console.error(`Error processing email ${message.id}:`, error);
         }
       }
 
@@ -314,8 +326,14 @@ export class EmailMonitoringService {
   /**
    * Fetch recent emails from Gmail and store them in the database
    * This method loads OAuth tokens for the user, fetches emails, and stores new ones
+   *
+   * Performance optimizations:
+   * - Processes emails in parallel batches of 10
+   * - Skips AI scoring during initial sync for faster processing (< 15 seconds)
+   * - AI scoring happens asynchronously in the background after sync completes
+   * - Default limit of 25 emails to avoid timeouts
    */
-  async fetchRecentEmails(userId: string, maxResults: number = 50): Promise<{ emailCount: number; newDeals: number }> {
+  async fetchRecentEmails(userId: string, maxResults: number = 25): Promise<{ emailCount: number; newDeals: number }> {
     try {
       console.log(`[Gmail Fetch] Starting email fetch for user ${userId.substring(0, 20)}...`);
 
@@ -349,7 +367,7 @@ export class EmailMonitoringService {
           );
 
           // Check if this email already exists
-          const existingDeal = await storage.findEmailDealByContentHash(contentHash);
+          const existingDeal = await storage.findEmailDealByContentHash(contentHash, userId);
 
           if (!existingDeal) {
             // Create new deal
@@ -372,6 +390,13 @@ export class EmailMonitoringService {
 
       console.log(`[Gmail Fetch] Complete: ${newDealsCreated} new deals created out of ${emailDeals.length} emails`);
 
+      // Trigger background AI scoring asynchronously (don't await)
+      if (emailDeals.length > 0) {
+        this.scoreEmailsInBackground(userId, emailDeals.map(e => e.id)).catch(err => {
+          console.error('[Background Scoring] Failed:', err);
+        });
+      }
+
       return {
         emailCount: emailDeals.length,
         newDeals: newDealsCreated,
@@ -379,6 +404,114 @@ export class EmailMonitoringService {
     } catch (error) {
       console.error('[Gmail Fetch] Error fetching emails:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Score emails in the background with AI
+   * This runs asynchronously after the initial sync to add AI quality scores
+   * without blocking the sync response
+   */
+  private async scoreEmailsInBackground(userId: string, emailIds: string[]): Promise<void> {
+    try {
+      console.log(`[Background Scoring] Starting AI scoring for ${emailIds.length} emails...`);
+
+      // Initialize Convex directly to avoid request context issues
+      if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
+        console.warn('[Background Scoring] NEXT_PUBLIC_CONVEX_URL not configured');
+        return;
+      }
+
+      const initialized = await initializeConvexForTokens();
+      if (!initialized || !convexClient || !convexApi) {
+        console.warn('[Background Scoring] Failed to initialize Convex');
+        return;
+      }
+
+      // Process in batches of 5 to avoid overwhelming the AI API
+      const BATCH_SIZE = 5;
+      let scoredCount = 0;
+
+      for (let i = 0; i < emailIds.length; i += BATCH_SIZE) {
+        const batch = emailIds.slice(i, i + BATCH_SIZE);
+        console.log(`[Background Scoring] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(emailIds.length / BATCH_SIZE)}`);
+
+        await Promise.allSettled(
+          batch.map(async (gmailId) => {
+            try {
+              // Get the email deal directly from Convex
+              const emailDeal = await convexClient.query(convexApi.emailDeals.getByGmailId, { gmailId });
+
+              if (!emailDeal || emailDeal.userId !== userId || !emailDeal.extractedProperty) {
+                return;
+              }
+
+              const property = emailDeal.extractedProperty;
+              const sourceLinks = property.sourceLinks || [];
+              const imageUrls = property.imageUrls || [];
+
+              // Skip if no links or images to score
+              if (sourceLinks.length === 0 && imageUrls.length === 0) {
+                return;
+              }
+
+              // Prepare context for scoring
+              const propertyContext = `${property.address || ''} ${property.city || ''} ${property.state || ''} - ${property.bedrooms || '?'}BR/${property.bathrooms || '?'}BA`.trim();
+
+              // Limit links for scoring
+              const listingLinks = sourceLinks.filter((link: any) => link.type === 'listing');
+              const otherLinks = sourceLinks.filter((link: any) => link.type !== 'listing');
+              const limitedSourceLinks = [...listingLinks.slice(0, 2), ...otherLinks.slice(0, 1)];
+
+              // Score links and images in parallel
+              const [linkScores, imgScores] = await Promise.all([
+                limitedSourceLinks.length > 0 ? aiQualityScoringService.scoreLinks(limitedSourceLinks) : Promise.resolve([]),
+                imageUrls.length > 0 ? aiQualityScoringService.scoreImages(imageUrls.slice(0, 1), propertyContext) : Promise.resolve([])
+              ]);
+
+              // Build updated property with scores
+              const scoredSourceLinks = limitedSourceLinks.map((link: any, index: number) => ({
+                ...link,
+                aiScore: linkScores[index]?.score,
+                aiCategory: linkScores[index]?.category,
+                aiReasoning: linkScores[index]?.reasoning
+              }));
+
+              const imageScores = imageUrls.slice(0, 1).map((url: string, index: number) => ({
+                url,
+                aiScore: imgScores[index]?.score,
+                aiCategory: imgScores[index]?.category,
+                aiReasoning: imgScores[index]?.reasoning
+              }));
+
+              // Update the email deal directly via Convex mutation
+              await convexClient.mutation(convexApi.emailDeals.update, {
+                id: emailDeal._id,
+                extractedProperty: {
+                  ...property,
+                  sourceLinks: [
+                    ...scoredSourceLinks,
+                    ...sourceLinks.slice(limitedSourceLinks.length)
+                  ],
+                  imageUrls: imageScores.length > 0 ?
+                    [...imageScores.map((s: any) => s.url), ...imageUrls.slice(1)] :
+                    imageUrls
+                }
+              });
+
+              scoredCount++;
+              console.log(`[Background Scoring] ✓ Scored email ${gmailId.substring(0, 20)}`);
+            } catch (error) {
+              console.error(`[Background Scoring] Failed to score email ${gmailId}:`, error);
+            }
+          })
+        );
+      }
+
+      console.log(`[Background Scoring] Complete: Scored ${scoredCount}/${emailIds.length} emails`);
+    } catch (error) {
+      console.error('[Background Scoring] Error:', error);
+      // Don't throw - this is a background process
     }
   }
 
@@ -427,7 +560,7 @@ export class EmailMonitoringService {
   }
 
   // Get detailed email information
-  private async getEmailDetails(messageId: string): Promise<EmailDeal | null> {
+  private async getEmailDetails(messageId: string, skipAIScoring: boolean = false): Promise<EmailDeal | null> {
     try {
       const response = await this.gmail.users.messages.get({
         userId: 'me',
@@ -743,14 +876,14 @@ export class EmailMonitoringService {
     const otherLinks = sourceLinks.filter(link => link.type !== 'listing');
     const limitedSourceLinks = [...listingLinks.slice(0, 2), ...otherLinks.slice(0, 1)];
 
-    // Apply AI scoring to links and images
+    // Apply AI scoring to links and images (skip if requested for faster sync)
     let scoredSourceLinks = limitedSourceLinks;
     let imageScores: Array<{url: string, aiScore?: number, aiCategory?: 'excellent' | 'good' | 'fair' | 'poor', aiReasoning?: string}> = [];
 
-    if (limitedSourceLinks.length > 0 || imageUrls.length > 0) {
+    if (!skipAIScoring && (limitedSourceLinks.length > 0 || imageUrls.length > 0)) {
       try {
         const propertyContext = `${address || ''} ${city || ''} ${state || ''} - ${bedrooms || '?'}BR/${bathrooms || '?'}BA`.trim();
-        
+
         // Score links and images in parallel
         const [linkScores, imgScores] = await Promise.all([
           limitedSourceLinks.length > 0 ? aiQualityScoringService.scoreLinks(limitedSourceLinks) : Promise.resolve([]),
@@ -781,6 +914,8 @@ export class EmailMonitoringService {
       } catch (error) {
         console.error('AI scoring failed, proceeding without scores:', error);
       }
+    } else if (skipAIScoring) {
+      console.log('AI Scoring skipped for faster sync');
     }
 
     const result = {
