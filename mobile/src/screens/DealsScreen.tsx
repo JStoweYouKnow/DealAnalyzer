@@ -166,6 +166,74 @@ export default function DealsScreen() {
                   <Text style={styles.dealSender}>{item.sender}</Text>
                 </View>
 
+                {/* Property Details Preview */}
+                {item.extractedProperty && (
+                  <View style={styles.propertyPreview}>
+                    {item.extractedProperty.address && (
+                      <View style={styles.propertyRow}>
+                        <Ionicons name="location-outline" size={14} color="#8E8E93" />
+                        <Text style={styles.propertyText} numberOfLines={1}>
+                          {item.extractedProperty.address}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={styles.propertyDetails}>
+                      {item.extractedProperty.price && (
+                        <View style={styles.propertyDetailItem}>
+                          <Text style={styles.propertyDetailLabel}>Price</Text>
+                          <Text style={styles.propertyDetailValue}>
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: 'USD',
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            }).format(item.extractedProperty.price)}
+                          </Text>
+                        </View>
+                      )}
+
+                      {(item.extractedProperty.bedrooms || item.extractedProperty.bathrooms) && (
+                        <View style={styles.propertyDetailItem}>
+                          <Text style={styles.propertyDetailLabel}>Beds/Baths</Text>
+                          <Text style={styles.propertyDetailValue}>
+                            {item.extractedProperty.bedrooms || 0} / {item.extractedProperty.bathrooms || 0}
+                          </Text>
+                        </View>
+                      )}
+
+                      {item.extractedProperty.sqft && (
+                        <View style={styles.propertyDetailItem}>
+                          <Text style={styles.propertyDetailLabel}>Size</Text>
+                          <Text style={styles.propertyDetailValue}>
+                            {item.extractedProperty.sqft.toLocaleString()} sqft
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Analysis Result Preview */}
+                    {item.analysis && (
+                      <View style={[
+                        styles.analysisBadge,
+                        { backgroundColor: item.analysis.meetsCriteria ? '#34C75920' : '#FF3B3020' }
+                      ]}>
+                        <Ionicons
+                          name={item.analysis.meetsCriteria ? "checkmark-circle" : "close-circle"}
+                          size={14}
+                          color={item.analysis.meetsCriteria ? '#34C759' : '#FF3B30'}
+                        />
+                        <Text style={[
+                          styles.analysisBadgeText,
+                          { color: item.analysis.meetsCriteria ? '#34C759' : '#FF3B30' }
+                        ]}>
+                          {item.analysis.meetsCriteria ? 'Meets Criteria' : 'Does Not Meet'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
                 <View style={styles.dealFooter}>
                   <View style={styles.dealDate}>
                     <Ionicons name="calendar-outline" size={16} color="#8E8E93" />
@@ -173,7 +241,7 @@ export default function DealsScreen() {
                       {formatDate(item.receivedDate)}
                     </Text>
                   </View>
-                  {item.propertyId && (
+                  {item.analysis && (
                     <View style={styles.analyzedBadge}>
                       <Ionicons name="checkmark-circle" size={16} color="#34C759" />
                       <Text style={styles.analyzedText}>Analyzed</Text>
@@ -229,10 +297,63 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8E8E93',
   },
+  propertyPreview: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  propertyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  propertyText: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginLeft: 6,
+    flex: 1,
+  },
+  propertyDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  propertyDetailItem: {
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  propertyDetailLabel: {
+    fontSize: 10,
+    color: '#8E8E93',
+    marginBottom: 2,
+  },
+  propertyDetailValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  analysisBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  analysisBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
   dealFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 8,
   },
   dealDate: {
     flexDirection: 'row',
