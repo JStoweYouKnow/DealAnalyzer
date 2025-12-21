@@ -595,7 +595,7 @@ export class EmailMonitoringService {
       }
 
       // Parse property information from email content
-      const extractedProperty = await this.parsePropertyInfo(emailContent, subject);
+      const extractedProperty = await this.parsePropertyInfo(emailContent, subject, skipAIScoring);
 
       return {
         id: messageId,
@@ -613,7 +613,7 @@ export class EmailMonitoringService {
   }
 
   // Enhanced property information parsing
-  private async parsePropertyInfo(content: string, subject: string): Promise<EmailDeal['extractedProperty']> {
+  private async parsePropertyInfo(content: string, subject: string, skipAIScoring: boolean = false): Promise<EmailDeal['extractedProperty']> {
     const combined = `${subject} ${content}`;
     console.log('Parsing property info from:', combined.substring(0, 500));
     
