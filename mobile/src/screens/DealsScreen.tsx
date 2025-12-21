@@ -6,10 +6,12 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
 import { RootStackParamList } from '../types';
@@ -23,8 +25,10 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 export default function DealsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [refreshing, setRefreshing] = useState(false);
+  const [archivingDealId, setArchivingDealId] = useState<string | null>(null);
   const { isSignedIn, isLoaded } = useAuth();
   const apiClient = useApiClient();
+  const queryClient = useQueryClient();
 
   const { data: deals = [], isLoading, refetch, error } = useQuery<EmailDeal[]>({
     queryKey: ['email-deals'],
@@ -79,6 +83,49 @@ export default function DealsScreen() {
     setRefreshing(true);
     await refetch();
     setRefreshing(false);
+  };
+
+  const handleArchiveDeal = async (dealId: string) => {
+    if (archivingDealId) return; // Prevent multiple simultaneous archives
+    
+    setArchivingDealId(dealId);
+    try {
+      console.log('📦 Archiving deal:', dealId);
+      await apiClient.post(`/email-deals/${dealId}/archive`);
+      console.log('✅ Deal archived successfully');
+      
+      // Invalidate and refetch the deals list
+      await queryClient.invalidateQueries({ queryKey: ['email-deals'] });
+      
+      // Show success feedback
+      Alert.alert('Success', 'Deal archived successfully');
+    } catch (error: any) {
+      console.error('❌ Failed to archive deal:', error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.error || 'Failed to archive deal. Please try again.'
+      );
+    } finally {
+      setArchivingDealId(null);
+    }
+  };
+
+  const renderRightActions = (deal: EmailDeal) => {
+    return (
+      <View style={styles.swipeActionsContainer}>
+        <TouchableOpacity
+          style={[styles.archiveAction, archivingDealId === deal.id && styles.archiveActionDisabled]}
+          onPress={() => handleArchiveDeal(deal.id)}
+          disabled={archivingDealId === deal.id}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="archive-outline" size={24} color="#FFFFFF" />
+          <Text style={styles.archiveActionText}>
+            {archivingDealId === deal.id ? 'Archiving...' : 'Archive'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const getStatusColor = (status: string) => {
@@ -140,117 +187,54 @@ export default function DealsScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('DealDetail', { dealId: item.id })}
+          <Swipeable
+            renderRightActions={() => renderRightActions(item)}
+            overshootRight={false}
           >
-            <Card style={styles.dealCard}>
-              <CardContent>
-                <View style={styles.dealHeader}>
-                  <View style={styles.dealTitleRow}>
-                    <Text style={styles.dealSubject} numberOfLines={2}>
-                      {item.subject}
-                    </Text>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: `${getStatusColor(item.status)}20` },
-                      ]}
-                    >
-                      <Text
-                        style={[styles.statusText, { color: getStatusColor(item.status) }]}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('DealDetail', { dealId: item.id })}
+            >
+              <Card style={styles.dealCard}>
+                <CardContent>
+                  <View style={styles.dealHeader}>
+                    <View style={styles.dealTitleRow}>
+                      <Text style={styles.dealSubject} numberOfLines={2}>
+                        {item.subject}
+                      </Text>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: `${getStatusColor(item.status)}20` },
+                        ]}
                       >
-                        {item.status.toUpperCase()}
+                        <Text
+                          style={[styles.statusText, { color: getStatusColor(item.status) }]}
+                        >
+                          {item.status.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.dealSender}>{item.sender}</Text>
+                  </View>
+
+                  <View style={styles.dealFooter}>
+                    <View style={styles.dealDate}>
+                      <Ionicons name="calendar-outline" size={16} color="#8E8E93" />
+                      <Text style={styles.dealDateText}>
+                        {formatDate(item.receivedDate)}
                       </Text>
                     </View>
-                  </View>
-                  <Text style={styles.dealSender}>{item.sender}</Text>
-                </View>
-
-                {/* Property Details Preview */}
-                {item.extractedProperty && (
-                  <View style={styles.propertyPreview}>
-                    {item.extractedProperty.address && (
-                      <View style={styles.propertyRow}>
-                        <Ionicons name="location-outline" size={14} color="#8E8E93" />
-                        <Text style={styles.propertyText} numberOfLines={1}>
-                          {item.extractedProperty.address}
-                        </Text>
-                      </View>
-                    )}
-
-                    <View style={styles.propertyDetails}>
-                      {item.extractedProperty.price && (
-                        <View style={styles.propertyDetailItem}>
-                          <Text style={styles.propertyDetailLabel}>Price</Text>
-                          <Text style={styles.propertyDetailValue}>
-                            {new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency: 'USD',
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            }).format(item.extractedProperty.price)}
-                          </Text>
-                        </View>
-                      )}
-
-                      {(item.extractedProperty.bedrooms || item.extractedProperty.bathrooms) && (
-                        <View style={styles.propertyDetailItem}>
-                          <Text style={styles.propertyDetailLabel}>Beds/Baths</Text>
-                          <Text style={styles.propertyDetailValue}>
-                            {item.extractedProperty.bedrooms || 0} / {item.extractedProperty.bathrooms || 0}
-                          </Text>
-                        </View>
-                      )}
-
-                      {item.extractedProperty.sqft && (
-                        <View style={styles.propertyDetailItem}>
-                          <Text style={styles.propertyDetailLabel}>Size</Text>
-                          <Text style={styles.propertyDetailValue}>
-                            {item.extractedProperty.sqft.toLocaleString()} sqft
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Analysis Result Preview */}
-                    {item.analysis && (
-                      <View style={[
-                        styles.analysisBadge,
-                        { backgroundColor: item.analysis.meetsCriteria ? '#34C75920' : '#FF3B3020' }
-                      ]}>
-                        <Ionicons
-                          name={item.analysis.meetsCriteria ? "checkmark-circle" : "close-circle"}
-                          size={14}
-                          color={item.analysis.meetsCriteria ? '#34C759' : '#FF3B30'}
-                        />
-                        <Text style={[
-                          styles.analysisBadgeText,
-                          { color: item.analysis.meetsCriteria ? '#34C759' : '#FF3B30' }
-                        ]}>
-                          {item.analysis.meetsCriteria ? 'Meets Criteria' : 'Does Not Meet'}
-                        </Text>
+                    {item.propertyId && (
+                      <View style={styles.analyzedBadge}>
+                        <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+                        <Text style={styles.analyzedText}>Analyzed</Text>
                       </View>
                     )}
                   </View>
-                )}
-
-                <View style={styles.dealFooter}>
-                  <View style={styles.dealDate}>
-                    <Ionicons name="calendar-outline" size={16} color="#8E8E93" />
-                    <Text style={styles.dealDateText}>
-                      {formatDate(item.receivedDate)}
-                    </Text>
-                  </View>
-                  {item.analysis && (
-                    <View style={styles.analyzedBadge}>
-                      <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-                      <Text style={styles.analyzedText}>Analyzed</Text>
-                    </View>
-                  )}
-                </View>
-              </CardContent>
-            </Card>
-          </TouchableOpacity>
+                </CardContent>
+              </Card>
+            </TouchableOpacity>
+          </Swipeable>
         )}
       />
     </View>
@@ -297,63 +281,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8E8E93',
   },
-  propertyPreview: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
-  },
-  propertyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  propertyText: {
-    fontSize: 13,
-    color: '#8E8E93',
-    marginLeft: 6,
-    flex: 1,
-  },
-  propertyDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  propertyDetailItem: {
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  propertyDetailLabel: {
-    fontSize: 10,
-    color: '#8E8E93',
-    marginBottom: 2,
-  },
-  propertyDetailValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  analysisBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  analysisBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 6,
-  },
   dealFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
   },
   dealDate: {
     flexDirection: 'row',
@@ -392,5 +323,30 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     paddingHorizontal: 32,
+  },
+  swipeActionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'flex-end',
+    marginBottom: 12,
+  },
+  archiveAction: {
+    backgroundColor: '#8E8E93',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 100,
+    flex: 1,
+    borderRadius: 8,
+    marginLeft: 8,
+    paddingVertical: 16,
+  },
+  archiveActionDisabled: {
+    opacity: 0.6,
+  },
+  archiveActionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

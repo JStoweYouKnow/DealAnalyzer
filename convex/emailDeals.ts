@@ -84,6 +84,7 @@ export const list = query({
       v.literal("interested"),
       v.literal("not_interested")
     )),
+    includeArchived: v.optional(v.boolean()), // Option to include archived deals
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -96,8 +97,12 @@ export const list = query({
 
     let query = ctx.db.query("emailDeals").withIndex("by_user_id", (q) => q.eq("userId", userId));
 
+    // Filter by status if provided
     if (args.status) {
       query = query.filter((q) => q.eq(q.field("status"), args.status));
+    } else if (!args.includeArchived) {
+      // By default, exclude archived deals unless explicitly requested
+      query = query.filter((q) => q.neq(q.field("status"), "archived"));
     }
 
     const deals = await query
