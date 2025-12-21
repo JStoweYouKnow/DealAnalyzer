@@ -102,6 +102,7 @@ export const list = query({
       query = query.filter((q) => q.eq(q.field("status"), args.status));
     } else if (!args.includeArchived) {
       // By default, exclude archived deals unless explicitly requested
+      // Only show deals that are NOT archived (including null/undefined status)
       query = query.filter((q) => q.neq(q.field("status"), "archived"));
     }
 
