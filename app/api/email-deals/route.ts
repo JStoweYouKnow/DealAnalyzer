@@ -24,8 +24,12 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
         // Decode the JWT to extract the user ID
         const parts = token.split('.');
         if (parts.length === 3) {
-          // Decode the payload (second part of JWT)
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          // Decode the payload (second part of JWT) - use base64url decoding
+          let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          while (base64.length % 4) {
+            base64 += '=';
+          }
+          const payload = JSON.parse(Buffer.from(base64, 'base64').toString());
           logger.info("Decoded JWT payload", {
             hasSub: !!payload?.sub,
             issuer: payload?.iss,
