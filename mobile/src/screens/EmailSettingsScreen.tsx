@@ -435,8 +435,13 @@ export default function EmailSettingsScreen() {
           onPress: async () => {
             try {
               console.log('[Gmail Disconnect] Disconnecting Gmail account...');
+              console.log('[Gmail Disconnect] API URL:', authenticatedClient.defaults?.baseURL);
 
               const response = await authenticatedClient.post('/gmail-disconnect');
+              console.log('[Gmail Disconnect] Response received:', response);
+              console.log('[Gmail Disconnect] Response status:', response.status);
+              console.log('[Gmail Disconnect] Response data:', response.data);
+
               const { deleted } = response.data;
 
               console.log('[Gmail Disconnect] Disconnect complete:', { deleted });
@@ -450,9 +455,13 @@ export default function EmailSettingsScreen() {
               );
 
               // Refresh the connection status
+              queryClient.invalidateQueries({ queryKey: ['gmail-status'] });
               await refetchStatus();
             } catch (error: any) {
               console.error('[Gmail Disconnect] Disconnect failed:', error);
+              console.error('[Gmail Disconnect] Error response:', error.response);
+              console.error('[Gmail Disconnect] Error status:', error.response?.status);
+              console.error('[Gmail Disconnect] Error data:', error.response?.data);
 
               const errorMessage = error.response?.data?.error || error.message || 'Failed to disconnect Gmail account';
               Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
