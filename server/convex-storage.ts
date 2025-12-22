@@ -155,7 +155,7 @@ class ConvexStorageImpl implements ConvexStorage {
       const deals = await this.convex.query(api.emailDeals.list, queryArgs);
       // Filter out archived deals client-side if not including archived
       // This provides backward compatibility if Convex schema doesn't support includeArchived yet
-      const filteredDeals = includeArchived ? deals : deals.filter(deal => deal.status !== 'archived');
+deals.filter((deal: any) => deal.status !== 'archived')
       return filteredDeals.map(this.mapConvexEmailDealToEmailDeal);
     } catch (error: any) {
       // If query fails (e.g., Convex schema not updated), try without includeArchived
@@ -165,7 +165,8 @@ class ConvexStorageImpl implements ConvexStorage {
           userId: finalUserId
         });
         // Filter out archived deals client-side
-        const filteredDeals = includeArchived ? deals : deals.filter(deal => deal.status !== 'archived');
+        const filteredDeals = includeArchived ? deals : deals.filter((deal: any) => deal.status !== 'archived')
+;
         return filteredDeals.map(this.mapConvexEmailDealToEmailDeal);
       }
       throw error;
