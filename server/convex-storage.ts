@@ -144,18 +144,23 @@ class ConvexStorageImpl implements ConvexStorage {
     await this.ensureInitialized();
     // Use passed userId if available, otherwise try to get from request context
     const finalUserId = userId || await this.getRequestUserId();
+    
+    // Build query args - only include includeArchived if it's true to avoid schema issues
+    const queryArgs: any = { userId: finalUserId };
+    if (includeArchived) {
+      queryArgs.includeArchived = true;
+    }
+    
     try {
-      const deals = await this.convex.query(api.emailDeals.list, { 
-        userId: finalUserId,
-        includeArchived 
-      });
-      // Filter out archived deals client-side if Convex doesn't support includeArchived yet
+      const deals = await this.convex.query(api.emailDeals.list, queryArgs);
+      // Filter out archived deals client-side if not including archived
+      // This provides backward compatibility if Convex schema doesn't support includeArchived yet
       const filteredDeals = includeArchived ? deals : deals.filter(deal => deal.status !== 'archived');
       return filteredDeals.map(this.mapConvexEmailDealToEmailDeal);
     } catch (error: any) {
       // If query fails (e.g., Convex schema not updated), try without includeArchived
-      if (error.message?.includes('includeArchived') || error.message?.includes('args')) {
-        console.warn('Convex schema may not support includeArchived yet, trying without it');
+      if (error.message?.includes('includeArchived') || error.message?.includes('args') || error.message?.includes('Invalid argument')) {
+        console.warn('Convex schema may not support includeArchived yet, trying without it and filtering client-side');
         const deals = await this.convex.query(api.emailDeals.list, { 
           userId: finalUserId
         });
