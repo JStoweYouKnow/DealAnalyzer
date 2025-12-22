@@ -47,7 +47,7 @@ async function initializeConvex() {
 // Storage interface using Convex
 export interface ConvexStorage {
   // Email Deals
-  getEmailDeals(): Promise<EmailDeal[]>;
+getEmailDeals(userId?: string, includeArchived?: boolean): Promise<EmailDeal[]>;
   getEmailDeal(id: string): Promise<EmailDeal | null>;
   createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
   updateEmailDeal(id: string, updates: Partial<EmailDeal>): Promise<EmailDeal>;
