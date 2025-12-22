@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { emailMonitoringService } from "../../../server/email-service";
 import { storage } from "../../../server/storage";
 import { cookies, headers } from "next/headers";
-import { google } from "googleapis";
 import type { EmailMonitoringResponse } from "../../../shared/schema";
 import { sendNotificationIfEnabled } from "../../../server/services/notification-helper";
 
@@ -256,13 +255,18 @@ export async function POST() {
           storage.getEmailDeal(deal.id),
           Promise.resolve(emailMonitoringService.generateContentHash(deal.subject, deal.sender, deal.emailContent))
         ]);
-        
-        // Check for duplicate by hash
-        const duplicateByHash = await storage.findEmailDealByContentHash(contentHash);
+
+        // Check for duplicate by hash (within this user's deals only)
+        const duplicateByHash = await storage.findEmailDealByContentHash(contentHash, userId || undefined);
         
         if (!existingDeal && !duplicateByHash) {
           console.log(`Creating new email deal with ID: ${deal.id}`);
-          const dealWithHash = { ...deal, contentHash };
+          const dealWithHash = {
+            ...deal,
+            contentHash,
+            userId: userId || undefined,
+            status: deal.status || 'new'
+          };
           const storedDeal = await storage.createEmailDeal(dealWithHash);
           console.log(`Stored deal with final ID: ${storedDeal.id}`);
           storedDeals.push(storedDeal);
