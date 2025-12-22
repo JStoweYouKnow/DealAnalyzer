@@ -144,11 +144,27 @@ class ConvexStorageImpl implements ConvexStorage {
     await this.ensureInitialized();
     // Use passed userId if available, otherwise try to get from request context
     const finalUserId = userId || await this.getRequestUserId();
-    const deals = await this.convex.query(api.emailDeals.list, { 
-      userId: finalUserId,
-      includeArchived 
-    });
-    return deals.map(this.mapConvexEmailDealToEmailDeal);
+    try {
+      const deals = await this.convex.query(api.emailDeals.list, { 
+        userId: finalUserId,
+        includeArchived 
+      });
+      // Filter out archived deals client-side if Convex doesn't support includeArchived yet
+      const filteredDeals = includeArchived ? deals : deals.filter(deal => deal.status !== 'archived');
+      return filteredDeals.map(this.mapConvexEmailDealToEmailDeal);
+    } catch (error: any) {
+      // If query fails (e.g., Convex schema not updated), try without includeArchived
+      if (error.message?.includes('includeArchived') || error.message?.includes('args')) {
+        console.warn('Convex schema may not support includeArchived yet, trying without it');
+        const deals = await this.convex.query(api.emailDeals.list, { 
+          userId: finalUserId
+        });
+        // Filter out archived deals client-side
+        const filteredDeals = includeArchived ? deals : deals.filter(deal => deal.status !== 'archived');
+        return filteredDeals.map(this.mapConvexEmailDealToEmailDeal);
+      }
+      throw error;
+    }
   }
 
   async getEmailDeal(id: string): Promise<EmailDeal | null> {
