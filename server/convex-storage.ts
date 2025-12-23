@@ -166,7 +166,7 @@ const filteredDeals = includeArchived ? deals : deals.filter((deal: any) => deal
         });
         // Filter out archived deals client-side
 const filteredDeals = includeArchived ? deals : deals.filter((deal: any) => deal.status !== 'archived');
-;
+
         return filteredDeals.map(this.mapConvexEmailDealToEmailDeal);
       }
       throw error;
