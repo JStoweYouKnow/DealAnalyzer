@@ -20,10 +20,10 @@ export interface IStorage {
   
   // Email deal methods
   getEmailDeals(userId?: string): Promise<EmailDeal[]>;
-  getEmailDeal(id: string): Promise<EmailDeal | undefined>;
+  getEmailDeal(id: string, userId?: string): Promise<EmailDeal | undefined>;
   createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
-  updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>): Promise<EmailDeal | undefined>;
-  deleteEmailDeal(id: string): Promise<boolean>;
+  updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>, userId?: string): Promise<EmailDeal | undefined>;
+  deleteEmailDeal(id: string, userId?: string): Promise<boolean>;
   findEmailDealByContentHash(contentHash: string, userId?: string): Promise<EmailDeal | undefined>;
   
   // Comparison methods
@@ -239,7 +239,7 @@ export class MemStorage implements IStorage {
       .sort((a, b) => b.receivedDate.getTime() - a.receivedDate.getTime());
   }
 
-  async getEmailDeal(id: string): Promise<EmailDeal | undefined> {
+  async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | undefined> {
     return this.emailDeals.get(id);
   }
 
@@ -258,7 +258,7 @@ export class MemStorage implements IStorage {
     return emailDeal;
   }
 
-  async updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>): Promise<EmailDeal | undefined> {
+  async updateEmailDeal(id: string, updates: Partial<Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>>, userId?: string): Promise<EmailDeal | undefined> {
     const existingDeal = this.emailDeals.get(id);
     if (!existingDeal) {
       return undefined;
@@ -275,7 +275,7 @@ export class MemStorage implements IStorage {
     return updatedDeal;
   }
 
-  async deleteEmailDeal(id: string): Promise<boolean> {
+  async deleteEmailDeal(id: string, userId?: string): Promise<boolean> {
     return this.emailDeals.delete(id);
   }
 
@@ -1401,9 +1401,9 @@ function createConvexStorageWrapper(): IStorage {
       return await convexStorage.getEmailDeals(userId);
     },
     
-    async getEmailDeal(id: string) {
+    async getEmailDeal(id: string, userId?: string) {
       const convexStorage = await getConvexStorage();
-      const result = await convexStorage.getEmailDeal(id);
+      const result = await convexStorage.getEmailDeal(id, userId);
       return result ?? undefined;
     },
     
@@ -1412,16 +1412,16 @@ function createConvexStorageWrapper(): IStorage {
       return await convexStorage.createEmailDeal(deal);
     },
     
-    async updateEmailDeal(id: string, updates: any) {
+    async updateEmailDeal(id: string, updates: any, userId?: string) {
       const convexStorage = await getConvexStorage();
-      const result = await convexStorage.updateEmailDeal(id, updates);
+      const result = await convexStorage.updateEmailDeal(id, updates, userId);
       return result || undefined;
     },
     
-    async deleteEmailDeal(id: string) {
+    async deleteEmailDeal(id: string, userId?: string) {
       try {
         const convexStorage = await getConvexStorage();
-        await convexStorage.deleteEmailDeal(id);
+        await convexStorage.deleteEmailDeal(id, userId);
         return true;
       } catch {
         return false;

@@ -52,7 +52,7 @@ export async function GET(
       );
     }
 
-    const emailDeal = await storage.getEmailDeal(id);
+    const emailDeal = await storage.getEmailDeal(id, userId);
 
     if (!emailDeal) {
       return NextResponse.json(
@@ -89,10 +89,10 @@ export async function PUT(
     const updates = await request.json();
 
     // Get existing deal to verify it exists
-    const existingDeal = await storage.getEmailDeal(id);
+    const existingDeal = await storage.getEmailDeal(id, userId);
     if (!existingDeal) {
       // Debug: Let's see what email deals exist
-      const allDeals = await storage.getEmailDeals();
+      const allDeals = await storage.getEmailDeals(userId);
       console.log(`PUT /api/email-deals/${id} - Deal not found!`);
       console.log(`Total deals in storage: ${allDeals.length}`);
       console.log('Available email deal IDs:', allDeals.slice(0, 5).map(d => `${d.id} (${d.subject?.substring(0, 30)}...)`));
@@ -104,7 +104,7 @@ export async function PUT(
     }
 
     // Update the email deal
-    const updatedDeal = await storage.updateEmailDeal(id, updates);
+    const updatedDeal = await storage.updateEmailDeal(id, updates, userId);
 
     return NextResponse.json({
       success: true,
@@ -135,7 +135,7 @@ export async function DELETE(
     }
 
     // Verify deal exists before deleting
-    const existingDeal = await storage.getEmailDeal(id);
+    const existingDeal = await storage.getEmailDeal(id, userId);
     if (!existingDeal) {
       return NextResponse.json(
         { error: "Email deal not found" },
@@ -143,7 +143,7 @@ export async function DELETE(
       );
     }
 
-    await storage.deleteEmailDeal(id);
+    await storage.deleteEmailDeal(id, userId);
 
     return NextResponse.json({
       success: true,

@@ -1,13 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { storage } from "../../../server/storage";
 import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
 import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
 import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 
+// Helper to decode JWT payload (for mobile bearer tokens)
+function decodeBase64(base64: string): string {
+  let padded = base64.replace(/-/g, '+').replace(/_/g, '/');
+  while (padded.length % 4) {
+    padded += '=';
+  }
+  return Buffer.from(padded, 'base64').toString('utf-8');
+}
+
+// Helper to get userId from bearer token or Clerk session
+async function getUserId(request: NextRequest): Promise<string | null> {
+  // Try bearer token first (for mobile)
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7).trim();
+    if (token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(decodeBase64(parts[1]));
+          if (payload?.sub && payload.iss?.includes('clerk')) {
+            return payload.sub;
+          }
+        }
+      } catch (error) {
+        console.error('[Bearer Auth] Token decode failed:', error);
+      }
+    }
+  }
+
+  // Fallback to Clerk session (for web)
+  const { userId } = await auth();
+  return userId;
+}
+
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
+    const userId = await getUserId(req);
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized. Please sign in." },
+        { status: 401 }
+      );
+    }
+
     const { dealId, emailContent, fundingSource, mortgageValues, monthlyExpenses } = await req.json();
     
     if (!dealId || !emailContent) {
@@ -19,11 +64,11 @@ export async function POST(request: NextRequest) {
 
     // Get the email deal
     console.log(`[analyze-email-deal] Looking for email deal with ID: ${dealId}`);
-    const emailDeal = await storage.getEmailDeal(dealId);
+    const emailDeal = await storage.getEmailDeal(dealId, userId);
     if (!emailDeal) {
       // Log available deals for debugging (limit to first 10 to avoid spam)
       try {
-        const allDeals = await storage.getEmailDeals();
+        const allDeals = await storage.getEmailDeals(userId);
         console.log(`[analyze-email-deal] Total deals in storage: ${allDeals.length}`);
         console.log(`[analyze-email-deal] Available deal IDs (first 10):`, allDeals.slice(0, 10).map(d => d.id));
       } catch (err) {
@@ -148,7 +193,7 @@ export async function POST(request: NextRequest) {
     await storage.updateEmailDeal(dealId, {
       analysis: storedAnalysis as any,
       status: 'analyzed'
-    } as any);
+    } as any, userId);
 
     return NextResponse.json({
       success: true,

@@ -66,3 +66,6 @@ mobile/android/app/build/
 mobile/android/build/
 mobile/android/app/google-services.json
 mobile/ios/GoogleService-Info.plist
+
+# External libraries
+assets/nutrient-viewer-lib/

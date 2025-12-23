@@ -47,11 +47,11 @@ async function initializeConvex() {
 // Storage interface using Convex
 export interface ConvexStorage {
   // Email Deals
-getEmailDeals(userId?: string, includeArchived?: boolean): Promise<EmailDeal[]>;
-getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null>;
+  getEmailDeals(userId?: string, includeArchived?: boolean): Promise<EmailDeal[]>;
+  getEmailDeal(id: string): Promise<EmailDeal | null>;
   createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
-updateEmailDeal(id: string, updates: Partial<EmailDeal>, userId?: string): Promise<EmailDeal>;
-deleteEmailDeal(id: string, userId?: string): Promise<void>;
+  updateEmailDeal(id: string, updates: Partial<EmailDeal>): Promise<EmailDeal>;
+  deleteEmailDeal(id: string): Promise<void>;
   findEmailDealByContentHash(contentHash: string, userId?: string): Promise<EmailDeal | null>;
   bulkCreateEmailDeals(deals: Omit<EmailDeal, 'createdAt' | 'updatedAt'>[]): Promise<EmailDeal[]>;
 
@@ -155,7 +155,7 @@ class ConvexStorageImpl implements ConvexStorage {
       const deals = await this.convex.query(api.emailDeals.list, queryArgs);
       // Filter out archived deals client-side if not including archived
       // This provides backward compatibility if Convex schema doesn't support includeArchived yet
-const filteredDeals = includeArchived ? deals : deals.filter((deal: any) => deal.status !== 'archived');
+      const filteredDeals = includeArchived ? deals : deals.filter(deal => deal.status !== 'archived');
       return filteredDeals.map(this.mapConvexEmailDealToEmailDeal);
     } catch (error: any) {
       // If query fails (e.g., Convex schema not updated), try without includeArchived
@@ -165,17 +165,16 @@ const filteredDeals = includeArchived ? deals : deals.filter((deal: any) => deal
           userId: finalUserId
         });
         // Filter out archived deals client-side
-const filteredDeals = includeArchived ? deals : deals.filter((deal: any) => deal.status !== 'archived');
-
+        const filteredDeals = includeArchived ? deals : deals.filter(deal => deal.status !== 'archived');
         return filteredDeals.map(this.mapConvexEmailDealToEmailDeal);
       }
       throw error;
     }
   }
-async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null> {
-  await this.ensureInitialized();
-  const effectiveUserId = userId || await this.getRequestUserId();
 
+  async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null> {
+    await this.ensureInitialized();
+    const effectiveUserId = userId || await this.getRequestUserId();
     // First try to get by Gmail ID (for backward compatibility)
     let deal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
 
@@ -185,7 +184,7 @@ async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null> {
     }
 
     // Enforce ownership
-    if (deal && deal.userId !== userId) {
+    if (deal && deal.userId !== effectiveUserId) {
       return null;
     }
     return deal ? this.mapConvexEmailDealToEmailDeal(deal) : null;
@@ -225,9 +224,9 @@ async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null> {
     return this.mapConvexEmailDealToEmailDeal(createdDeal);
   }
 
-  async updateEmailDeal(id: string, updates: Partial<EmailDeal>): Promise<EmailDeal> {
+  async updateEmailDeal(id: string, updates: Partial<EmailDeal>, userId?: string): Promise<EmailDeal> {
     // Get the deal first to find the Convex ID
-    const existingDeal = await this.getEmailDeal(id);
+    const existingDeal = await this.getEmailDeal(id, userId);
     if (!existingDeal) {
       throw new Error("Email deal not found");
     }
@@ -239,8 +238,8 @@ async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null> {
     }
 
     // Enforce ownership
-    const userId = await this.getRequestUserId();
-    if (convexDeal && convexDeal.userId !== userId) {
+    const effectiveUserId = userId || await this.getRequestUserId();
+    if (convexDeal && convexDeal.userId !== effectiveUserId) {
       throw new Error("Unauthorized: Cannot update email deal belonging to another user");
     }
     if (!convexDeal) {
@@ -262,7 +261,7 @@ async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null> {
     return this.mapConvexEmailDealToEmailDeal(updatedDeal!);
   }
 
-  async deleteEmailDeal(id: string): Promise<void> {
+  async deleteEmailDeal(id: string, userId?: string): Promise<void> {
     // Find the Convex deal to get the internal ID
     let convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
     if (!convexDeal && id.startsWith("k")) {
@@ -274,8 +273,8 @@ async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null> {
     }
 
     // Enforce ownership
-    const userId = await this.getRequestUserId();
-    if (convexDeal.userId !== userId) {
+    const effectiveUserId = userId || await this.getRequestUserId();
+    if (convexDeal.userId !== effectiveUserId) {
       throw new Error("Unauthorized: Cannot delete email deal belonging to another user");
     }
     await this.convex.mutation(api.emailDeals.remove, { id: convexDeal._id });
