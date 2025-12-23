@@ -48,10 +48,10 @@ async function initializeConvex() {
 export interface ConvexStorage {
   // Email Deals
 getEmailDeals(userId?: string, includeArchived?: boolean): Promise<EmailDeal[]>;
-  getEmailDeal(id: string): Promise<EmailDeal | null>;
+getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null>;
   createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal>;
-  updateEmailDeal(id: string, updates: Partial<EmailDeal>): Promise<EmailDeal>;
-  deleteEmailDeal(id: string): Promise<void>;
+updateEmailDeal(id: string, updates: Partial<EmailDeal>, userId?: string): Promise<EmailDeal>;
+deleteEmailDeal(id: string, userId?: string): Promise<void>;
   findEmailDealByContentHash(contentHash: string, userId?: string): Promise<EmailDeal | null>;
   bulkCreateEmailDeals(deals: Omit<EmailDeal, 'createdAt' | 'updatedAt'>[]): Promise<EmailDeal[]>;
 
@@ -172,10 +172,10 @@ const filteredDeals = includeArchived ? deals : deals.filter((deal: any) => deal
       throw error;
     }
   }
+async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null> {
+  await this.ensureInitialized();
+  const effectiveUserId = userId || await this.getRequestUserId();
 
-  async getEmailDeal(id: string): Promise<EmailDeal | null> {
-    await this.ensureInitialized();
-    const userId = await this.getRequestUserId();
     // First try to get by Gmail ID (for backward compatibility)
     let deal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
 
