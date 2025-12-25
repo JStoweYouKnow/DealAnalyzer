@@ -47,8 +47,8 @@ export const TIMEOUTS = {
   // Standard API calls (property analysis, data fetching)
   STANDARD: 30000, // 30 seconds
   
-  // Long-running operations (file processing, PDF generation)
-  LONG: 60000, // 60 seconds
+  // Long-running operations (file processing, PDF generation, AI analysis)
+  LONG: 90000, // 90 seconds (increased from 60s for AI analysis)
   
   // Very long operations (batch processing)
   VERY_LONG: 120000, // 2 minutes

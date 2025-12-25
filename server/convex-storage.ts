@@ -175,19 +175,109 @@ class ConvexStorageImpl implements ConvexStorage {
   async getEmailDeal(id: string, userId?: string): Promise<EmailDeal | null> {
     await this.ensureInitialized();
     const effectiveUserId = userId || await this.getRequestUserId();
-    // First try to get by Gmail ID (for backward compatibility)
-    let deal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
+    
+    console.log('[ConvexStorage] getEmailDeal called:', {
+      id,
+      idLength: id.length,
+      idStartsWithK: id.startsWith('k'),
+      effectiveUserId: effectiveUserId?.substring(0, 8) + '...',
+      hasUserId: !!userId,
+    });
 
-    // If not found by Gmail ID, try by Convex ID
-    if (!deal && id.startsWith("k")) {
-      deal = await this.convex.query(api.emailDeals.getById, { id: id as any });
+    let deal: any = null;
+    let lookupMethod = 'none';
+
+    // Strategy 1: Try by Gmail ID first (for backward compatibility)
+    // Gmail IDs are typically hex strings (like "19afb5cbc3b45326")
+    if (!id.startsWith('k')) {
+      try {
+        console.log('[ConvexStorage] Attempting lookup by Gmail ID:', id);
+        // Pass userId to filter results - this ensures we only get deals for this user
+        deal = await this.convex.query(api.emailDeals.getByGmailId, { 
+          gmailId: id,
+          userId: effectiveUserId,
+        });
+        if (deal) {
+          lookupMethod = 'gmailId';
+          console.log('[ConvexStorage] ✅ Found deal by Gmail ID');
+        } else {
+          console.log('[ConvexStorage] ⚠️ Deal not found by Gmail ID (with userId filter)');
+          // Try without userId filter as fallback (in case userId format differs)
+          try {
+            deal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
+            if (deal) {
+              console.log('[ConvexStorage] ⚠️ Found deal by Gmail ID without userId filter - will check ownership');
+              lookupMethod = 'gmailId-no-user-filter';
+            }
+          } catch (fallbackError) {
+            // Ignore fallback errors
+          }
+        }
+      } catch (error: any) {
+        console.warn('[ConvexStorage] Error looking up by Gmail ID:', {
+          error: error?.message || String(error),
+        });
+      }
     }
+
+    // Strategy 2: Try by Convex ID if it starts with "k"
+    if (!deal && id.startsWith("k")) {
+      try {
+        console.log('[ConvexStorage] Attempting lookup by Convex ID:', id);
+        deal = await this.convex.query(api.emailDeals.getById, { id: id as any });
+        if (deal) {
+          lookupMethod = 'convexId';
+          console.log('[ConvexStorage] ✅ Found deal by Convex ID');
+        } else {
+          console.log('[ConvexStorage] ⚠️ Deal not found by Convex ID');
+        }
+      } catch (error: any) {
+        console.warn('[ConvexStorage] Error looking up by Convex ID:', {
+          error: error?.message || String(error),
+        });
+      }
+    }
+
+    // Strategy 3: If still not found and ID doesn't start with "k", try as Convex ID anyway
+    // (in case the ID format changed or was stored differently)
+    if (!deal && !id.startsWith('k')) {
+      try {
+        console.log('[ConvexStorage] Attempting fallback lookup as Convex ID:', id);
+        deal = await this.convex.query(api.emailDeals.getById, { id: id as any });
+        if (deal) {
+          lookupMethod = 'convexId-fallback';
+          console.log('[ConvexStorage] ✅ Found deal by Convex ID (fallback)');
+        }
+      } catch (error: any) {
+        // Expected to fail if ID is not a valid Convex ID format
+        console.log('[ConvexStorage] Fallback Convex ID lookup failed (expected if not Convex ID)');
+      }
+    }
+
+    if (!deal) {
+      console.warn('[ConvexStorage] ❌ Deal not found with any lookup method');
+      console.warn('[ConvexStorage] Tried methods: Gmail ID, Convex ID, Fallback');
+      return null;
+    }
+
+    console.log('[ConvexStorage] Deal found via:', lookupMethod);
+    console.log('[ConvexStorage] Deal userId:', deal.userId?.substring(0, 8) + '...');
+    console.log('[ConvexStorage] Effective userId:', effectiveUserId?.substring(0, 8) + '...');
 
     // Enforce ownership
     if (deal && deal.userId !== effectiveUserId) {
+      console.warn('[ConvexStorage] ❌ User ID mismatch - deal belongs to different user');
+      console.warn('[ConvexStorage] Deal userId:', deal.userId);
+      console.warn('[ConvexStorage] Request userId:', effectiveUserId);
       return null;
     }
-    return deal ? this.mapConvexEmailDealToEmailDeal(deal) : null;
+
+    const mappedDeal = deal ? this.mapConvexEmailDealToEmailDeal(deal) : null;
+    if (mappedDeal) {
+      console.log('[ConvexStorage] ✅ Successfully mapped and returned deal');
+      console.log('[ConvexStorage] Mapped deal ID:', mappedDeal.id);
+    }
+    return mappedDeal;
   }
 
   async createEmailDeal(deal: Omit<EmailDeal, 'createdAt' | 'updatedAt'> | Omit<EmailDeal, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmailDeal> {
@@ -232,9 +322,17 @@ class ConvexStorageImpl implements ConvexStorage {
     }
 
     // Find the Convex deal to get the internal ID
-    let convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
+    const effectiveUserId = userId || await this.getRequestUserId();
+    let convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { 
+      gmailId: id,
+      userId: effectiveUserId,
+    });
     if (!convexDeal && id.startsWith("k")) {
       convexDeal = await this.convex.query(api.emailDeals.getById, { id: id as any });
+    }
+    // Fallback: try without userId filter if not found
+    if (!convexDeal && !id.startsWith("k")) {
+      convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
     }
 
     // Enforce ownership
@@ -263,9 +361,17 @@ class ConvexStorageImpl implements ConvexStorage {
 
   async deleteEmailDeal(id: string, userId?: string): Promise<void> {
     // Find the Convex deal to get the internal ID
-    let convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
+    const effectiveUserId = userId || await this.getRequestUserId();
+    let convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { 
+      gmailId: id,
+      userId: effectiveUserId,
+    });
     if (!convexDeal && id.startsWith("k")) {
       convexDeal = await this.convex.query(api.emailDeals.getById, { id: id as any });
+    }
+    // Fallback: try without userId filter if not found
+    if (!convexDeal && !id.startsWith("k")) {
+      convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
     }
 
     if (!convexDeal) {
@@ -434,8 +540,16 @@ class ConvexStorageImpl implements ConvexStorage {
 
   // Mapping functions
   private mapConvexEmailDealToEmailDeal(convexDeal: any): EmailDeal {
+    // Use Gmail ID if available, otherwise fall back to Convex ID
+    // This ensures backward compatibility while supporting newer deals
+    const dealId = convexDeal.gmailId || convexDeal._id;
+    
+    if (!convexDeal.gmailId && convexDeal._id) {
+      console.log('[ConvexStorage] ⚠️ Deal missing gmailId, using Convex ID:', convexDeal._id);
+    }
+    
     return {
-      id: convexDeal.gmailId, // Use Gmail ID for backward compatibility
+      id: dealId,
       subject: convexDeal.subject,
       sender: convexDeal.sender,
       receivedDate: new Date(convexDeal.receivedDate),

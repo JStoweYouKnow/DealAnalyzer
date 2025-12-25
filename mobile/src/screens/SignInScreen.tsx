@@ -325,33 +325,42 @@ export default function SignInScreen() {
         }
       }
     } catch (error: any) {
-      console.error('[Password Reset] ❌❌❌ ERROR CAUGHT ❌❌❌');
-      console.error('[Password Reset] Error type:', typeof error);
-      console.error('[Password Reset] Error object:', error);
-      console.error('[Password Reset] Error message:', error.message);
-      console.error('[Password Reset] Error errors array:', error.errors);
-      console.error('[Password Reset] Error stack:', error.stack);
+      // Use console.warn instead of console.error to prevent error overlay in dev mode
+      console.warn('[Password Reset] Password reset failed');
+      console.warn('[Password Reset] Error type:', typeof error);
+      console.warn('[Password Reset] Error message:', error?.message || 'Unknown error');
+      
+      // Only log full error details in development
+      if (__DEV__) {
+        console.warn('[Password Reset] Full error object:', error);
+        console.warn('[Password Reset] Error errors array:', error?.errors);
+        console.warn('[Password Reset] Error stack:', error?.stack);
+      }
 
       let errorMessage = 'Failed to send password reset code. Please try again.';
 
       // Extract the most specific error message
-      if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
+      if (error?.errors && Array.isArray(error.errors) && error.errors.length > 0) {
         const clerkError = error.errors[0];
         errorMessage = clerkError.longMessage || clerkError.message || errorMessage;
-        console.error('[Password Reset] Clerk error code:', clerkError.code);
-        console.error('[Password Reset] Clerk error message:', clerkError.message);
-      } else if (error.message) {
+        if (__DEV__) {
+          console.warn('[Password Reset] Clerk error code:', clerkError.code);
+          console.warn('[Password Reset] Clerk error message:', clerkError.message);
+        }
+      } else if (error?.message) {
         errorMessage = error.message;
       }
 
-      console.error('[Password Reset] Final error message to user:', errorMessage);
+      // Show user-friendly alert instead of error overlay
       Alert.alert('Password Reset Failed', errorMessage);
 
       // Reset the state if it failed - DON'T show reset form
       setIsResettingPassword(false);
     } finally {
       setLoading(false);
-      console.log('[Password Reset] ========================================');
+      if (__DEV__) {
+        console.log('[Password Reset] ========================================');
+      }
     }
   };
 
@@ -446,29 +455,39 @@ export default function SignInScreen() {
         throw new Error(`Password reset incomplete. Status: ${result?.status || 'unknown'}`);
       }
     } catch (error: any) {
-      console.error('[Password Reset] ❌❌❌ ERROR CAUGHT ❌❌❌');
-      console.error('[Password Reset] Error type:', typeof error);
-      console.error('[Password Reset] Error object:', error);
-      console.error('[Password Reset] Error message:', error.message);
-      console.error('[Password Reset] Error errors array:', error.errors);
+      // Use console.warn instead of console.error to prevent error overlay in dev mode
+      console.warn('[Password Reset] Password reset failed');
+      console.warn('[Password Reset] Error type:', typeof error);
+      console.warn('[Password Reset] Error message:', error?.message || 'Unknown error');
+      
+      // Only log full error details in development
+      if (__DEV__) {
+        console.warn('[Password Reset] Full error object:', error);
+        console.warn('[Password Reset] Error errors array:', error?.errors);
+        console.warn('[Password Reset] Error stack:', error?.stack);
+      }
 
       let errorMessage = 'Failed to reset password. Please check your code and try again.';
 
       // Extract the most specific error message
-      if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
+      if (error?.errors && Array.isArray(error.errors) && error.errors.length > 0) {
         const clerkError = error.errors[0];
         errorMessage = clerkError.longMessage || clerkError.message || errorMessage;
-        console.error('[Password Reset] Clerk error code:', clerkError.code);
-        console.error('[Password Reset] Clerk error message:', clerkError.message);
-      } else if (error.message) {
+        if (__DEV__) {
+          console.warn('[Password Reset] Clerk error code:', clerkError.code);
+          console.warn('[Password Reset] Clerk error message:', clerkError.message);
+        }
+      } else if (error?.message) {
         errorMessage = error.message;
       }
 
-      console.error('[Password Reset] Final error message to user:', errorMessage);
+      // Show user-friendly alert instead of error overlay
       Alert.alert('Password Reset Failed', errorMessage);
     } finally {
       setLoading(false);
-      console.log('[Password Reset] ========================================');
+      if (__DEV__) {
+        console.log('[Password Reset] ========================================');
+      }
     }
   };
 

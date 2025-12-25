@@ -116,12 +116,37 @@ export const list = query({
 
 // Get email deal by Gmail ID
 export const getByGmailId = query({
-  args: { gmailId: v.string() },
+  args: { 
+    gmailId: v.string(),
+    userId: v.optional(v.string()), // Optional userId for filtering
+  },
   handler: async (ctx, args) => {
-    return await ctx.db
+    // First, try to find by Gmail ID with userId filter if provided
+    let query = ctx.db
       .query("emailDeals")
-      .withIndex("by_gmail_id", (q) => q.eq("gmailId", args.gmailId))
-      .first();
+      .withIndex("by_gmail_id", (q) => q.eq("gmailId", args.gmailId));
+    
+    // Filter by userId if provided
+    if (args.userId) {
+      query = query.filter((q) => q.eq(q.field("userId"), args.userId));
+    }
+    
+    const result = await query.first();
+    
+    // If not found with userId filter, try without filter (for debugging)
+    // This helps identify if there's a userId mismatch
+    if (!result && args.userId) {
+      const withoutFilter = await ctx.db
+        .query("emailDeals")
+        .withIndex("by_gmail_id", (q) => q.eq("gmailId", args.gmailId))
+        .first();
+      
+      if (withoutFilter) {
+        console.warn(`[Convex getByGmailId] Found deal but userId mismatch. Deal userId: ${withoutFilter.userId}, Request userId: ${args.userId}`);
+      }
+    }
+    
+    return result;
   },
 });
 

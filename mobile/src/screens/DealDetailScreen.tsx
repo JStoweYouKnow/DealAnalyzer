@@ -253,58 +253,92 @@ export default function DealDetailScreen() {
 
       {/* Analysis Results Card */}
       {deal.analysis && (
-        <Card style={styles.analysisCard}>
-          <CardHeader>
-            <Text style={styles.sectionTitle}>Analysis Results</Text>
-            <View style={[
-              styles.criteriaBadge,
-              { backgroundColor: deal.analysis.meetsCriteria ? '#34C75920' : '#FF3B3020' }
-            ]}>
-              <Text style={[
-                styles.criteriaText,
-                { color: deal.analysis.meetsCriteria ? '#34C759' : '#FF3B30' }
+        <TouchableOpacity
+          onPress={() => {
+            navigation.navigate('Analyze', { 
+              dealId: deal.id,
+              initialData: deal.analysis 
+            });
+          }}
+          activeOpacity={0.7}
+        >
+          <Card style={styles.analysisCard}>
+            <CardHeader>
+              <View style={styles.analysisHeaderRow}>
+                <Text style={styles.sectionTitle}>Analysis Results</Text>
+                <Ionicons name="chevron-forward" size={20} color="#007AFF" />
+              </View>
+              <View style={[
+                styles.criteriaBadge,
+                { backgroundColor: deal.analysis.meetsCriteria ? '#34C75920' : '#FF3B3020' }
               ]}>
-                {deal.analysis.meetsCriteria ? 'MEETS CRITERIA' : 'DOES NOT MEET'}
-              </Text>
-            </View>
-          </CardHeader>
-          <CardContent>
-            {deal.analysis.cashFlow !== undefined && (
-              <View style={styles.analysisRow}>
-                <Text style={styles.analysisLabel}>Cash Flow</Text>
                 <Text style={[
-                  styles.analysisValue,
-                  { color: deal.analysis.cashFlow >= 0 ? '#34C759' : '#FF3B30' }
+                  styles.criteriaText,
+                  { color: deal.analysis.meetsCriteria ? '#34C759' : '#FF3B30' }
                 ]}>
-                  {formatCurrency(deal.analysis.cashFlow)}
+                  {deal.analysis.meetsCriteria ? 'MEETS CRITERIA' : 'DOES NOT MEET'}
                 </Text>
               </View>
-            )}
-            {deal.analysis.roi !== undefined && (
-              <View style={styles.analysisRow}>
-                <Text style={styles.analysisLabel}>ROI</Text>
-                <Text style={styles.analysisValue}>{deal.analysis.roi.toFixed(2)}%</Text>
+            </CardHeader>
+            <CardContent>
+              {deal.analysis.cashFlow !== undefined && (
+                <View style={styles.analysisRow}>
+                  <Text style={styles.analysisLabel}>Cash Flow</Text>
+                  <Text style={[
+                    styles.analysisValue,
+                    { color: deal.analysis.cashFlow >= 0 ? '#34C759' : '#FF3B30' }
+                  ]}>
+                    {formatCurrency(deal.analysis.cashFlow)}
+                  </Text>
+                </View>
+              )}
+              {deal.analysis.roi !== undefined && (
+                <View style={styles.analysisRow}>
+                  <Text style={styles.analysisLabel}>ROI</Text>
+                  <Text style={styles.analysisValue}>{deal.analysis.roi.toFixed(2)}%</Text>
+                </View>
+              )}
+              {deal.analysis.capRate !== undefined && (
+                <View style={styles.analysisRow}>
+                  <Text style={styles.analysisLabel}>Cap Rate</Text>
+                  <Text style={styles.analysisValue}>{deal.analysis.capRate.toFixed(2)}%</Text>
+                </View>
+              )}
+              <View style={styles.viewFullAnalysisHint}>
+                <Text style={styles.viewFullAnalysisText}>
+                  Tap to view full analysis details
+                </Text>
               </View>
-            )}
-            {deal.analysis.capRate !== undefined && (
-              <View style={styles.analysisRow}>
-                <Text style={styles.analysisLabel}>Cap Rate</Text>
-                <Text style={styles.analysisValue}>{deal.analysis.capRate.toFixed(2)}%</Text>
-              </View>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </TouchableOpacity>
       )}
 
       {/* Action Buttons */}
       <View style={styles.actionsContainer}>
-        {!deal.analysis && deal.extractedProperty && (
+        {deal.analysis ? (
           <Button
-            title="Analyze This Deal"
-            onPress={() => navigation.navigate('Analyze', { dealId: deal.id })}
+            title="View Full Analysis"
+            onPress={() => {
+              navigation.navigate('Analyze', { 
+                dealId: deal.id,
+                initialData: deal.analysis 
+              });
+            }}
             style={styles.actionButton}
           />
-        )}
+        ) : deal.extractedProperty ? (
+          <Button
+            title="Analyze This Deal"
+            onPress={() => {
+              console.log('[DealDetailScreen] Navigate to Analyze with dealId:', deal.id);
+              console.log('[DealDetailScreen] Deal ID type:', deal.id.startsWith('k') ? 'Convex ID' : 'Gmail ID');
+              console.log('[DealDetailScreen] Deal ID length:', deal.id.length);
+              navigation.navigate('Analyze', { dealId: deal.id });
+            }}
+            style={styles.actionButton}
+          />
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -498,5 +532,23 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     textAlign: 'center',
     marginTop: 32,
+  },
+  analysisHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  viewFullAnalysisHint: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+    alignItems: 'center',
+  },
+  viewFullAnalysisText: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontStyle: 'italic',
   },
 });

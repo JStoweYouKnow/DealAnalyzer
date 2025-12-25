@@ -1,5 +1,5 @@
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
+import { RateLimiterRedis, RateLimiterRes } from 'rate-limiter-flexible';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Lazy Redis client initialization to avoid connection attempts at module load
@@ -7,7 +7,7 @@ let redis: Redis | null = null;
 let warnedRedisUnavailable = false;
 
 /**
- * Get Redis client instance, initializing it only when both env vars are present.
+ * Get Redis client instance, initializing it only when env vars are present.
  * Returns null if Redis credentials are missing (no connection attempt is made).
  */
 function getRedis(): Redis | null {
@@ -15,169 +15,208 @@ function getRedis(): Redis | null {
     return redis;
   }
 
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const redisUrl = process.env.REDIS_URL?.trim();
+  const redisHost = process.env.REDIS_HOST?.trim();
+  const redisPort = process.env.REDIS_PORT?.trim();
+  const redisPassword = process.env.REDIS_PASSWORD?.trim();
 
-  if (!url || !token) {
-    return null;
+  // Support both REDIS_URL and individual host/port/password configs
+  if (redisUrl) {
+    try {
+      redis = new Redis(redisUrl, {
+        maxRetriesPerRequest: 3,
+        enableReadyCheck: true,
+        lazyConnect: true, // Don't connect immediately
+      });
+
+      // Handle connection errors
+      redis.on('error', (err) => {
+        console.warn('[Rate Limit] Redis connection error:', err.message);
+      });
+
+      return redis;
+    } catch (error: any) {
+      console.warn('[Rate Limit] Failed to create Redis client from URL:', {
+        error: error?.message || String(error),
+      });
+      return null;
+    }
+  } else if (redisHost) {
+    try {
+      redis = new Redis({
+        host: redisHost,
+        port: redisPort ? parseInt(redisPort, 10) : 6379,
+        password: redisPassword || undefined,
+        maxRetriesPerRequest: 3,
+        enableReadyCheck: true,
+        lazyConnect: true,
+      });
+
+      redis.on('error', (err) => {
+        console.warn('[Rate Limit] Redis connection error:', err.message);
+      });
+
+      return redis;
+    } catch (error: any) {
+      console.warn('[Rate Limit] Failed to create Redis client:', {
+        error: error?.message || String(error),
+      });
+      return null;
+    }
   }
 
-  redis = new Redis({
-    url,
-    token,
-  });
-
-  return redis;
+  return null;
 }
 
 // Module-scoped cached singletons for rate limiters
-let cachedGeneralRateLimit: Ratelimit | null = null;
-let cachedExpensiveRateLimit: Ratelimit | null = null;
-let cachedStrictRateLimit: Ratelimit | null = null;
+let cachedGeneralRateLimit: RateLimiterRedis | null = null;
+let cachedExpensiveRateLimit: RateLimiterRedis | null = null;
+let cachedStrictRateLimit: RateLimiterRedis | null = null;
 
 // Module-scoped pending promises to coordinate concurrent initialization
-let cachedGeneralRateLimitPromise: Promise<Ratelimit | null> | null = null;
-let cachedExpensiveRateLimitPromise: Promise<Ratelimit | null> | null = null;
-let cachedStrictRateLimitPromise: Promise<Ratelimit | null> | null = null;
+let cachedGeneralRateLimitPromise: Promise<RateLimiterRedis | null> | null = null;
+let cachedExpensiveRateLimitPromise: Promise<RateLimiterRedis | null> | null = null;
+let cachedStrictRateLimitPromise: Promise<RateLimiterRedis | null> | null = null;
 
 // Lazy rate limiters - only created when Redis is available, cached after first creation
-// Uses async pattern with pending promises to prevent race conditions
-async function getGeneralRateLimit(): Promise<Ratelimit | null> {
-  // If instance exists, return it
+async function getGeneralRateLimit(): Promise<RateLimiterRedis | null> {
   if (cachedGeneralRateLimit !== null) {
     return cachedGeneralRateLimit;
   }
-  
-  // If pending promise exists, await it and return the resolved instance
+
   if (cachedGeneralRateLimitPromise !== null) {
     return await cachedGeneralRateLimitPromise;
   }
-  
-  // Otherwise, create and assign a new pending promise
+
   cachedGeneralRateLimitPromise = (async () => {
     const redisClient = getRedis();
     if (!redisClient) {
       cachedGeneralRateLimitPromise = null;
       return null;
     }
-    
+
     try {
-      const instance = new Ratelimit({
-        redis: redisClient,
-        limiter: Ratelimit.slidingWindow(100, '1 m'), // 100 requests per minute
-        analytics: true,
-        prefix: '@upstash/ratelimit/general',
+      // Ensure connection is established
+      await redisClient.connect();
+
+      const instance = new RateLimiterRedis({
+        storeClient: redisClient,
+        keyPrefix: 'rlflx:general',
+        points: 100, // Number of requests
+        duration: 60, // Per 60 seconds (1 minute)
       });
-      
-      // Assign the cached instance on success
+
       cachedGeneralRateLimit = instance;
       cachedGeneralRateLimitPromise = null;
       return instance;
-    } catch (error) {
-      console.error('Failed to instantiate general rate limiter:', error);
-      // Clear the pending promise on error
+    } catch (error: any) {
+      console.warn('[Rate Limit] Failed to instantiate general rate limiter:', {
+        error: error?.message || String(error),
+      });
       cachedGeneralRateLimitPromise = null;
       return null;
     }
   })();
-  
+
   return await cachedGeneralRateLimitPromise;
 }
 
-async function getExpensiveRateLimit(): Promise<Ratelimit | null> {
-  // If instance exists, return it
+async function getExpensiveRateLimit(): Promise<RateLimiterRedis | null> {
   if (cachedExpensiveRateLimit !== null) {
     return cachedExpensiveRateLimit;
   }
-  
-  // If pending promise exists, await it and return the resolved instance
+
   if (cachedExpensiveRateLimitPromise !== null) {
     return await cachedExpensiveRateLimitPromise;
   }
-  
-  // Otherwise, create and assign a new pending promise
+
   cachedExpensiveRateLimitPromise = (async () => {
     const redisClient = getRedis();
     if (!redisClient) {
       cachedExpensiveRateLimitPromise = null;
       return null;
     }
-    
+
     try {
-      const instance = new Ratelimit({
-        redis: redisClient,
-        limiter: Ratelimit.slidingWindow(10, '1 m'), // 10 requests per minute for expensive operations
-        analytics: true,
-        prefix: '@upstash/ratelimit/expensive',
+      await redisClient.connect();
+
+      // Use different limits for development vs production
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      const points = isDevelopment ? 100 : 30; // 100/min in dev, 30/min in prod
+
+      const instance = new RateLimiterRedis({
+        storeClient: redisClient,
+        keyPrefix: 'rlflx:expensive',
+        points, // Requests per duration
+        duration: 60, // 60 seconds (1 minute)
       });
-      
-      // Assign the cached instance on success
+
       cachedExpensiveRateLimit = instance;
       cachedExpensiveRateLimitPromise = null;
       return instance;
-    } catch (error) {
-      console.error('Failed to instantiate expensive rate limiter:', error);
-      // Clear the pending promise on error
+    } catch (error: any) {
+      console.warn('[Rate Limit] Failed to instantiate expensive rate limiter:', {
+        error: error?.message || String(error),
+      });
       cachedExpensiveRateLimitPromise = null;
       return null;
     }
   })();
-  
+
   return await cachedExpensiveRateLimitPromise;
 }
 
-async function getStrictRateLimit(): Promise<Ratelimit | null> {
-  // If instance exists, return it
+async function getStrictRateLimit(): Promise<RateLimiterRedis | null> {
   if (cachedStrictRateLimit !== null) {
     return cachedStrictRateLimit;
   }
-  
-  // If pending promise exists, await it and return the resolved instance
+
   if (cachedStrictRateLimitPromise !== null) {
     return await cachedStrictRateLimitPromise;
   }
-  
-  // Otherwise, create and assign a new pending promise
+
   cachedStrictRateLimitPromise = (async () => {
     const redisClient = getRedis();
     if (!redisClient) {
       cachedStrictRateLimitPromise = null;
       return null;
     }
-    
+
     try {
-      const instance = new Ratelimit({
-        redis: redisClient,
-        limiter: Ratelimit.slidingWindow(5, '1 m'), // 5 requests per minute for very expensive operations
-        analytics: true,
-        prefix: '@upstash/ratelimit/strict',
+      await redisClient.connect();
+
+      const instance = new RateLimiterRedis({
+        storeClient: redisClient,
+        keyPrefix: 'rlflx:strict',
+        points: 5, // 5 requests per minute for very expensive operations
+        duration: 60,
       });
-      
-      // Assign the cached instance on success
+
       cachedStrictRateLimit = instance;
       cachedStrictRateLimitPromise = null;
       return instance;
-    } catch (error) {
-      console.error('Failed to instantiate strict rate limiter:', error);
-      // Clear the pending promise on error
+    } catch (error: any) {
+      console.warn('[Rate Limit] Failed to instantiate strict rate limiter:', {
+        error: error?.message || String(error),
+      });
       cachedStrictRateLimitPromise = null;
       return null;
     }
   })();
-  
+
   return await cachedStrictRateLimitPromise;
 }
 
 // Export getter functions for backward compatibility
-export async function generalRateLimit(): Promise<Ratelimit | null> {
+export async function generalRateLimit(): Promise<RateLimiterRedis | null> {
   return await getGeneralRateLimit();
 }
 
-export async function expensiveRateLimit(): Promise<Ratelimit | null> {
+export async function expensiveRateLimit(): Promise<RateLimiterRedis | null> {
   return await getExpensiveRateLimit();
 }
 
-export async function strictRateLimit(): Promise<Ratelimit | null> {
+export async function strictRateLimit(): Promise<RateLimiterRedis | null> {
   return await getStrictRateLimit();
 }
 
@@ -186,68 +225,51 @@ export async function strictRateLimit(): Promise<Ratelimit | null> {
  * Only use forwarded headers when behind a trusted proxy to prevent spoofing
  */
 function isTrustedProxy(): boolean {
-  // Check for explicit trusted proxy flag (allows manual override)
   if (process.env.TRUSTED_PROXY === 'true') {
     return true;
   }
-  
-  // Check if running on Vercel (Vercel is a trusted proxy)
-  // Vercel sets VERCEL=1 in production and preview deployments
+
   if (process.env.VERCEL === '1') {
     return true;
   }
-  
-  // Check for other trusted proxy indicators
-  // Next.js on Vercel also sets VERCEL_ENV
+
   if (process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview') {
     return true;
   }
-  
-  // In development, be conservative - don't trust forwarded headers by default
-  // Users can set TRUSTED_PROXY=true if they're behind a trusted proxy in dev
+
   return false;
 }
 
 /**
  * Gets the client identifier for rate limiting
  * Prioritizes authenticated user ID, falls back to IP address
- * Only uses forwarded headers when behind a trusted proxy
  */
 function getIdentifier(
   request: NextRequest,
   userId: string | null | undefined
 ): string {
-  // Prioritize authenticated user ID
   if (userId) {
     return `user:${userId}`;
   }
-  
-  // Fall back to IP address
-  // Only use forwarded headers if we're behind a trusted proxy
+
   if (isTrustedProxy()) {
     const forwardedFor = request.headers.get('x-forwarded-for');
     const realIp = request.headers.get('x-real-ip');
-    
+
     if (forwardedFor) {
-      // Take the first IP in the chain (the original client IP)
       return forwardedFor.split(',')[0].trim();
     }
-    
+
     if (realIp) {
       return realIp.trim();
     }
   }
-  
-  // If not behind a trusted proxy or headers not available,
-  // we can't reliably get the IP from headers (they're spoofable)
-  // Return 'unknown' as a safe fallback
-  // In production behind a trusted proxy, this should rarely happen
+
   return 'unknown';
 }
 
 /**
  * Helper function to get authenticated user ID from Clerk
- * Returns null if not authenticated or Clerk is not available
  */
 async function getAuthenticatedUserId(request: NextRequest): Promise<string | null> {
   try {
@@ -257,7 +279,7 @@ async function getAuthenticatedUserId(request: NextRequest): Promise<string | nu
       return authResult.userId;
     }
   } catch (error) {
-    // Clerk not available or not configured, continue without user ID
+    // Clerk not available or not configured
   }
   return null;
 }
@@ -265,22 +287,20 @@ async function getAuthenticatedUserId(request: NextRequest): Promise<string | nu
 // Rate limit middleware wrapper
 export async function withRateLimit(
   request: NextRequest,
-  limiterGetter: (() => Promise<Ratelimit | null> | Ratelimit | null) | Ratelimit = generalRateLimit,
+  limiterGetter: (() => Promise<RateLimiterRedis | null> | RateLimiterRedis | null) | RateLimiterRedis = generalRateLimit,
   handler: (request: NextRequest) => Promise<NextResponse>,
   userId?: string | null
 ): Promise<NextResponse> {
-  // Get the limiter (support both function and direct instance for backward compatibility)
-  // Functions can now return either Promise<Ratelimit | null> or Ratelimit | null
-  const limiterResult = typeof limiterGetter === 'function' 
-    ? limiterGetter() 
+  // Get the limiter
+  const limiterResult = typeof limiterGetter === 'function'
+    ? limiterGetter()
     : limiterGetter;
-  
-  // Await if it's a promise, otherwise use directly
+
   const limiter = limiterResult instanceof Promise
     ? await limiterResult
     : limiterResult;
 
-  // Skip rate limiting if Redis is not available (fallback to no-op limiter)
+  // Skip rate limiting if Redis is not available
   if (!limiter) {
     if (!warnedRedisUnavailable) {
       warnedRedisUnavailable = true;
@@ -290,41 +310,87 @@ export async function withRateLimit(
   }
 
   // Get authenticated user ID if not provided
-  const authenticatedUserId = userId !== undefined 
-    ? userId 
+  const authenticatedUserId = userId !== undefined
+    ? userId
     : await getAuthenticatedUserId(request);
-  
-  const identifier = getIdentifier(request, authenticatedUserId);
-  const { success, limit, remaining, reset } = await limiter.limit(identifier);
 
-  if (!success) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Rate limit exceeded. Please try again later.',
-        retryAfter: Math.ceil((reset - Date.now()) / 1000),
-      },
-      {
-        status: 429,
-        headers: {
-          'X-RateLimit-Limit': limit.toString(),
-          'X-RateLimit-Remaining': remaining.toString(),
-          'X-RateLimit-Reset': new Date(reset).toISOString(),
-          'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
-        },
-      }
+  const identifier = getIdentifier(request, authenticatedUserId);
+
+  // Wrap rate limit check in try-catch with timeout
+  let rateLimitResult: RateLimiterRes;
+  try {
+    // Add timeout to prevent hanging on network failures (3 second timeout)
+    const limitPromise = limiter.consume(identifier, 1);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Rate limit check timeout')), 3000)
     );
+
+    rateLimitResult = await Promise.race([limitPromise, timeoutPromise]);
+  } catch (error: any) {
+    // Check if this is a rate limit rejection (not an error)
+    if (error instanceof RateLimiterRes) {
+      // Rate limit exceeded
+      const msBeforeNext = error.msBeforeNext;
+      const retryAfterSeconds = Math.ceil(msBeforeNext / 1000);
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Rate limit exceeded. Please try again later.',
+          retryAfter: retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': limiter.points.toString(),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': new Date(Date.now() + msBeforeNext).toISOString(),
+            'Retry-After': retryAfterSeconds.toString(),
+          },
+        }
+      );
+    }
+
+    // If rate limiting fails (e.g., network error), fail open
+    const errorMessage = error?.message || error?.cause?.message || String(error);
+    const errorCode = error?.code || error?.cause?.code;
+
+    console.warn('[Rate Limit] Rate limiting check failed, allowing request:', {
+      error: errorMessage,
+      errorCode: errorCode,
+    });
+
+    // Check for network errors
+    const isNetworkError =
+      errorCode === 'ENOTFOUND' ||
+      errorCode === 'ECONNREFUSED' ||
+      errorCode === 'ETIMEDOUT' ||
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('connection');
+
+    if (isNetworkError) {
+      // Clear cached limiters
+      cachedGeneralRateLimit = null;
+      cachedExpensiveRateLimit = null;
+      cachedStrictRateLimit = null;
+      cachedGeneralRateLimitPromise = null;
+      cachedExpensiveRateLimitPromise = null;
+      cachedStrictRateLimitPromise = null;
+      redis = null;
+      warnedRedisUnavailable = false;
+    }
+
+    return handler(request);
   }
 
   // Add rate limit headers to successful responses
   const response = await handler(request);
-  response.headers.set('X-RateLimit-Limit', limit.toString());
-  response.headers.set('X-RateLimit-Remaining', remaining.toString());
-  response.headers.set('X-RateLimit-Reset', new Date(reset).toISOString());
+  response.headers.set('X-RateLimit-Limit', limiter.points.toString());
+  response.headers.set('X-RateLimit-Remaining', rateLimitResult.remainingPoints.toString());
+  response.headers.set('X-RateLimit-Reset', new Date(Date.now() + rateLimitResult.msBeforeNext).toISOString());
 
   return response;
 }
 
 // Export getRedis for external use if needed
 export { getRedis };
-

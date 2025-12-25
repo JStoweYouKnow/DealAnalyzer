@@ -56,5 +56,6 @@
     "dist/**/*",
     "temp_uploads/**/*",
     "mobile/**/*"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }

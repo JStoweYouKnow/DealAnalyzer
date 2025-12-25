@@ -155,8 +155,14 @@ export async function getMortgageRate(params?: MortgageRateParams): Promise<numb
       3600 // Cache for 1 hour
     );
   } catch (error) {
-    console.error('Error fetching mortgage rate from API Ninjas:', error);
-    console.warn('Falling back to default rate of 7% (0.07)');
+    // Log as warning instead of error - fallback is expected behavior
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('API_NINJAS_API_KEY')) {
+      console.warn('[Mortgage Rate] ⚠️ API_NINJAS_API_KEY not configured, using default rate of 7%');
+    } else {
+      console.warn('[Mortgage Rate] ⚠️ Error fetching mortgage rate from API Ninjas:', errorMessage);
+      console.warn('[Mortgage Rate] Falling back to default rate of 7% (0.07)');
+    }
     // Return default rate on error (fallback is not cached)
     return 0.07;
   }

@@ -11,8 +11,11 @@ export const setupGlobalErrorHandlers = () => {
   if (typeof Promise !== 'undefined') {
     // @ts-ignore
     global.Promise.onPossiblyUnhandledRejection = (error: Error) => {
-      console.error('Unhandled Promise Rejection:', error);
-      console.error('Stack:', error.stack);
+      // Use console.warn to prevent React Native error overlay
+      console.warn('[Crash Prevention] ⚠️ Unhandled Promise Rejection:', error?.message || error);
+      if (__DEV__) {
+        console.warn('[Crash Prevention] Stack:', error?.stack);
+      }
       // TODO: Send to error tracking service (Sentry, etc.)
     };
   }
@@ -21,14 +24,17 @@ export const setupGlobalErrorHandlers = () => {
   if (typeof ErrorUtils !== 'undefined') {
     // @ts-ignore
     ErrorUtils.setGlobalHandler((error: Error, isFatal: boolean) => {
-      console.error('Global Error:', error);
-      console.error('Is Fatal:', isFatal);
-      console.error('Stack:', error.stack);
+      // Use console.warn to prevent React Native error overlay
+      console.warn('[Crash Prevention] ⚠️ Global Error:', error?.message || error);
+      console.warn('[Crash Prevention] Is Fatal:', isFatal);
+      if (__DEV__) {
+        console.warn('[Crash Prevention] Stack:', error?.stack);
+      }
       
       if (isFatal) {
-        // Log critical error before crash
+        // Log critical error before crash (still use warn to prevent overlay)
+        console.warn('[Crash Prevention] ⚠️ FATAL ERROR - App may crash');
         // TODO: Send to error tracking service
-        console.error('FATAL ERROR - App may crash');
       }
     });
   }
@@ -42,7 +48,7 @@ export const safeAsync = async <T>(
   try {
     return await fn();
   } catch (error) {
-    console.error('Async error caught:', error);
+    console.warn('[Crash Prevention] ⚠️ Async error caught:', error);
     return fallback;
   }
 };
@@ -56,7 +62,7 @@ export const safeNativeCall = async <T>(
   try {
     return await fn();
   } catch (error) {
-    console.error(`Native module error (${moduleName}):`, error);
+    console.warn(`[Crash Prevention] ⚠️ Native module error (${moduleName}):`, error);
     // Alert user if needed
     return fallback;
   }

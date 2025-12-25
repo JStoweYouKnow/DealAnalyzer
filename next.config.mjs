@@ -81,6 +81,18 @@ const nextConfig = {
             key: 'Cache-Control',
             value: 'public, s-maxage=60, stale-while-revalidate=300',
           },
+          // CORS headers for mobile app support
+          // Note: Can't use '*' with credentials, so we'll handle CORS in middleware/API routes
+          // For mobile apps, we don't need CORS (same-origin policy doesn't apply)
+          // But we add these for web compatibility
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization, x-user-id, x-user-session-id',
+          },
         ],
       },
     ];

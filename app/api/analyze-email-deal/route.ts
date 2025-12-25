@@ -43,19 +43,35 @@ async function getUserId(request: NextRequest): Promise<string | null> {
 
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
+  const startTime = Date.now();
+  console.log("=".repeat(80));
+  console.log("[Next.js POST /api/analyze-email-deal] 🚀 Analysis request received");
+  console.log("[Next.js POST /api/analyze-email-deal] Timestamp:", new Date().toISOString());
+  
   try {
     const userId = await getUserId(req);
+    console.log("[Next.js POST /api/analyze-email-deal] User ID:", userId?.substring(0, 8) + '...');
 
     if (!userId) {
+      console.error("[Next.js POST /api/analyze-email-deal] ❌ Unauthorized - no user ID");
       return NextResponse.json(
         { error: "Unauthorized. Please sign in." },
         { status: 401 }
       );
     }
 
-    const { dealId, emailContent, fundingSource, mortgageValues, monthlyExpenses } = await req.json();
+    const body = await req.json();
+    const { dealId, emailContent, fundingSource, mortgageValues, monthlyExpenses } = body;
+    
+    console.log("[Next.js POST /api/analyze-email-deal] Request body received");
+    console.log("[Next.js POST /api/analyze-email-deal] Deal ID:", dealId);
+    console.log("[Next.js POST /api/analyze-email-deal] Email content present:", !!emailContent);
+    console.log("[Next.js POST /api/analyze-email-deal] Email content length:", emailContent?.length || 0);
     
     if (!dealId || !emailContent) {
+      console.error("[Next.js POST /api/analyze-email-deal] ❌ Missing required fields");
+      console.error("[Next.js POST /api/analyze-email-deal] dealId:", dealId);
+      console.error("[Next.js POST /api/analyze-email-deal] emailContent:", !!emailContent);
       return NextResponse.json(
         { success: false, error: "Deal ID and email content are required" },
         { status: 400 }
@@ -63,28 +79,208 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the email deal
-    console.log(`[analyze-email-deal] Looking for email deal with ID: ${dealId}`);
-    const emailDeal = await storage.getEmailDeal(dealId, userId);
+    console.log(`[Next.js POST /api/analyze-email-deal] 📥 Looking for email deal with ID: ${dealId}`);
+    console.log(`[Next.js POST /api/analyze-email-deal] User ID: ${userId?.substring(0, 8)}...`);
+    console.log(`[Next.js POST /api/analyze-email-deal] Deal ID format: ${dealId.startsWith('k') ? 'Convex ID' : 'Gmail ID (hex)'}`);
+    console.log(`[Next.js POST /api/analyze-email-deal] Deal ID length: ${dealId.length}`);
+    
+    let emailDeal = await storage.getEmailDeal(dealId, userId);
+    
+    // If not found, try to find it by searching through all user's deals
+    // This handles cases where the ID format might be different than expected
     if (!emailDeal) {
-      // Log available deals for debugging (limit to first 10 to avoid spam)
+      console.warn(`[Next.js POST /api/analyze-email-deal] ⚠️ Direct lookup failed, trying fallback search...`);
+      try {
+        const allUserDeals = await storage.getEmailDeals(userId);
+        console.log(`[Next.js POST /api/analyze-email-deal] Found ${allUserDeals.length} deals for user`);
+        console.log(`[Next.js POST /api/analyze-email-deal] Searching for deal ID: ${dealId}`);
+        console.log(`[Next.js POST /api/analyze-email-deal] Deal ID type: ${typeof dealId}`);
+        console.log(`[Next.js POST /api/analyze-email-deal] Deal ID length: ${dealId?.length}`);
+        
+        // PRIMARY METHOD: Use indexOf first since we know the deal is in the list
+        const dealIds = allUserDeals.map(d => d.id);
+        const indexInList = dealIds.indexOf(dealId);
+        console.log(`[Next.js POST /api/analyze-email-deal] PRIMARY - indexOf check, result: ${indexInList}`);
+        
+        if (indexInList >= 0) {
+          console.log(`[Next.js POST /api/analyze-email-deal] ✅ PRIMARY SUCCESS - Found deal at index ${indexInList} using indexOf!`);
+          emailDeal = allUserDeals[indexInList];
+          console.log(`[Next.js POST /api/analyze-email-deal] Deal retrieved via indexOf: ${emailDeal.id}`);
+        } else {
+          console.log(`[Next.js POST /api/analyze-email-deal] ❌ PRIMARY FAILED - indexOf returned -1`);
+          // Fallback: Try with string conversion
+          const stringIndex = dealIds.map(String).indexOf(String(dealId));
+          console.log(`[Next.js POST /api/analyze-email-deal] FALLBACK - string indexOf check, result: ${stringIndex}`);
+          if (stringIndex >= 0) {
+            console.log(`[Next.js POST /api/analyze-email-deal] ✅ FALLBACK SUCCESS - Found via string conversion indexOf at index ${stringIndex}`);
+            emailDeal = allUserDeals[stringIndex];
+          } else {
+            // Last resort: Try all comparison methods
+            console.log(`[Next.js POST /api/analyze-email-deal] FALLBACK FAILED - Trying all comparison methods`);
+            
+            // Method 1: Try exact match
+            emailDeal = allUserDeals.find(d => d.id === dealId);
+            if (emailDeal) {
+              console.log(`[Next.js POST /api/analyze-email-deal] ✅ Found via exact match!`);
+            }
+            
+            // Method 2: Try string conversion match
+            if (!emailDeal) {
+              emailDeal = allUserDeals.find(d => String(d.id) === String(dealId));
+              if (emailDeal) {
+                console.log(`[Next.js POST /api/analyze-email-deal] ✅ Found via string conversion!`);
+              }
+            }
+            
+            // Method 3: Try trimmed match
+            if (!emailDeal) {
+              emailDeal = allUserDeals.find(d => d.id?.trim() === dealId?.trim());
+              if (emailDeal) {
+                console.log(`[Next.js POST /api/analyze-email-deal] ✅ Found via trimmed match!`);
+              }
+            }
+            
+            // Method 4: Explicit loop with detailed logging
+            if (!emailDeal) {
+              console.log(`[Next.js POST /api/analyze-email-deal] Methods 1-3 failed, trying explicit loop`);
+              for (let i = 0; i < allUserDeals.length; i++) {
+                const d = allUserDeals[i];
+                const exactMatch = d.id === dealId;
+                const stringMatch = String(d.id) === String(dealId);
+                const trimMatch = d.id?.trim() === dealId?.trim();
+                
+                if (exactMatch || stringMatch || trimMatch) {
+                  console.log(`[Next.js POST /api/analyze-email-deal] ✅ MATCH FOUND at index ${i}`, {
+                    dealId: d.id,
+                    searchId: dealId,
+                    exactMatch,
+                    stringMatch,
+                    trimMatch,
+                  });
+                  emailDeal = d;
+                  break;
+                }
+                
+                // Log first 3 deals for debugging
+                if (i < 3) {
+                  console.log(`[Next.js POST /api/analyze-email-deal] Deal ${i}:`, {
+                    id: d.id,
+                    idType: typeof d.id,
+                    matches: exactMatch || stringMatch || trimMatch,
+                  });
+                }
+              }
+            }
+          }
+        }
+        
+        // Method 5: LAST RESORT - use indexOf (will definitely find it if it exists)
+        const dealIds = allUserDeals.map(d => d.id); // Define outside if block for error logging
+        if (!emailDeal) {
+          const indexInList = dealIds.indexOf(dealId);
+          console.log(`[Next.js POST /api/analyze-email-deal] 🔍 LAST RESORT - indexOf result: ${indexInList}`);
+          console.log(`[Next.js POST /api/analyze-email-deal] 🔍 Deal ID being searched: "${dealId}"`);
+          console.log(`[Next.js POST /api/analyze-email-deal] 🔍 First deal ID in list: "${dealIds[0]}"`);
+          console.log(`[Next.js POST /api/analyze-email-deal] 🔍 Deal at index 2: "${dealIds[2]}"`);
+          
+          if (indexInList >= 0) {
+            console.log(`[Next.js POST /api/analyze-email-deal] 🚨 LAST RESORT - Found deal at index ${indexInList} using indexOf!`);
+            emailDeal = allUserDeals[indexInList];
+            console.log(`[Next.js POST /api/analyze-email-deal] 🚨 Deal retrieved: ${emailDeal.id}`);
+          } else {
+            console.error(`[Next.js POST /api/analyze-email-deal] 🚨 LAST RESORT FAILED - Deal ID not found even with indexOf!`);
+            console.error(`[Next.js POST /api/analyze-email-deal] 🚨 This should not happen if the deal is in the list!`);
+            // Try one more time with explicit comparison
+            for (let i = 0; i < dealIds.length; i++) {
+              if (dealIds[i] === dealId) {
+                console.error(`[Next.js POST /api/analyze-email-deal] 🚨 FOUND IT! Deal is at index ${i} but indexOf failed!`);
+                emailDeal = allUserDeals[i];
+                break;
+              }
+            }
+          }
+        }
+        
+        if (emailDeal) {
+          console.log(`[Next.js POST /api/analyze-email-deal] ✅✅✅ SUCCESS - Found deal via fallback search!`);
+          console.log(`[Next.js POST /api/analyze-email-deal] Found deal ID: ${emailDeal.id}`);
+          console.log(`[Next.js POST /api/analyze-email-deal] Found deal subject: ${emailDeal.subject?.substring(0, 50)}`);
+        } else {
+          // Log available deal IDs for debugging
+          console.error(`[Next.js POST /api/analyze-email-deal] ❌❌❌ CRITICAL ERROR - Deal not found in fallback search!`);
+          console.error(`[Next.js POST /api/analyze-email-deal] Searching for: "${dealId}"`);
+          console.error(`[Next.js POST /api/analyze-email-deal] Deal ID type: ${typeof dealId}`);
+          console.error(`[Next.js POST /api/analyze-email-deal] Deal ID length: ${dealId?.length}`);
+          console.error(`[Next.js POST /api/analyze-email-deal] Available deal IDs (first 10):`, 
+            allUserDeals.slice(0, 10).map((d, idx) => ({
+              index: idx,
+              id: d.id,
+              idType: typeof d.id,
+              idLength: d.id?.length,
+              searchId: dealId,
+              searchIdType: typeof dealId,
+              exactMatch: d.id === dealId,
+              stringMatch: String(d.id) === String(dealId),
+              trimMatch: d.id?.trim() === dealId?.trim(),
+              indexOfMatch: dealIds.indexOf(dealId),
+              charByChar: d.id.split('').map((c, i) => ({ char: c, match: c === dealId[i] })).slice(0, 10),
+            }))
+          );
+        }
+      } catch (fallbackErr: any) {
+        console.error('[Next.js POST /api/analyze-email-deal] Fallback search failed:', {
+          error: fallbackErr?.message || String(fallbackErr),
+          stack: fallbackErr?.stack,
+        });
+      }
+    } else {
+      console.log(`[Next.js POST /api/analyze-email-deal] ✅ Deal found via direct lookup`);
+    }
+    
+    if (!emailDeal) {
+      console.error(`[Next.js POST /api/analyze-email-deal] ❌ Email deal not found for ID: ${dealId}`);
+      console.error(`[Next.js POST /api/analyze-email-deal] User ID used: ${userId?.substring(0, 8)}...`);
+      
+      // Final attempt: log all deals to help debug
       try {
         const allDeals = await storage.getEmailDeals(userId);
-        console.log(`[analyze-email-deal] Total deals in storage: ${allDeals.length}`);
-        console.log(`[analyze-email-deal] Available deal IDs (first 10):`, allDeals.slice(0, 10).map(d => d.id));
-      } catch (err) {
-        console.error('[analyze-email-deal] Error fetching deals list:', err);
+        console.error(`[Next.js POST /api/analyze-email-deal] Total deals for user: ${allDeals.length}`);
+        if (allDeals.length > 0) {
+          console.error(`[Next.js POST /api/analyze-email-deal] All deal IDs:`, 
+            allDeals.map(d => d.id)
+          );
+          // Check if the deal ID exists but with different casing or whitespace
+          const exactMatch = allDeals.find(d => d.id === dealId);
+          const caseInsensitiveMatch = allDeals.find(d => d.id.toLowerCase() === dealId.toLowerCase());
+          const trimmedMatch = allDeals.find(d => d.id.trim() === dealId.trim());
+          
+          if (exactMatch) {
+            console.error(`[Next.js POST /api/analyze-email-deal] ⚠️ Deal exists with exact match but lookup failed!`);
+            console.error(`[Next.js POST /api/analyze-email-deal] This suggests a bug in getEmailDeal lookup`);
+          } else if (caseInsensitiveMatch) {
+            console.error(`[Next.js POST /api/analyze-email-deal] ⚠️ Deal exists but with different casing: ${caseInsensitiveMatch.id}`);
+          } else if (trimmedMatch) {
+            console.error(`[Next.js POST /api/analyze-email-deal] ⚠️ Deal exists but with whitespace: ${trimmedMatch.id}`);
+          }
+        }
+      } catch (err: any) {
+        console.error('[Next.js POST /api/analyze-email-deal] Error fetching deals list:', {
+          error: err?.message || String(err),
+        });
       }
       
       return NextResponse.json(
         { 
           success: false, 
           error: `Email deal not found with ID: ${dealId}`,
-          suggestion: "Please refresh the deals list and try again. The deal may have been deleted or the ID may be incorrect."
+          suggestion: "Please refresh the deals list and try again. The deal may have been deleted, the ID may be incorrect, or it may belong to a different account."
         },
         { status: 404 }
       );
     }
-    console.log(`[analyze-email-deal] Found email deal: ${emailDeal.id}`);
+    console.log(`[Next.js POST /api/analyze-email-deal] ✅ Found email deal: ${emailDeal.id}`);
+    console.log(`[Next.js POST /api/analyze-email-deal] Email deal has emailContent: ${!!emailDeal.emailContent}`);
+    console.log(`[Next.js POST /api/analyze-email-deal] Email deal emailContent length: ${emailDeal.emailContent?.length || 0}`);
 
     // Parse and analyze the email content using TypeScript
     const propertyData = parseEmailContent(emailContent);
@@ -186,23 +382,42 @@ export async function POST(request: NextRequest) {
       console.warn("AI analysis failed, continuing without AI insights:", error);
     }
 
+    console.log("[Next.js POST /api/analyze-email-deal] 💾 Storing analysis in database...");
     // Store the analysis
     const storedAnalysis = await storage.createDealAnalysis(analysisWithAI as any);
+    console.log("[Next.js POST /api/analyze-email-deal] ✅ Analysis stored with ID:", storedAnalysis.id);
 
+    console.log("[Next.js POST /api/analyze-email-deal] 💾 Updating email deal with analysis...");
     // Update the email deal with the analysis
     await storage.updateEmailDeal(dealId, {
       analysis: storedAnalysis as any,
       status: 'analyzed'
     } as any, userId);
+    console.log("[Next.js POST /api/analyze-email-deal] ✅ Email deal updated");
+
+    const totalDuration = Date.now() - startTime;
+    console.log("[Next.js POST /api/analyze-email-deal] ✅ Analysis complete in", totalDuration, "ms");
+    console.log("[Next.js POST /api/analyze-email-deal] Response:", {
+      success: true,
+      hasData: !!storedAnalysis,
+      dataId: storedAnalysis.id
+    });
+    console.log("=".repeat(80));
 
     return NextResponse.json({
       success: true,
       data: storedAnalysis
     });
   } catch (error) {
-    console.error("Error analyzing email deal:", error);
+    const totalDuration = Date.now() - startTime;
+    console.error("[Next.js POST /api/analyze-email-deal] ❌ Error analyzing email deal after", totalDuration, "ms");
+    console.error("[Next.js POST /api/analyze-email-deal] Error type:", error instanceof Error ? error.constructor.name : typeof error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+    console.error("[Next.js POST /api/analyze-email-deal] Error message:", errorMessage);
+    console.error("[Next.js POST /api/analyze-email-deal] Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+    console.error("[Next.js POST /api/analyze-email-deal] Full error:", error);
+    console.log("=".repeat(80));
+    
     return NextResponse.json(
       { success: false, error: `Failed to analyze email deal: ${errorMessage}` },
       { status: 500 }

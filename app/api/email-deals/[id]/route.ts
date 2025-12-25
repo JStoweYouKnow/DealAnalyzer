@@ -45,7 +45,13 @@ export async function GET(
     const { id } = await params;
     const userId = await getUserId(request);
 
+    console.log(`[GET /api/email-deals/${id}] Request received`);
+    console.log(`[GET /api/email-deals/${id}] User ID: ${userId?.substring(0, 8)}...`);
+    console.log(`[GET /api/email-deals/${id}] Deal ID: ${id}`);
+    console.log(`[GET /api/email-deals/${id}] Deal ID format: ${id.startsWith('k') ? 'Convex ID' : 'Gmail ID'}`);
+
     if (!userId) {
+      console.error(`[GET /api/email-deals/${id}] ❌ Unauthorized - no user ID`);
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -55,15 +61,34 @@ export async function GET(
     const emailDeal = await storage.getEmailDeal(id, userId);
 
     if (!emailDeal) {
+      console.error(`[GET /api/email-deals/${id}] ❌ Deal not found`);
+      // Log available deals for debugging
+      try {
+        const allDeals = await storage.getEmailDeals(userId);
+        console.error(`[GET /api/email-deals/${id}] Total deals for user: ${allDeals.length}`);
+        if (allDeals.length > 0) {
+          console.error(`[GET /api/email-deals/${id}] Available deal IDs (first 10):`, 
+            allDeals.slice(0, 10).map(d => ({
+              id: d.id,
+              idType: d.id.startsWith('k') ? 'Convex' : 'Gmail',
+              subject: d.subject?.substring(0, 30) + '...',
+            }))
+          );
+        }
+      } catch (err: any) {
+        console.error(`[GET /api/email-deals/${id}] Error fetching deals list:`, err?.message);
+      }
+      
       return NextResponse.json(
         { error: "Email deal not found" },
         { status: 404 }
       );
     }
 
+    console.log(`[GET /api/email-deals/${id}] ✅ Deal found: ${emailDeal.id}`);
     return NextResponse.json(emailDeal);
   } catch (error) {
-    console.error("Error getting email deal:", error);
+    console.error(`[GET /api/email-deals/${id}] ❌ Error:`, error);
     return NextResponse.json(
       { error: "Failed to get email deal" },
       { status: 500 }

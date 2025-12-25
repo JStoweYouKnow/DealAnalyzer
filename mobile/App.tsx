@@ -206,6 +206,24 @@ export default function App() {
   // Setup global error handlers to catch unhandled errors
   useEffect(() => {
     setupGlobalErrorHandlers();
+    
+    // Disable React Native error overlay for API errors in development
+    if (__DEV__) {
+      const originalError = console.error;
+      console.error = (...args: any[]) => {
+        // Check if this is an API error that we want to suppress
+        const errorMessage = args[0]?.toString() || '';
+        if (errorMessage.includes('[API Client]') || 
+            errorMessage.includes('Request failed') ||
+            errorMessage.includes('Network Error')) {
+          // Use console.warn instead to prevent error overlay
+          console.warn(...args);
+          return;
+        }
+        // For other errors, use the original console.error
+        originalError.apply(console, args);
+      };
+    }
   }, []);
 
   // Log configuration on startup
@@ -229,7 +247,7 @@ export default function App() {
           console.log('[App] ✅ Network connectivity test: SUCCESS');
         })
         .catch((error) => {
-          console.error('[App] ❌ Network connectivity test: FAILED', error);
+          console.warn('[App] ⚠️ Network connectivity test: FAILED', error);
         });
     }
   }, []);
@@ -282,8 +300,12 @@ export default function App() {
     <ErrorBoundary
       FallbackComponent={ErrorFallback}
       onError={(error, errorInfo) => {
-        console.error('🚨 Error Boundary Caught:', error);
-        console.error('Error Info:', errorInfo);
+        // Use console.warn to prevent React Native error overlay
+        console.warn('🚨 Error Boundary Caught:', error?.message || error);
+        if (__DEV__) {
+          console.warn('Error Info:', errorInfo);
+          console.warn('Error Stack:', error?.stack);
+        }
         // TODO: Send to crash reporting service (Sentry, etc.)
       }}
     >

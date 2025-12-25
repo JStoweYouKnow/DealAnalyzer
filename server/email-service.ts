@@ -439,10 +439,37 @@ export class EmailMonitoringService {
         await Promise.allSettled(
           batch.map(async (gmailId) => {
             try {
+              console.log(`[Background Scoring] Processing email ${gmailId.substring(0, 20)}...`);
+              
               // Get the email deal directly from Convex
-              const emailDeal = await convexClient.query(convexApi.emailDeals.getByGmailId, { gmailId });
+              let emailDeal;
+              try {
+                // Pass userId to filter results - ensures we only get deals for this user
+                emailDeal = await convexClient.query(convexApi.emailDeals.getByGmailId, { 
+                  gmailId,
+                  userId,
+                });
+              } catch (queryError: any) {
+                console.error(`[Background Scoring] ❌ Convex query failed for ${gmailId}:`, {
+                  error: queryError?.message || String(queryError),
+                  errorType: queryError?.constructor?.name,
+                  requestId: queryError?.requestId,
+                });
+                throw queryError;
+              }
 
-              if (!emailDeal || emailDeal.userId !== userId || !emailDeal.extractedProperty) {
+              if (!emailDeal) {
+                console.warn(`[Background Scoring] ⚠️ Email deal not found for ${gmailId}`);
+                return;
+              }
+
+              if (emailDeal.userId !== userId) {
+                console.warn(`[Background Scoring] ⚠️ Email deal userId mismatch for ${gmailId}`);
+                return;
+              }
+
+              if (!emailDeal.extractedProperty) {
+                console.warn(`[Background Scoring] ⚠️ No extracted property for ${gmailId}`);
                 return;
               }
 
@@ -452,6 +479,7 @@ export class EmailMonitoringService {
 
               // Skip if no links or images to score
               if (sourceLinks.length === 0 && imageUrls.length === 0) {
+                console.log(`[Background Scoring] ⚠️ No links or images to score for ${gmailId}`);
                 return;
               }
 
@@ -463,11 +491,25 @@ export class EmailMonitoringService {
               const otherLinks = sourceLinks.filter((link: any) => link.type !== 'listing');
               const limitedSourceLinks = [...listingLinks.slice(0, 2), ...otherLinks.slice(0, 1)];
 
+              console.log(`[Background Scoring] Scoring ${limitedSourceLinks.length} links and ${Math.min(imageUrls.length, 1)} images for ${gmailId.substring(0, 20)}`);
+
               // Score links and images in parallel
-              const [linkScores, imgScores] = await Promise.all([
-                limitedSourceLinks.length > 0 ? aiQualityScoringService.scoreLinks(limitedSourceLinks) : Promise.resolve([]),
-                imageUrls.length > 0 ? aiQualityScoringService.scoreImages(imageUrls.slice(0, 1), propertyContext) : Promise.resolve([])
-              ]);
+              let linkScores: any[] = [];
+              let imgScores: any[] = [];
+              
+              try {
+                [linkScores, imgScores] = await Promise.all([
+                  limitedSourceLinks.length > 0 ? aiQualityScoringService.scoreLinks(limitedSourceLinks) : Promise.resolve([]),
+                  imageUrls.length > 0 ? aiQualityScoringService.scoreImages(imageUrls.slice(0, 1), propertyContext) : Promise.resolve([])
+                ]);
+              } catch (scoringError: any) {
+                console.error(`[Background Scoring] ❌ AI scoring failed for ${gmailId}:`, {
+                  error: scoringError?.message || String(scoringError),
+                  errorType: scoringError?.constructor?.name,
+                  stack: scoringError?.stack,
+                });
+                throw scoringError;
+              }
 
               // Build updated property with scores
               const scoredSourceLinks = limitedSourceLinks.map((link: any, index: number) => ({
@@ -485,24 +527,40 @@ export class EmailMonitoringService {
               }));
 
               // Update the email deal directly via Convex mutation
-              await convexClient.mutation(convexApi.emailDeals.update, {
-                id: emailDeal._id,
-                extractedProperty: {
-                  ...property,
-                  sourceLinks: [
-                    ...scoredSourceLinks,
-                    ...sourceLinks.slice(limitedSourceLinks.length)
-                  ],
-                  imageUrls: imageScores.length > 0 ?
-                    [...imageScores.map((s: any) => s.url), ...imageUrls.slice(1)] :
-                    imageUrls
-                }
-              });
+              try {
+                await convexClient.mutation(convexApi.emailDeals.update, {
+                  id: emailDeal._id,
+                  extractedProperty: {
+                    ...property,
+                    sourceLinks: [
+                      ...scoredSourceLinks,
+                      ...sourceLinks.slice(limitedSourceLinks.length)
+                    ],
+                    imageUrls: imageScores.length > 0 ?
+                      [...imageScores.map((s: any) => s.url), ...imageUrls.slice(1)] :
+                      imageUrls
+                  }
+                });
+              } catch (mutationError: any) {
+                console.error(`[Background Scoring] ❌ Convex mutation failed for ${gmailId}:`, {
+                  error: mutationError?.message || String(mutationError),
+                  errorType: mutationError?.constructor?.name,
+                  requestId: mutationError?.requestId,
+                  dealId: emailDeal._id,
+                });
+                throw mutationError;
+              }
 
               scoredCount++;
               console.log(`[Background Scoring] ✓ Scored email ${gmailId.substring(0, 20)}`);
-            } catch (error) {
-              console.error(`[Background Scoring] Failed to score email ${gmailId}:`, error);
+            } catch (error: any) {
+              console.error(`[Background Scoring] ❌ Failed to score email ${gmailId}:`, {
+                error: error?.message || String(error),
+                errorType: error?.constructor?.name,
+                requestId: error?.requestId,
+                stack: error?.stack,
+                fullError: error,
+              });
             }
           })
         );

@@ -50,8 +50,8 @@ const getApiBaseUrl = (): string => {
   }
   
   // Production fallback - this is an error condition
-  console.error('[API Config] ❌ API URL not configured for production!');
-  console.error('[API Config] Set apiUrl in app.json extra section or EXPO_PUBLIC_API_URL in eas.json');
+  console.warn('[API Config] ⚠️ API URL not configured for production!');
+  console.warn('[API Config] Set apiUrl in app.json extra section or EXPO_PUBLIC_API_URL in eas.json');
   throw new Error('API URL not configured. Please set apiUrl in app.json or EXPO_PUBLIC_API_URL environment variable.');
 };
 
@@ -68,7 +68,7 @@ const createApiClient = (getToken?: () => Promise<string | null>): AxiosInstance
   
   // Validate base URL
   if (!baseURL || (!baseURL.startsWith('http://') && !baseURL.startsWith('https://'))) {
-    console.error('Invalid API base URL:', baseURL);
+    console.warn('[API Config] ⚠️ Invalid API base URL:', baseURL);
     throw new Error('API base URL must be an absolute URL starting with http:// or https://');
   }
   
@@ -91,7 +91,16 @@ const createApiClient = (getToken?: () => Promise<string | null>): AxiosInstance
       // Ensure URL starts with / before prepending /api
       const url = config.url.startsWith('/') ? config.url : `/${config.url}`;
       config.url = `/api${url}`;
+      console.log('[API Client] Added /api prefix. Final URL:', config.url);
+    } else {
+      console.log('[API Client] URL already has /api or is localhost. URL:', config.url);
     }
+    console.log('[API Client] Request config:', {
+      method: config.method,
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+    });
     return config;
   });
 
@@ -107,7 +116,7 @@ const createApiClient = (getToken?: () => Promise<string | null>): AxiosInstance
           console.warn('⚠️ No auth token available - user may not be signed in');
         }
       } catch (error) {
-        console.error('❌ Failed to get auth token:', error);
+        console.warn('[API Client] ⚠️ Failed to get auth token:', error);
       }
       return config;
     });
@@ -128,38 +137,72 @@ const createApiClient = (getToken?: () => Promise<string | null>): AxiosInstance
 
   // Handle errors
   client.interceptors.response.use(
-    (response) => response,
+    (response) => {
+      console.log('[API Client] ✅ Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.config?.url,
+        dataKeys: Object.keys(response.data || {}),
+      });
+      return response;
+    },
     async (error) => {
-      // Log detailed error information
+      // Use console.warn for network/API errors to prevent error overlay
+      // Only use console.error for critical errors that need immediate attention
+      console.warn('[API Client] ⚠️ Request failed');
+      
+      // Log detailed error information in development mode only
+      if (__DEV__) {
+        console.warn('[API Client] Error type:', error.constructor?.name || typeof error);
+        console.warn('[API Client] Error code:', error.code);
+        console.warn('[API Client] Error message:', error.message);
+        console.warn('[API Client] Request config:', {
+          method: error.config?.method,
+          url: error.config?.url,
+          baseURL: error.config?.baseURL,
+          fullURL: `${error.config?.baseURL}${error.config?.url}`,
+        });
+      }
+      
       if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.message?.includes('Network Error')) {
-        console.error('[API Error] ❌ Server not found or connection refused');
-        console.error('[API Error] Base URL:', cleanBaseURL);
-        console.error('[API Error] Request URL:', error.config?.url);
-        console.error('[API Error] Full URL:', `${cleanBaseURL}${error.config?.url}`);
-        console.error('[API Error] Error code:', error.code);
-        console.error('[API Error] Error message:', error.message);
-        console.error('[API Error] This usually means:');
-        console.error('  1. API server is not running');
-        console.error('  2. API URL is incorrect');
-        console.error('  3. Network connectivity issue');
-        console.error('  4. Firewall blocking the connection');
-        console.error('[API Error] Check your API URL configuration in app.json or .env.local');
+        if (__DEV__) {
+          console.warn('[API Error] ⚠️ Server not found or connection refused');
+          console.warn('[API Error] Base URL:', cleanBaseURL);
+          console.warn('[API Error] Request URL:', error.config?.url);
+          console.warn('[API Error] Full URL:', `${cleanBaseURL}${error.config?.url}`);
+          console.warn('[API Error] Error code:', error.code);
+          console.warn('[API Error] Error message:', error.message);
+          console.warn('[API Error] This usually means:');
+          console.warn('  1. API server is not running');
+          console.warn('  2. API URL is incorrect');
+          console.warn('  3. Network connectivity issue');
+          console.warn('  4. Firewall blocking the connection');
+          console.warn('[API Error] Check your API URL configuration in app.json or .env.local');
+        }
       } else if (error.response?.status === 401) {
         // Handle unauthorized - could redirect to login
         console.warn('[API Error] Unauthorized request (401)');
+        if (__DEV__) {
+          console.warn('[API Error] Response data:', error.response?.data);
+        }
       } else if (error.response) {
         // Server responded with error status
-        console.error('[API Error] Server error:', {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          url: error.config?.url,
-        });
+        if (__DEV__) {
+          console.warn('[API Error] Server error:', {
+            status: error.response.status,
+            statusText: error.response.statusText,
+            url: error.config?.url,
+            data: error.response.data,
+          });
+        }
       } else if (error.request) {
         // Request was made but no response received
-        console.error('[API Error] No response received:', {
-          url: error.config?.url,
-          baseURL: cleanBaseURL,
-        });
+        if (__DEV__) {
+          console.warn('[API Error] No response received:', {
+            url: error.config?.url,
+            baseURL: cleanBaseURL,
+          });
+        }
       }
       return Promise.reject(error);
     }
