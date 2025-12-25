@@ -336,7 +336,6 @@ class ConvexStorageImpl implements ConvexStorage {
     }
 
     // Enforce ownership
-    const effectiveUserId = userId || await this.getRequestUserId();
     if (convexDeal && convexDeal.userId !== effectiveUserId) {
       throw new Error("Unauthorized: Cannot update email deal belonging to another user");
     }
