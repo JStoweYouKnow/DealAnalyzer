@@ -173,9 +173,8 @@ export async function POST(request: NextRequest) {
             }
           }
         }
-        
+
         // Method 5: LAST RESORT - use indexOf (will definitely find it if it exists)
-        const dealIds = allUserDeals.map(d => d.id); // Define outside if block for error logging
         if (!emailDeal) {
           const indexInList = dealIds.indexOf(dealId);
           console.log(`[Next.js POST /api/analyze-email-deal] 🔍 LAST RESORT - indexOf result: ${indexInList}`);
