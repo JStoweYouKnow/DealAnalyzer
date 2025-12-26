@@ -351,18 +351,25 @@ class ConvexStorageImpl implements ConvexStorage {
         });
       }
     }
-    
-    // Fallback: try without userId filter if not found
+
+    // Fallback: try without userId filter if not found, but verify ownership afterwards
     if (!convexDeal && !id.startsWith("k")) {
       try {
-        convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
+        const potentialDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
+        // Only use this deal if it belongs to the correct user
+        if (potentialDeal && potentialDeal.userId === effectiveUserId) {
+          convexDeal = potentialDeal;
+          console.log('[ConvexStorage] updateEmailDeal - ✅ Found deal via no-userId query (ownership verified)');
+        } else if (potentialDeal) {
+          console.warn('[ConvexStorage] updateEmailDeal - Found deal via no-userId query but userId mismatch, skipping');
+        }
       } catch (error: any) {
         console.warn('[ConvexStorage] updateEmailDeal - Fallback query without userId failed:', {
           error: error?.message || String(error),
         });
       }
     }
-    
+
     // LAST RESORT: Get all user deals from Convex and find the matching one
     if (!convexDeal && effectiveUserId) {
       try {
