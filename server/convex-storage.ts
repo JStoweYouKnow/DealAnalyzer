@@ -323,16 +323,59 @@ class ConvexStorageImpl implements ConvexStorage {
 
     // Find the Convex deal to get the internal ID
     const effectiveUserId = userId || await this.getRequestUserId();
-    let convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { 
-      gmailId: id,
-      userId: effectiveUserId,
-    });
-    if (!convexDeal && id.startsWith("k")) {
-      convexDeal = await this.convex.query(api.emailDeals.getById, { id: id as any });
+    let convexDeal: any = null;
+    
+    try {
+      convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { 
+        gmailId: id,
+        userId: effectiveUserId,
+      });
+    } catch (error: any) {
+      console.warn('[ConvexStorage] updateEmailDeal - Direct Convex query failed, trying fallback search:', {
+        error: error?.message || String(error),
+      });
     }
+    
+    if (!convexDeal && id.startsWith("k")) {
+      try {
+        convexDeal = await this.convex.query(api.emailDeals.getById, { id: id as any });
+      } catch (error: any) {
+        console.warn('[ConvexStorage] updateEmailDeal - Convex ID lookup failed:', {
+          error: error?.message || String(error),
+        });
+      }
+    }
+    
     // Fallback: try without userId filter if not found
     if (!convexDeal && !id.startsWith("k")) {
-      convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
+      try {
+        convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { gmailId: id });
+      } catch (error: any) {
+        console.warn('[ConvexStorage] updateEmailDeal - Fallback query without userId failed:', {
+          error: error?.message || String(error),
+        });
+      }
+    }
+    
+    // LAST RESORT: Get all user deals from Convex and find the matching one
+    if (!convexDeal && effectiveUserId) {
+      try {
+        console.log('[ConvexStorage] updateEmailDeal - Using fallback search through all Convex deals');
+        const allConvexDeals = await this.convex.query(api.emailDeals.list, { userId: effectiveUserId });
+        const matchingConvexDeal = allConvexDeals?.find((d: any) => 
+          d.gmailId === id || d._id === id || String(d.gmailId) === String(id)
+        );
+        if (matchingConvexDeal) {
+          convexDeal = matchingConvexDeal;
+          console.log('[ConvexStorage] updateEmailDeal - ✅ Found Convex deal via fallback search');
+        } else {
+          console.warn('[ConvexStorage] updateEmailDeal - Deal not found in Convex list');
+        }
+      } catch (error: any) {
+        console.warn('[ConvexStorage] updateEmailDeal - Fallback search failed:', {
+          error: error?.message || String(error),
+        });
+      }
     }
 
     // Enforce ownership
@@ -349,6 +392,20 @@ class ConvexStorageImpl implements ConvexStorage {
     if (updates.emailContent !== undefined) convexUpdates.emailContent = updates.emailContent;
     if (updates.status !== undefined) convexUpdates.status = updates.status;
     if (updates.extractedProperty !== undefined) convexUpdates.extractedProperty = updates.extractedProperty;
+    // Handle analysis - use analysisId if the analysis has a Convex ID
+    if (updates.analysis !== undefined) {
+      const analysis = updates.analysis as any;
+      console.log('[ConvexStorage] updateEmailDeal - Analysis provided, id:', analysis?.id, 'type:', typeof analysis?.id);
+      if (analysis?.id && typeof analysis.id === 'string' && analysis.id.startsWith('k')) {
+        // It's a Convex ID, use as analysisId
+        convexUpdates.analysisId = analysis.id;
+        console.log('[ConvexStorage] updateEmailDeal - Using analysisId:', analysis.id);
+      } else {
+        // Analysis doesn't have a Convex ID - this shouldn't happen if createDealAnalysis worked
+        console.warn('[ConvexStorage] updateEmailDeal - Analysis ID is not a Convex ID, cannot link to email deal');
+        // We'll still update the status, but the analysis won't be linked
+      }
+    }
 
     const updatedDeal = await this.convex.mutation(api.emailDeals.update, {
       id: convexDeal._id,
