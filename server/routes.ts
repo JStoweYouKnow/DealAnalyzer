@@ -2007,7 +2007,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           bathrooms: prop.bathrooms,
         });
         
-        if (!prop.monthlyRent && !prop.monthly_rent) {
+        if (!prop.monthlyRent) {
           console.warn("[POST /api/analyze-email-deal] ⚠️ Monthly rent not found in property data - this may result in negative cash flow");
         }
       }
