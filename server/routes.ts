@@ -2001,8 +2001,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const prop = analysisResult.data.property;
         console.log("[POST /api/analyze-email-deal] Property data:", {
           address: prop.address,
-          purchasePrice: prop.purchasePrice || prop.price,
-          monthlyRent: prop.monthlyRent || prop.monthly_rent || 0,
+          purchasePrice: prop.purchasePrice || 0,
+          monthlyRent: prop.monthlyRent || 0,
           bedrooms: prop.bedrooms,
           bathrooms: prop.bathrooms,
         });
