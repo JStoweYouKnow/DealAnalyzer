@@ -315,15 +315,21 @@ class ConvexStorageImpl implements ConvexStorage {
   }
 
   async updateEmailDeal(id: string, updates: Partial<EmailDeal>, userId?: string): Promise<EmailDeal> {
-    // Get the deal first to find the Convex ID
-    const existingDeal = await this.getEmailDeal(id, userId);
-    if (!existingDeal) {
-      throw new Error("Email deal not found");
-    }
-
     // Find the Convex deal to get the internal ID
     const effectiveUserId = userId || await this.getRequestUserId();
     let convexDeal: any = null;
+    
+    // Try to get the deal first (but don't fail if it doesn't work - we'll use fallback)
+    try {
+      const existingDeal = await this.getEmailDeal(id, userId);
+      if (existingDeal) {
+        console.log('[ConvexStorage] updateEmailDeal - Found deal via getEmailDeal');
+      }
+    } catch (error: any) {
+      console.warn('[ConvexStorage] updateEmailDeal - getEmailDeal failed, will use fallback search:', {
+        error: error?.message || String(error),
+      });
+    }
     
     try {
       convexDeal = await this.convex.query(api.emailDeals.getByGmailId, { 
@@ -361,19 +367,47 @@ class ConvexStorageImpl implements ConvexStorage {
     if (!convexDeal && effectiveUserId) {
       try {
         console.log('[ConvexStorage] updateEmailDeal - Using fallback search through all Convex deals');
+        console.log('[ConvexStorage] updateEmailDeal - Searching for ID:', id);
+        console.log('[ConvexStorage] updateEmailDeal - User ID:', effectiveUserId?.substring(0, 8) + '...');
         const allConvexDeals = await this.convex.query(api.emailDeals.list, { userId: effectiveUserId });
-        const matchingConvexDeal = allConvexDeals?.find((d: any) => 
-          d.gmailId === id || d._id === id || String(d.gmailId) === String(id)
-        );
-        if (matchingConvexDeal) {
-          convexDeal = matchingConvexDeal;
-          console.log('[ConvexStorage] updateEmailDeal - ✅ Found Convex deal via fallback search');
+        console.log('[ConvexStorage] updateEmailDeal - Found', allConvexDeals?.length || 0, 'Convex deals');
+        
+        if (allConvexDeals && allConvexDeals.length > 0) {
+          // Use indexOf for reliable matching
+          const dealIds = allConvexDeals.map((d: any) => d.gmailId || d._id);
+          const indexInList = dealIds.indexOf(id);
+          console.log('[ConvexStorage] updateEmailDeal - indexOf result:', indexInList);
+          
+          if (indexInList >= 0) {
+            convexDeal = allConvexDeals[indexInList];
+            console.log('[ConvexStorage] updateEmailDeal - ✅ Found Convex deal via indexOf at index', indexInList);
+          } else {
+            // Try string conversion
+            const stringIndex = dealIds.map(String).indexOf(String(id));
+            if (stringIndex >= 0) {
+              convexDeal = allConvexDeals[stringIndex];
+              console.log('[ConvexStorage] updateEmailDeal - ✅ Found Convex deal via string indexOf at index', stringIndex);
+            } else {
+              // Try find as last resort
+              const matchingConvexDeal = allConvexDeals.find((d: any) => 
+                d.gmailId === id || d._id === id || String(d.gmailId) === String(id)
+              );
+              if (matchingConvexDeal) {
+                convexDeal = matchingConvexDeal;
+                console.log('[ConvexStorage] updateEmailDeal - ✅ Found Convex deal via find');
+              } else {
+                console.warn('[ConvexStorage] updateEmailDeal - Deal not found in Convex list');
+                console.warn('[ConvexStorage] updateEmailDeal - First few deal IDs:', dealIds.slice(0, 5));
+              }
+            }
+          }
         } else {
-          console.warn('[ConvexStorage] updateEmailDeal - Deal not found in Convex list');
+          console.warn('[ConvexStorage] updateEmailDeal - No Convex deals found for user');
         }
       } catch (error: any) {
         console.warn('[ConvexStorage] updateEmailDeal - Fallback search failed:', {
           error: error?.message || String(error),
+          stack: error?.stack,
         });
       }
     }
