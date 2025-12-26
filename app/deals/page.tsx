@@ -16,6 +16,8 @@ import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
 import type { EmailDeal, EmailMonitoringResponse, AnalyzePropertyResponse, FundingSource } from "@shared/schema";
 import { EmailForwardingSetup } from "@/components/email-forwarding-setup";
 import { InfoTooltip } from "@/components/info-tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AnalysisViewer } from "@/components/analysis-viewer";
 
 // Lazy load AdvancedSearch component for better code-splitting
 const AdvancedSearch = lazy(() => import("@/components/advanced-search").then(module => ({ default: module.AdvancedSearch })));
@@ -70,6 +72,7 @@ export default function DealsPage() {
   const [mortgageInputs, setMortgageInputs] = useState<Record<string, DealMortgageInputs>>({});
   const [mortgageLoading, setMortgageLoading] = useState<{[key: string]: boolean}>({});
   const [mortgageResults, setMortgageResults] = useState<Record<string, DealMortgageResult>>({});
+  const [viewingAnalysis, setViewingAnalysis] = useState<EmailDeal | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -1871,9 +1874,19 @@ export default function DealsPage() {
                       )}
 
                       {deal.analysis && (
-                        <Badge variant={deal.analysis.meetsCriteria ? "default" : "destructive"}>
-                          {deal.analysis.meetsCriteria ? 'Meets Criteria' : 'Does Not Meet'}
-                        </Badge>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => setViewingAnalysis(deal)}
+                          >
+                            <i className="fas fa-eye mr-2"></i>
+                            View Analysis
+                          </Button>
+                          <Badge variant={deal.analysis.meetsCriteria ? "default" : "destructive"}>
+                            {deal.analysis.meetsCriteria ? 'Meets Criteria' : 'Does Not Meet'}
+                          </Badge>
+                        </>
                       )}
                       
                       {/* Report generation buttons - available for all deals */}
@@ -1957,6 +1970,20 @@ export default function DealsPage() {
           )}
         </div>
         </div>
+
+      {/* Analysis Viewer Dialog */}
+      <Dialog open={!!viewingAnalysis} onOpenChange={(open) => !open && setViewingAnalysis(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              Property Analysis: {viewingAnalysis?.extractedProperty?.address || 'Property'}
+            </DialogTitle>
+          </DialogHeader>
+          {viewingAnalysis?.analysis && (
+            <AnalysisViewer analysis={viewingAnalysis.analysis} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

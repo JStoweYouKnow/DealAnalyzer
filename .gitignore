@@ -69,3 +69,4 @@ mobile/ios/GoogleService-Info.plist
 
 # External libraries
 assets/nutrient-viewer-lib/
+.env*.local
