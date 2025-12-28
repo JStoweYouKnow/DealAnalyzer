@@ -1,0 +1,22 @@
+{
+  "name": "@dealanalyzer/analysis-engine",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts || true",
+    "test": "echo 'No tests configured'"
+  },
+  "dependencies": {
+    "@dealanalyzer/types": "workspace:*",
+    "@dealanalyzer/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

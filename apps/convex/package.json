@@ -1,0 +1,17 @@
+{
+  "name": "convex",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "predev": "convex dev --until-success"
+  },
+  "dependencies": {
+    "convex": "^1.28.0"
+  },
+  "devDependencies": {
+    "@dealanalyzer/config": "workspace:*",
+    "typescript": "^5.6.3"
+  }
+}

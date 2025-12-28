@@ -1,0 +1,37 @@
+{
+  "name": "dealanalyzer-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=web",
+    "dev:api": "turbo run dev --filter=api",
+    "dev:mobile": "turbo run dev --filter=mobile",
+    "build": "turbo run build",
+    "build:web": "turbo run build --filter=web",
+    "build:api": "turbo run build --filter=api",
+    "build:mobile": "turbo run build --filter=mobile",
+    "build:all": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "convex:dev": "turbo run convex:dev --filter=convex",
+    "convex:deploy": "turbo run convex:deploy --filter=convex",
+    "convex:codegen": "turbo run convex:codegen --filter=convex"
+  },
+  "devDependencies": {
+    "@turbo/gen": "^2.3.4",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.4",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

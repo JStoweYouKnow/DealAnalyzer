@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "owner": "project-comfort-dev",
+    "name": "The Comfort Finder",
+    "slug": "deal-analyzer-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.comfortfinder.dealanalyzer",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select property images for analysis.",
+        "NSCameraUsageDescription": "This app needs access to your camera to take photos of property documents."
+      },
+      "associatedDomains": [
+        "applinks:comfortfinder.projcomfort.com"
+      ],
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "scheme": "dealanalyzer",
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6B806B"
+      },
+      "package": "com.comfortfinder.dealanalyzer",
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "256e912e-3a30-479d-8524-c2c92a08f80a"
+      },
+      "clerkPublishableKey": "pk_live_Y2xlcmsuY29tZm9ydGZpbmRlci5wcm9qY29tZm9ydC5jb20k",
+      "apiUrl": "https://comfortfinder.projcomfort.com"
+    }
+  }
+}

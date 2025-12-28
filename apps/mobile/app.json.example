@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "DealAnalyzer",
+    "slug": "dealanalyzer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dealanalyzer.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.dealanalyzer.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "_comment": "API Configuration - Add your API keys below",
+
+      "devServerUrl": "http://192.168.1.100:3000",
+      "_devServerUrlNote": "For physical devices, set this to your machine's LAN IP address. iOS Simulator and Android Emulator have automatic defaults.",
+
+      "walkScoreApiKey": "",
+      "_walkScoreNote": "Get free API key at https://www.walkscore.com/professional/api.php (5,000 calls/day)",
+
+      "openWeatherMapApiKey": "",
+      "_openWeatherMapNote": "Get free API key at https://openweathermap.org/api (1,000 calls/day)",
+
+      "fredApiKey": "",
+      "_fredNote": "Get free API key at https://fred.stlouisfed.org/docs/api/api_key.html (unlimited)",
+
+      "_blsNote": "Bureau of Labor Statistics API requires NO API key (completely free)",
+      "_geocodingNote": "Nominatim/OpenStreetMap geocoding requires NO API key (rate limited to 1 req/sec)"
+    }
+  }
+}

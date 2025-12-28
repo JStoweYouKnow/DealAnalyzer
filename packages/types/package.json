@@ -1,0 +1,48 @@
+{
+  "name": "@dealanalyzer/types",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./property": {
+      "types": "./dist/property.d.ts",
+      "default": "./dist/property.js"
+    },
+    "./analysis": {
+      "types": "./dist/analysis.d.ts",
+      "default": "./dist/analysis.js"
+    },
+    "./email": {
+      "types": "./dist/email.d.ts",
+      "default": "./dist/email.js"
+    },
+    "./market": {
+      "types": "./dist/market.d.ts",
+      "default": "./dist/market.js"
+    },
+    "./export": {
+      "types": "./dist/export.d.ts",
+      "default": "./dist/export.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts || true",
+    "test": "echo 'No tests configured'"
+  },
+  "dependencies": {
+    "zod": "^3.24.2",
+    "drizzle-zod": "^0.7.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

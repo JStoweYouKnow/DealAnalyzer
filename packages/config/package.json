@@ -1,0 +1,13 @@
+{
+  "name": "@dealanalyzer/config",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "eslint",
+    "typescript",
+    "tailwind"
+  ],
+  "scripts": {
+    "clean": "echo 'No build needed for config package'"
+  }
+}
