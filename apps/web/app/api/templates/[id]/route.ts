@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storage } from "../../../../server/storage";
+import { storage } from "@dealanalyzer/storage";
 import { insertAnalysisTemplateSchema } from "@dealanalyzer/types";
 
 export async function GET(

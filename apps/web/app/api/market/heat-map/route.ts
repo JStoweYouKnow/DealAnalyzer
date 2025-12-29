@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storage } from "../../../../server/storage";
+import { storage } from "@dealanalyzer/storage";
 import { rentCastAPI } from "../../../../server/services/rentcast-api";
 import { censusAPI } from "../../../../server/services/census-api";
 import { attomAPI } from "../../../../server/services/attom-api";

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storage } from "../../../../server/storage";
+import { storage } from "@dealanalyzer/storage";
 
 export async function GET(request: NextRequest) {
   try {

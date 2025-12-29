@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { storage } from "../../../../server/storage";
+import { storage } from "@dealanalyzer/storage";
 import { ZodError } from "zod";
 
 const filtersSchema = z.object({

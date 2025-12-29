@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storage } from "../../../../server/storage";
+import { storage } from "@dealanalyzer/storage";
 
 /**
  * Authenticates the request and returns the user ID if authenticated.

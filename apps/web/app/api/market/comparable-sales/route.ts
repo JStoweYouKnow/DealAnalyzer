@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storage } from "../../../../server/storage";
+import { storage } from "@dealanalyzer/storage";
 import { rentCastAPI } from "../../../../server/services/rentcast-api";
 import { attomAPI } from "../../../../server/services/attom-api";
 import type { ComparableSale } from "@dealanalyzer/types";
