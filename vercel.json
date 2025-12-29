@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd apps/web && pnpm next build",
+  "buildCommand": "cd packages/types && pnpm build && cd ../utils && pnpm build && cd ../ui && pnpm build && cd ../../apps/web && pnpm next build",
   "installCommand": "pnpm install --frozen-lockfile",
   "outputDirectory": "apps/web/.next"
 }
