@@ -1,0 +1,129 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { emailMonitoringService } from "../../../server/email-service";
+import { logger } from "@/lib/logger";
+
+// Helper function to decode base64url with padding
+function decodeBase64(base64: string): string {
+  // Convert from base64url to base64
+  let padded = base64.replace(/-/g, '+').replace(/_/g, '/');
+  // Add padding if needed
+  while (padded.length % 4) {
+    padded += '=';
+  }
+  return Buffer.from(padded, 'base64').toString('utf-8');
+}
+
+// Helper to get userId from bearer token (for mobile apps)
+async function getUserIdFromBearerToken(request: NextRequest): Promise<string | null> {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7).trim();
+    if (token) {
+      try {
+        // Decode the JWT to extract the user ID (same approach as middleware)
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          // Decode the payload (second part of JWT) with proper base64 padding
+          const payload = JSON.parse(decodeBase64(parts[1]));
+          if (payload?.sub) {
+            // Verify it's a Clerk token by checking the issuer
+            if (payload.iss?.includes('clerk') || payload.iss?.includes('clerk.accounts')) {
+              console.log('[Bearer Auth] ✅ Authenticated via bearer token', {
+                userId: payload.sub.substring(0, 20),
+                issuer: payload.iss,
+              });
+              return payload.sub;
+            } else {
+              console.log('[Bearer Auth] ⚠️ Token issuer is not Clerk', {
+                issuer: payload.iss,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[Bearer Auth] Token decode failed:', error);
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Manually fetch emails from Gmail
+ * This endpoint triggers a one-time fetch of emails from the user's connected Gmail account
+ */
+export async function POST(request: NextRequest) {
+  try {
+    // Get userId from Clerk auth (cookie-based for web) or bearer token (for mobile)
+    const { userId: clerkUserId } = await auth();
+    let userId = clerkUserId;
+
+    // If no cookie-based userId, try bearer token (mobile apps)
+    if (!userId) {
+      userId = await getUserIdFromBearerToken(request);
+    }
+
+    if (!userId) {
+      logger.warn("Unauthorized: No userId from Clerk auth or bearer token");
+      return NextResponse.json(
+        { error: "Unauthorized. Please sign in." },
+        { status: 401 }
+      );
+    }
+
+    logger.info("Manual Gmail fetch triggered", { userId: userId.substring(0, 20) });
+
+    // Fetch emails from Gmail
+    const result = await emailMonitoringService.fetchRecentEmails(userId);
+
+    logger.info("Gmail fetch completed", {
+      userId: userId.substring(0, 20),
+      emailCount: result.emailCount,
+      newDeals: result.newDeals,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Fetched ${result.emailCount} emails, created ${result.newDeals} new deals`,
+      emailCount: result.emailCount,
+      newDeals: result.newDeals,
+    });
+  } catch (error: any) {
+    logger.error("Error fetching Gmail emails", error instanceof Error ? error : undefined, {
+      errorMessage: error.message || 'Unknown error',
+    });
+
+    // Check for specific error types
+    if (error.message?.includes('not connected') || error.message?.includes('No Gmail tokens')) {
+      return NextResponse.json(
+        { error: "Gmail not connected. Please connect your Gmail account first." },
+        { status: 400 }
+      );
+    }
+
+    if (error.message?.includes('invalid_grant') || error.message?.includes('Token has been expired')) {
+      return NextResponse.json(
+        { error: "Gmail authorization expired. Please reconnect your Gmail account." },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: `Failed to fetch emails: ${error.message}` },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Health check endpoint
+ */
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    endpoint: 'fetch-gmail-emails',
+    message: 'Gmail fetch endpoint is active. Use POST to trigger a fetch.',
+  });
+}
