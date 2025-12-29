@@ -80,8 +80,10 @@ class ConvexStorageImpl implements ConvexStorage {
     try {
       // Prefer Clerk if available
       try {
+        // Use dynamic require to avoid build-time resolution errors
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const clerk = require('@clerk/nextjs/server');
+        const dynamicRequire = new Function('modulePath', 'return require(modulePath)');
+        const clerk = dynamicRequire('@clerk/nextjs/server');
         if (clerk?.auth) {
           const res = await clerk.auth();
           const clerkUserId = res?.userId as string | undefined;
