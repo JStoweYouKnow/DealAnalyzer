@@ -1,5 +1,3 @@
 {
-  "buildCommand": "turbo run build --filter=web",
-  "devCommand": "turbo run dev --filter=web",
-  "installCommand": "pnpm install --frozen-lockfile"
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile"
 }
