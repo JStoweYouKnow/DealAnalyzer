@@ -1,15 +1,14 @@
 #!/bin/bash
 set -e
 
-# Build packages using TypeScript project references
-# This handles dependencies automatically
-pnpm tsc -b packages/types
-pnpm tsc -b packages/utils
-pnpm tsc -b packages/ui
-pnpm tsc -b packages/external-apis
-pnpm tsc -b packages/storage
-pnpm tsc -b packages/ai-services
-pnpm tsc -b packages/analysis-engine
+# Build packages in dependency order by running build from each package directory
+(cd packages/types && pnpm build)
+(cd packages/utils && pnpm build)
+(cd packages/ui && pnpm build)
+(cd packages/external-apis && pnpm build)
+(cd packages/storage && pnpm build)
+(cd packages/ai-services && pnpm build)
+(cd packages/analysis-engine && pnpm build)
 
 # Build Next.js app
-pnpm --filter web build
+(cd apps/web && pnpm build)
