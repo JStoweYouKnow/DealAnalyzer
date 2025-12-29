@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter='./packages/*' --workspace-concurrency=1 run build || true && cd apps/web && pnpm next build",
+  "buildCommand": "pnpm --filter types run build && pnpm --filter utils run build && pnpm --filter ui run build && pnpm --filter storage run build && pnpm --filter external-apis run build && pnpm --filter ai-services run build && cd apps/web && pnpm next build",
   "installCommand": "pnpm install --frozen-lockfile",
   "outputDirectory": "apps/web/.next"
 }
