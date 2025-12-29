@@ -16,7 +16,7 @@
     "build:mobile": "turbo run build --filter=mobile",
     "build:packages": "turbo run build --filter='./packages/*'",
     "build:all": "turbo run build",
-    "build:vercel": "pnpm build:packages && cd apps/web && pnpm next build",
+    "build:vercel": "./build-vercel.sh",
     "test": "turbo run test",
     "test:web": "turbo run test --filter=web",
     "test:api": "turbo run test --filter=api",
