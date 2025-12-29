@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-# Build packages in dependency order
-cd packages/types && pnpm build
-cd ../utils && pnpm build
-cd ../ui && pnpm build
-cd ../external-apis && pnpm build
-cd ../storage && pnpm build
-cd ../ai-services && pnpm build
-cd ../analysis-engine && pnpm build
+# Build packages in dependency order using pnpm from root
+pnpm --filter @dealanalyzer/types build
+pnpm --filter @dealanalyzer/utils build
+pnpm --filter @dealanalyzer/ui build
+pnpm --filter @dealanalyzer/external-apis build
+pnpm --filter @dealanalyzer/storage build
+pnpm --filter @dealanalyzer/ai-services build
+pnpm --filter @dealanalyzer/analysis-engine build
 
 # Build Next.js app
-cd ../../apps/web && pnpm next build
+pnpm --filter web build
