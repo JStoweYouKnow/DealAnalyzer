@@ -1,17 +1,18 @@
 #!/bin/bash
 set -e
 
-# Ensure workspace is properly linked
-pnpm install --offline
+# Add node_modules/.bin to PATH so tsc can be found
+export PATH="./node_modules/.bin:$PATH"
 
-# Build packages in dependency order by running build from each package directory
-(cd packages/types && pnpm build)
-(cd packages/utils && pnpm build)
-(cd packages/ui && pnpm build)
-(cd packages/external-apis && pnpm build)
-(cd packages/storage && pnpm build)
-(cd packages/ai-services && pnpm build)
-(cd packages/analysis-engine && pnpm build)
+# Build packages using TypeScript build mode with --force
+# This ensures clean builds and properly handles project references
+tsc -b packages/types --force
+tsc -b packages/utils --force
+tsc -b packages/ui --force
+tsc -b packages/external-apis --force
+tsc -b packages/storage --force
+tsc -b packages/ai-services --force
+tsc -b packages/analysis-engine --force
 
 # Build Next.js app
 (cd apps/web && pnpm build)

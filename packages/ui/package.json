@@ -23,7 +23,7 @@
     }
   },
   "scripts": {
-    "build": "pnpm exec tsc",
+    "build": "tsc",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit",
