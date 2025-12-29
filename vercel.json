@@ -1,18 +1,5 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "npm run build:next",
-  "devCommand": "npm run dev:next",
-  "installCommand": "npm install --legacy-peer-deps",
-  "functions": {
-    "app/api/**/*.ts": {
-      "maxDuration": 120
-    }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/weekly-digest",
-      "schedule": "0 9 * * 1"
-    }
-  ],
-  "regions": ["iad1"]
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm build:web",
+  "devCommand": "pnpm dev:web"
 }
