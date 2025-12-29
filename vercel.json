@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd packages/types && pnpm build && cd ../utils && pnpm build && cd ../ui && pnpm build && cd ../external-apis && pnpm build && cd ../storage && pnpm build && cd ../ai-services && pnpm build && cd ../analysis-engine && pnpm build && cd ../../apps/web && pnpm next build",
+  "buildCommand": "pnpm build:vercel",
   "installCommand": "pnpm install --frozen-lockfile",
   "outputDirectory": "apps/web/.next"
 }
