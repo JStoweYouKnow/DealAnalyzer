@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Ensure workspace is properly linked
+pnpm install --offline
+
 # Build packages in dependency order by running build from each package directory
 (cd packages/types && pnpm build)
 (cd packages/utils && pnpm build)
