@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzePropertyRequestSchema, FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
+import { analyzePropertyRequestSchema, FUNDING_SOURCE_DOWN_PAYMENTS } from "@dealanalyzer/types";
 import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
 import { storage } from "../../../server/storage";
 import { getAiService } from "../../lib/lazy-load";

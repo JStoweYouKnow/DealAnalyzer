@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../server/storage";
-import type { DealAnalysis } from "../../../shared/schema";
+import type { DealAnalysis } from "@dealanalyzer/types";
 
 export async function POST(request: NextRequest) {
   try {

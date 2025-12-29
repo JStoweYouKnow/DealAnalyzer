@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { storage } from "../../../server/storage";
 import { parseEmailContent, analyzeProperty } from "../../lib/property-analyzer";
 import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
-import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
+import { FUNDING_SOURCE_DOWN_PAYMENTS } from "@dealanalyzer/types";
 import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 
 // Helper to decode JWT payload (for mobile bearer tokens)

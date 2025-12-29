@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadInvestmentCriteria, DEFAULT_CRITERIA } from "../../../server/services/criteria-service";
-import { updateCriteriaRequestSchema } from "../../../shared/schema";
-import type { CriteriaResponse } from "../../../shared/schema";
+import { updateCriteriaRequestSchema } from "@dealanalyzer/types";
+import type { CriteriaResponse } from "@dealanalyzer/types";
 import { criteriaCache } from "../../lib/cache-service";
 import { ConvexHttpClient } from 'convex/browser';
 

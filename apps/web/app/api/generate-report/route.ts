@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../server/storage";
 import { generateReportBuffer } from "../../../server/report-generator";
-import { FUNDING_SOURCE_DOWN_PAYMENTS } from "../../../shared/schema";
+import { FUNDING_SOURCE_DOWN_PAYMENTS } from "@dealanalyzer/types";
 import { withRateLimit, strictRateLimit } from "../../lib/rate-limit";
 
 /**

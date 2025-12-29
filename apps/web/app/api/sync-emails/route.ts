@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { emailMonitoringService } from "../../../server/email-service";
 import { storage } from "../../../server/storage";
 import { cookies, headers } from "next/headers";
-import type { EmailMonitoringResponse } from "../../../shared/schema";
+import type { EmailMonitoringResponse } from "@dealanalyzer/types";
 import { sendNotificationIfEnabled } from "../../../server/services/notification-helper";
 
 // Increase timeout for this route (Vercel Pro allows up to 60s, Hobby is 10s)

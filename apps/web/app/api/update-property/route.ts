@@ -4,7 +4,7 @@ import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 import { analyzeProperty } from "../../lib/property-analyzer";
 import { getMortgageRate } from "../../../server/mortgage-rate-service";
 import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
-import { FUNDING_SOURCE_DOWN_PAYMENTS, mortgageValuesSchema } from "../../../shared/schema";
+import { FUNDING_SOURCE_DOWN_PAYMENTS, mortgageValuesSchema } from "@dealanalyzer/types";
 
 export async function POST(request: NextRequest) {
   try {

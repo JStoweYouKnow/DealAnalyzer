@@ -5,7 +5,7 @@ import { storage } from "../../../server/storage";
 import { aiAnalysisService as coreAiService } from "../../../server/ai-service";
 import { getMortgageRate } from "../../../server/mortgage-rate-service";
 import { loadInvestmentCriteria } from "../../../server/services/criteria-service";
-import { FUNDING_SOURCE_DOWN_PAYMENTS, mortgageValuesSchema } from "../../../shared/schema";
+import { FUNDING_SOURCE_DOWN_PAYMENTS, mortgageValuesSchema } from "@dealanalyzer/types";
 import { getPdfExtractor } from "../../lib/lazy-load";
 import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 
