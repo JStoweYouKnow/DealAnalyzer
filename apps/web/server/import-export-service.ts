@@ -19,7 +19,7 @@ import {
   type CsvExportRequest,
   type DealAnalysis,
   biggerPocketsImportSchema 
-} from "@shared/schema";
+} from "@dealanalyzer/types";
 import { storage } from "./storage";
 
 export class ImportExportService {

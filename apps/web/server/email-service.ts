@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import type { DealAnalysis } from '@shared/schema';
+import type { DealAnalysis } from '@dealanalyzer/types';
 import { aiQualityScoringService } from './ai-scoring-service';
 
 // Lazy import Convex client for token persistence
@@ -18,7 +18,7 @@ async function initializeConvexForTokens() {
     }
 
     if (!convexApi) {
-      const apiModule = await import('../convex/_generated/api');
+      const apiModule = await import('../../convex/_generated/api');
       convexApi = apiModule.api;
     }
 

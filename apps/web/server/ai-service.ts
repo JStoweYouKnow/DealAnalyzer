@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { Property, AIAnalysis, SmartPropertyRecommendation, RentPricingRecommendation, InvestmentTimingAdvice } from "@shared/schema";
+import type { Property, AIAnalysis, SmartPropertyRecommendation, RentPricingRecommendation, InvestmentTimingAdvice } from "@dealanalyzer/types";
 import { logger } from "../app/lib/logger";
 import { withTimeout, TIMEOUTS } from "../app/lib/api-timeout";
 

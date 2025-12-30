@@ -1,7 +1,7 @@
 import { createObjectCsvWriter } from 'csv-writer';
 import path from 'path';
 import fs from 'fs';
-import type { DealAnalysis, PropertyComparison } from '@shared/schema';
+import type { DealAnalysis, PropertyComparison } from '@dealanalyzer/types';
 import { aiAnalysisService } from './ai-service';
 import type { Browser } from 'puppeteer-core';
 

@@ -1,5 +1,5 @@
 import { ConvexHttpClient } from "convex/browser";
-import { EmailDeal, PhotoAnalysis, DealAnalysis } from "@shared/schema";
+import { EmailDeal, PhotoAnalysis, DealAnalysis } from "@dealanalyzer/types";
 import { IStorage } from "./storage";
 import { logger } from "../app/lib/logger";
 
@@ -19,11 +19,11 @@ async function initializeConvex() {
     // Using dynamic imports with relative paths that work in both Node.js and Next.js
     let apiModule;
     try {
-      apiModule = await import('../convex/_generated/api.js');
+      apiModule = await import('../../convex/_generated/api.js');
     } catch (jsError) {
       // Fallback: try without extension (TypeScript/ESM resolution)
       try {
-        apiModule = await import('../convex/_generated/api');
+        apiModule = await import('../../convex/_generated/api');
       } catch (tsError) {
         throw new Error(`Convex API not found. JS error: ${jsError}, TS error: ${tsError}`);
       }

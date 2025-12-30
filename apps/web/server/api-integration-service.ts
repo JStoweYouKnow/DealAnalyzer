@@ -3,7 +3,7 @@ import {
   apiIntegrationSchema, 
   type ApiIntegration, 
   type InsertApiIntegration 
-} from "@shared/schema";
+} from "@dealanalyzer/types";
 
 export class ApiIntegrationService {
   

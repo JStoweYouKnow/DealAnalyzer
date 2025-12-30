@@ -38,7 +38,7 @@ import {
   insertApiIntegrationSchema,
   type ApiIntegration,
   type InsertApiIntegration
-} from "@shared/schema";
+} from "@dealanalyzer/types";
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
