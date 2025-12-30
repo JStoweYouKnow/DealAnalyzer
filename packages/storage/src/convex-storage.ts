@@ -21,12 +21,12 @@ async function initializeConvex() {
       let apiModule;
       try {
         // @ts-ignore - Generated file may not exist at build time
-        apiModule = await import('../convex/_generated/api.js');
+        apiModule = await import('../../../convex/_generated/api.js');
       } catch (jsError) {
         // Fallback: try without extension (TypeScript/ESM resolution)
         try {
           // @ts-ignore - Generated file may not exist at build time
-          apiModule = await import('../convex/_generated/api');
+          apiModule = await import('../../../convex/_generated/api');
         } catch (tsError) {
           throw new Error(`Convex API not found. JS error: ${jsError}, TS error: ${tsError}`);
         }

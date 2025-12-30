@@ -23,7 +23,7 @@ async function getConvexApi(): Promise<any> {
   try {
     // Use Function constructor to create a dynamic import that webpack can't analyze
     // This prevents webpack from trying to resolve the module at build time
-    const importPath = '../../../../convex/_generated/api';
+    const importPath = '../../../../../convex/_generated/api';
     const dynamicImport = new Function('path', 'return import(path)');
     // @ts-ignore - dynamic import path
     const apiModule = await dynamicImport(importPath);

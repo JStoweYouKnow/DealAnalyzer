@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
       try {
         console.log('[Gmail Status Check] Checking database for tokens, userId:', userId.substring(0, 20) + '...');
         const { ConvexHttpClient } = await import('convex/browser');
-        const apiModule = await import('../../../convex/_generated/api');
+        const apiModule = await import('../../../../../convex/_generated/api');
         const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
 
         console.log('[Gmail Status Check] Calling retrieveTokensForServer action for userId:', userId);

@@ -49,7 +49,7 @@ export class AIAnalysisService {
           response_format: { type: "json_object" },
         }),
         TIMEOUTS.LONG
-      );
+      ) as OpenAI.Chat.Completions.ChatCompletion;
 
       const analysisResult = JSON.parse(response.choices[0].message.content || "{}");
       propertyLogger.info("AI analysis completed successfully");

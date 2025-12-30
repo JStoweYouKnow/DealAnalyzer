@@ -236,7 +236,7 @@ export async function GET(request: NextRequest) {
       // Try to import Convex API - use relative path to avoid path alias issues
       let api;
       try {
-        const apiModule = await import('../../../../convex/_generated/api');
+        const apiModule = await import('../../../../../../convex/_generated/api');
         api = apiModule.api;
       } catch (importError) {
         console.warn('[Cron] Could not import Convex API (codegen may not be run):', importError);

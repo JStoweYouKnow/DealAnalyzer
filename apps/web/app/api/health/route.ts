@@ -54,8 +54,8 @@ async function checkConvexDatabase(): Promise<ServiceStatus> {
     const checkResult = await checkServiceWithTimeout(async () => {
       try {
         // Dynamic import to avoid build-time errors
-        const apiModule = await import('../../../convex/_generated/api.js').catch(() => 
-          import('../../../convex/_generated/api')
+        const apiModule = await import('../../../../../convex/_generated/api.js').catch(() => 
+          import('../../../../../convex/_generated/api')
         );
         
         if (!apiModule?.api) {

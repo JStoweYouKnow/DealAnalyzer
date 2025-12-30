@@ -67,7 +67,7 @@ export async function POST() {
       try {
         console.log('[Sync Emails] Attempting to retrieve tokens from database for userId:', userId.substring(0, 8) + '...');
         const { ConvexHttpClient } = await import('convex/browser');
-        const apiModule = await import('../../../convex/_generated/api');
+        const apiModule = await import('../../../../../convex/_generated/api');
         const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
         
         // SECURITY: Use action to retrieve tokens server-side only

@@ -19,7 +19,7 @@ async function getConvexClient() {
 
 async function getConvexApi() {
   try {
-    const apiModule = await import('../../../../convex/_generated/api');
+    const apiModule = await import('../../../../../convex/_generated/api');
     return apiModule.api;
   } catch (error) {
     console.error('Failed to import Convex API:', error);

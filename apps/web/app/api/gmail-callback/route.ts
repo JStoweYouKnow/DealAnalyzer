@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
     if (!refreshToken && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
       try {
         const { ConvexHttpClient } = await import('convex/browser');
-        const apiModule = await import('../../../convex/_generated/api');
+        const apiModule = await import('../../../../../convex/_generated/api');
         const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
 
         const dbTokens = await convexClient.action(
@@ -291,7 +291,7 @@ export async function GET(request: NextRequest) {
         // Initialize Convex client for token persistence
         if (process.env.NEXT_PUBLIC_CONVEX_URL) {
           const { ConvexHttpClient } = await import('convex/browser');
-          const apiModule = await import('../../../convex/_generated/api');
+          const apiModule = await import('../../../../../convex/_generated/api');
           const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
 
           console.log('[Gmail Callback] Convex Client initialized with URL:', process.env.NEXT_PUBLIC_CONVEX_URL?.substring(0, 30) + '...');

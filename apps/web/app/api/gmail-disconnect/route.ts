@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     logger.info("Gmail disconnect triggered", { userId: userId.substring(0, 20) });
 
     // Delete the OAuth tokens from Convex
-    const apiModule = await import('../../../convex/_generated/api');
+    const apiModule = await import('../../../../../convex/_generated/api');
     const result = await fetchMutation(apiModule.api.userOAuthTokens.deleteTokens, {
       userId,
     });
