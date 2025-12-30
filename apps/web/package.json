@@ -58,6 +58,7 @@
     "openai": "^4.78.0",
     "p-limit": "^3.1.0",
     "p-map": "^4.0.0",
+    "pdf-parse": "^1.1.1",
     "puppeteer-core": "^23.11.1",
     "rate-limiter-flexible": "^5.0.3",
     "react": "^19.2.1",
