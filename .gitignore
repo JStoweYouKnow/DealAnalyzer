@@ -70,3 +70,8 @@ mobile/ios/GoogleService-Info.plist
 # External libraries
 assets/nutrient-viewer-lib/
 .env*.local
+
+# Convex compiled files
+convex/*.js
+convex/*.d.ts
+convex/*.d.ts.map
