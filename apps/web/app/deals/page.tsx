@@ -13,7 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import comfortFinderLogo from "@/assets/comfort-finder-logo.png";
-import type { EmailDeal, EmailMonitoringResponse, AnalyzePropertyResponse, FundingSource } from "@shared/schema";
+import type { EmailDeal, EmailMonitoringResponse, AnalyzePropertyResponse, FundingSource } from "@dealanalyzer/types";
 import { EmailForwardingSetup } from "@/components/email-forwarding-setup";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";

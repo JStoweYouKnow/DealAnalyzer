@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { DealAnalysis } from "@shared/schema";
+import type { DealAnalysis } from "@dealanalyzer/types";
 
 export function useComparison() {
   const [comparisonList, setComparisonList] = useState<DealAnalysis[]>([]);
