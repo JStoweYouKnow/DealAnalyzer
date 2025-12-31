@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
-import type { GenerateAuthUrlOpts } from "google-auth-library";
 import { logger } from "@/lib/logger";
 
 const DEFAULT_PROJECT_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN;
@@ -182,7 +181,7 @@ export async function GET(request: NextRequest) {
       state = userId;
     }
 
-    const authUrlConfig: GenerateAuthUrlOpts = {
+    const authUrlConfig = {
       access_type: 'offline',
       scope: scopes,
       include_granted_scopes: true,
