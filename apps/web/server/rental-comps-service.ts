@@ -1,6 +1,6 @@
 // Note: web_search will be imported as needed
 
-interface RentalProperty {
+export interface RentalProperty {
   address: string;
   rent: number;
   bedrooms: number;
@@ -9,7 +9,7 @@ interface RentalProperty {
   source: string;
 }
 
-interface AirbnbData {
+export interface AirbnbData {
   averageDailyRate: number;
   occupancyRate: number;
   properties: AirbnbProperty[];
@@ -17,7 +17,7 @@ interface AirbnbData {
   confidence: 'high' | 'medium' | 'low';
 }
 
-interface AirbnbProperty {
+export interface AirbnbProperty {
   title: string;
   dailyRate: number;
   occupancyRate?: number;
@@ -26,7 +26,7 @@ interface AirbnbProperty {
   source: string;
 }
 
-interface RentalCompsResult {
+export interface RentalCompsResult {
   averageRent: number;
   properties: RentalProperty[];
   searchArea: string;
