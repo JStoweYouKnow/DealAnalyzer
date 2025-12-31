@@ -228,9 +228,9 @@ export async function PUT(request: NextRequest) {
 
     // Fallback: Build updated criteria structure and cache it (in-memory only, won't persist)
     const updatedCriteria: CriteriaResponse = {
-      property_types: DEFAULT_CRITERIA.property_types,
+      property_types: [...DEFAULT_CRITERIA.property_types],
       location: DEFAULT_CRITERIA.location,
-      min_purchase_price: criteria.price_min ?? DEFAULT_CRITERIA.min_purchase_price,
+      min_purchase_price: criteria.price_min ?? 0,
       max_purchase_price: criteria.price_max ?? DEFAULT_CRITERIA.max_purchase_price,
       downpayment_percentage_min: DEFAULT_CRITERIA.downpayment_percentage_min,
       downpayment_percentage_max: DEFAULT_CRITERIA.downpayment_percentage_max,
