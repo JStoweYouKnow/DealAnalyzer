@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       // and analyzeProperty will use mortgageValues.monthlyPayment directly
       
       // Only fetch criteria in parallel
-      criteria = await apiLimit(() => loadInvestmentCriteria().catch(() => DEFAULT_CRITERIA));
+      criteria = await apiLimit(() => Promise.resolve(loadInvestmentCriteria()).catch(() => DEFAULT_CRITERIA));
     } else {
       // Fetch mortgage rate and criteria in parallel (they're independent)
       const zipCode = propertyData.zip_code || propertyData.zipCode;
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
               zip_code: zipCode,
             }).catch(() => 0.07)) // Fallback to 7% on error
           : Promise.resolve(0.07),
-        criteria: apiLimit(() => loadInvestmentCriteria().catch(() => DEFAULT_CRITERIA)),
+        criteria: apiLimit(() => Promise.resolve(loadInvestmentCriteria()).catch(() => DEFAULT_CRITERIA)),
       });
       
       mortgageRate = fetchedRate;
