@@ -189,7 +189,7 @@ export async function PUT(request: NextRequest) {
         if (client && apiInstance && (apiInstance as any).userCriteria) {
           await client.mutation((apiInstance as any).userCriteria.updateCriteria, {
             userId,
-            min_purchase_price: criteria.price_min ?? DEFAULT_CRITERIA.min_purchase_price,
+            min_purchase_price: criteria.price_min ?? 0,
             max_purchase_price: criteria.price_max ?? DEFAULT_CRITERIA.max_purchase_price,
             coc_minimum_min: finalCocMinimumMin,
             coc_minimum_max: finalCocMinimumMax,
