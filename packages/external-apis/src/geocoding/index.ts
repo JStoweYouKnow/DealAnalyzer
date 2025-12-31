@@ -1,7 +1,7 @@
 import { geocodingCache } from './cache';
 import { logger } from '@dealanalyzer/utils';
 
-interface GeocodeResult {
+export interface GeocodeResult {
   lat: number;
   lng: number;
   formatted_address?: string;
