@@ -294,8 +294,7 @@ export async function POST() {
                     address: deal.extractedProperty?.address || deal.subject,
                     price: deal.extractedProperty?.price || 0,
                   },
-                },
-                userEmail
+                }
               );
             } catch (error) {
               // Don't fail the sync if notification fails
