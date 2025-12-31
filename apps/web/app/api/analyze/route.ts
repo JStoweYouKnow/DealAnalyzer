@@ -149,8 +149,7 @@ export async function POST(request: NextRequest) {
               address: analysisData.property.address,
               meetsCriteria: analysisData.meetsCriteria,
             },
-          },
-          userEmail
+          }
         );
 
         // Send criteria match notification if property meets criteria
@@ -171,8 +170,7 @@ export async function POST(request: NextRequest) {
                 cocReturn: analysisData.cocReturn,
                 capRate: analysisData.capRate,
               },
-            },
-            userEmail
+            }
           );
         }
       }
