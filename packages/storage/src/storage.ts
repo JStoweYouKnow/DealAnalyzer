@@ -1368,13 +1368,13 @@ function initializeStorage(): IStorage {
 }
 
 // Lazy getter - initializes on first access
-export const storage = new Proxy({} as IStorage, {
+export const storage: IStorage = new Proxy({} as IStorage, {
   get(_target, prop) {
     const storageInstance = initializeStorage();
     const value = (storageInstance as any)[prop];
     return typeof value === 'function' ? value.bind(storageInstance) : value;
   }
-});
+}) as IStorage;
 
 // Lazy import Convex storage to avoid errors when not configured
 async function getConvexStorage() {
