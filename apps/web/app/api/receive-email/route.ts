@@ -4,9 +4,21 @@ import { createHash, createVerify } from 'crypto';
 import OpenAI from 'openai';
 import { createSafeEmailLog } from '../../lib/pii-redaction';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization of OpenAI client to ensure environment variables are loaded first
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('The OPENAI_API_KEY environment variable is missing or empty; either provide it, or instantiate the OpenAI client with an apiKey option, like new OpenAI({ apiKey: \'My API Key\' }).');
+    }
+    openaiClient = new OpenAI({
+      apiKey: apiKey,
+    });
+  }
+  return openaiClient;
+}
 
 /**
  * Wraps a promise with a timeout using Promise.race
@@ -213,7 +225,7 @@ async function extractPropertyFromEmail(subject: string, emailContent: string): 
     // Truncate email content to avoid token limits
     const truncatedContent = emailContent.substring(0, 10000);
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
