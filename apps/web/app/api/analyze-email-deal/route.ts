@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
               stringMatch: String(d.id) === String(dealId),
               trimMatch: d.id?.trim() === dealId?.trim(),
               indexOfMatch: dealIds.indexOf(dealId),
-              charByChar: d.id.split('').map((c: string, i) => ({ char: c, match: c === dealId[i] })).slice(0, 10),
+              charByChar: d.id.split('').map((c: string, i: number) => ({ char: c, match: c === dealId[i] })).slice(0, 10),
             }))
           );
         }
