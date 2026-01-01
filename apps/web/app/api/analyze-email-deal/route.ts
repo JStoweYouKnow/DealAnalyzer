@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
     
     // Ensure purchasePrice is set in propertyData (extractedProperty may have 'price' instead of 'purchasePrice')
     // This handles the case where extractedProperty has 'price' but analyzeProperty expects 'purchasePrice'
-    const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || propertyData.price || emailDeal.extractedProperty?.price || 0;
+    const purchasePrice = propertyData.purchase_price || propertyData.purchasePrice || emailDeal.extractedProperty?.price || 0;
     if (purchasePrice > 0) {
       propertyData.purchasePrice = purchasePrice;
       propertyData.purchase_price = purchasePrice;
