@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import type { Credentials } from 'google-auth-library';
 import type { DealAnalysis } from '@dealanalyzer/types';
 import { aiQualityScoringService } from './ai-scoring-service';
 
@@ -259,7 +260,7 @@ export class EmailMonitoringService {
   }
 
   // Exchange authorization code for tokens
-  async getTokens(code: string) {
+  async getTokens(code: string): Promise<Credentials> {
     const auth = new google.auth.OAuth2(
       process.env.GMAIL_CLIENT_ID,
       process.env.GMAIL_CLIENT_SECRET,
