@@ -1,5 +1,5 @@
 {
   "buildCommand": "pnpm build:vercel",
-  "installCommand": "pnpm install --frozen-lockfile",
+  "installCommand": "pnpm install --no-frozen-lockfile",
   "outputDirectory": "apps/web/.next"
 }
