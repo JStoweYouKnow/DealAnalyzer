@@ -11,6 +11,9 @@ importers:
       '@turbo/gen':
         specifier: ^2.3.4
         version: 2.7.2(@types/node@25.0.3)(typescript@5.9.3)
+      next:
+        specifier: 16.0.7
+        version: 16.0.7(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       prettier:
         specifier: ^3.4.2
         version: 3.7.4
@@ -9994,7 +9997,7 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
       chalk: 2.4.2
       js-tokens: 4.0.0
-      picocolors: 1.0.1
+      picocolors: 1.1.1
 
   '@babel/parser@7.28.5':
     dependencies:
