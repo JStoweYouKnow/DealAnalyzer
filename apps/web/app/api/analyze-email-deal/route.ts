@@ -315,7 +315,7 @@ export async function POST(request: NextRequest) {
     
     // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
     // Use fundingSource from request, or from propertyData, or default to 'conventional'
-    let propertyFundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
+    let propertyFundingSource = fundingSource || propertyData.fundingSource || 'conventional';
     // Validate that propertyFundingSource exists as a key in FUNDING_SOURCE_DOWN_PAYMENTS
     if (!Object.prototype.hasOwnProperty.call(FUNDING_SOURCE_DOWN_PAYMENTS, propertyFundingSource)) {
       propertyFundingSource = 'conventional';
