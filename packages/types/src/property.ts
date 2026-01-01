@@ -2,14 +2,15 @@ import { z } from "zod";
 
 // Funding source types with associated down payment percentages
 export const fundingSourceSchema = z.enum(['conventional', 'fha', 'va', 'dscr', 'cash']);
+export type FundingSource = z.infer<typeof fundingSourceSchema>;
 
-export const FUNDING_SOURCE_DOWN_PAYMENTS = {
+export const FUNDING_SOURCE_DOWN_PAYMENTS: Record<FundingSource, number> = {
   conventional: 0.05,  // 5%
   fha: 0.035,          // 3.5%
   va: 0.00,            // 0%
   dscr: 0.20,          // 20%
   cash: 0.00,          // 0% (no mortgage)
-} as const;
+};
 
 // Property data schema
 export const propertySchema = z.object({
@@ -63,7 +64,6 @@ export const mortgageValuesSchema = z.object({
 export const insertPropertySchema = propertySchema.omit({ id: true });
 
 // Export types
-export type FundingSource = z.infer<typeof fundingSourceSchema>;
 export type Property = z.infer<typeof propertySchema>;
 export type MortgageValues = z.infer<typeof mortgageValuesSchema>;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
