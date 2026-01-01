@@ -1,22 +1,22 @@
 // Property exports
 // Property exports
-export * from "./property";
-export { 
-  fundingSourceSchema, 
-  FUNDING_SOURCE_DOWN_PAYMENTS, 
-  propertySchema, 
-  mortgageValuesSchema, 
-  insertPropertySchema 
-} from "./property";
-export type { 
-  Property, 
-  FundingSource, 
-  MortgageValues, 
-  InsertProperty 
-} from "./property";
+export * from "./property.js";
+export {
+  fundingSourceSchema,
+  FUNDING_SOURCE_DOWN_PAYMENTS,
+  propertySchema,
+  mortgageValuesSchema,
+  insertPropertySchema
+} from "./property.js";
+export type {
+  Property,
+  FundingSource,
+  MortgageValues,
+  InsertProperty
+} from "./property.js";
 
 // Analysis exports
-export * from "./analysis";
+export * from "./analysis.js";
 export type {
   DealAnalysis,
   AIAnalysis,
@@ -27,14 +27,14 @@ export type {
   InsertDealAnalysis,
   InsertPropertyClassification,
   InsertPhotoAnalysis
-} from "./analysis";
+} from "./analysis.js";
 
 // Email exports
-export * from "./email";
-export type { EmailDeal } from "./email";
+export * from "./email.js";
+export type { EmailDeal } from "./email.js";
 
 // Market exports
-export * from "./market";
+export * from "./market.js";
 export type {
   NeighborhoodTrend,
   ComparableSale,
@@ -54,11 +54,11 @@ export type {
   InsertRentPricingRecommendation,
   InsertInvestmentTimingAdvice,
   InsertAnalysisTemplate
-} from "./market";
+} from "./market.js";
 
 // Export/Import exports
-export * from "./export";
+export * from "./export.js";
 export type {
   ApiIntegration,
   InsertApiIntegration
-} from "./export";
+} from "./export.js";
