@@ -1,5 +1,9 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import bundleAnalyzer from "@next/bundle-analyzer";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
@@ -10,6 +14,8 @@ const nextConfig = {
   reactStrictMode: true,
   // Enable compression for better performance
   compress: true,
+  // Standalone output for better monorepo support on Vercel
+  output: 'standalone',
   // Transpile workspace packages
   transpilePackages: [
     '@dealanalyzer/types',
@@ -27,6 +33,8 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '50mb',
     },
+    // Ensure dependencies from other workspace packages are traced correctly
+    outputFileTracingRoot: path.join(__dirname, '../../'),
     // Optimize package imports - tree-shake large libraries
     optimizePackageImports: [
       'lucide-react',
@@ -70,18 +78,7 @@ const nextConfig = {
   },
   serverExternalPackages: [
     "puppeteer-core", 
-    "@sparticuz/chromium-min", 
-    "axios", 
-    "rimraf", 
-    "dotenv", 
-    "express", 
-    "express-session", 
-    "connect-redis", 
-    "vite", 
-    "multer", 
-    "google-auth-library",
-    "csv-parse",
-    "convex"
+    "@sparticuz/chromium-min"
   ],
   // Ensure chromium-min package files (including brotli files) are included only for routes that use puppeteer
   outputFileTracingIncludes: {
