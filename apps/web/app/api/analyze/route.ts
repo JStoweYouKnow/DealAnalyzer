@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const propertyData = parseEmailContent(emailContent);
 
     // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
-    let propertyFundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
+    let propertyFundingSource = fundingSource || 'conventional';
     // Validate that propertyFundingSource exists as a key in FUNDING_SOURCE_DOWN_PAYMENTS
     if (!Object.prototype.hasOwnProperty.call(FUNDING_SOURCE_DOWN_PAYMENTS, propertyFundingSource)) {
       propertyFundingSource = 'conventional';
