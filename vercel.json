@@ -1,6 +1,6 @@
 {
-  "buildCommand": "bash build-vercel.sh",
+  "buildCommand": "pnpm build:vercel",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "outputDirectory": "apps/web/.next",
-  "framework": null
+  "framework": "nextjs"
 }
