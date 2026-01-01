@@ -17,7 +17,17 @@ export type {
 
 // Analysis exports
 export * from "./analysis";
-export type { DealAnalysis, AIAnalysis } from "./analysis";
+export type {
+  DealAnalysis,
+  AIAnalysis,
+  CriteriaResponse,
+  PropertyComparison,
+  PropertyClassification,
+  PhotoAnalysis,
+  InsertDealAnalysis,
+  InsertPropertyClassification,
+  InsertPhotoAnalysis
+} from "./analysis";
 
 // Email exports
 export * from "./email";
@@ -42,8 +52,13 @@ export type {
   InsertNaturalLanguageSearch,
   InsertSmartPropertyRecommendation,
   InsertRentPricingRecommendation,
-  InsertInvestmentTimingAdvice
+  InsertInvestmentTimingAdvice,
+  InsertAnalysisTemplate
 } from "./market";
 
 // Export/Import exports
 export * from "./export";
+export type {
+  ApiIntegration,
+  InsertApiIntegration
+} from "./export";
