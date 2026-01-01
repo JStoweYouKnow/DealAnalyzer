@@ -68,7 +68,21 @@ const nextConfig = {
       '@tanstack/react-query',
     ],
   },
-  serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium-min", "axios", "rimraf"],
+  serverExternalPackages: [
+    "puppeteer-core", 
+    "@sparticuz/chromium-min", 
+    "axios", 
+    "rimraf", 
+    "dotenv", 
+    "express", 
+    "express-session", 
+    "connect-redis", 
+    "vite", 
+    "multer", 
+    "google-auth-library",
+    "csv-parse",
+    "convex"
+  ],
   // Ensure chromium-min package files (including brotli files) are included only for routes that use puppeteer
   outputFileTracingIncludes: {
     '/api/generate-report/**/*': [
