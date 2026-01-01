@@ -63,8 +63,8 @@ async function getPdfParse() {
       pdfParse = require('pdf-parse');
     } catch {
       // Fallback to dynamic import if require fails
-      const pdfParseModule = await import('pdf-parse');
-      pdfParse = (pdfParseModule as any).default || pdfParseModule.PDFParse || pdfParseModule;
+      const pdfParseModule = await import('pdf-parse') as any;
+      pdfParse = pdfParseModule.default || pdfParseModule.PDFParse || pdfParseModule;
     }
   }
   return pdfParse;
