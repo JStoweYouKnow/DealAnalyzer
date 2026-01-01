@@ -153,8 +153,8 @@ export async function POST(request: NextRequest) {
               
               // Fetch mortgage rate
               
-              // fundingSource is in propertyData after merge (normalized to camelCase), or default to 'conventional'
-              const propertyFundingSource = propertyData.fundingSource || 'conventional';
+              // Use default funding source
+              const propertyFundingSource = 'conventional';
               // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
               const downpaymentPercentage = FUNDING_SOURCE_DOWN_PAYMENTS[propertyFundingSource as keyof typeof FUNDING_SOURCE_DOWN_PAYMENTS] ?? 0.20;
               const downpayment = purchasePrice * downpaymentPercentage;

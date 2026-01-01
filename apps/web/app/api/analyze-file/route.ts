@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Use funding source to determine down payment percentage (same logic as in analyzeProperty)
-    const propertyFundingSource = fundingSource || propertyData.funding_source || propertyData.fundingSource || 'conventional';
+    const propertyFundingSource = fundingSource || 'conventional';
     
     // Use mortgage calculator values if provided, otherwise fetch mortgage rate
     // Note: mortgageRate should be passed directly as a decimal if provided
