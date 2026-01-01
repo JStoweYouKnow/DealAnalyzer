@@ -8,7 +8,9 @@
     "declarationMap": true,
     "lib": ["es2017"],
     "jsx": "preserve",
-    "types": []
+    "types": [],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
