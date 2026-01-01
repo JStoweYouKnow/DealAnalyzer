@@ -1367,14 +1367,95 @@ function initializeStorage(): IStorage {
   return globalForStorage.storageInstance;
 }
 
-// Lazy getter - initializes on first access
-export const storage: IStorage = new Proxy({} as IStorage, {
-  get(_target, prop) {
-    const storageInstance = initializeStorage();
-    const value = (storageInstance as any)[prop];
-    return typeof value === 'function' ? value.bind(storageInstance) : value;
-  }
-}) as IStorage;
+// Lazy wrapper - initializes on first access and delegates all methods
+function createLazyStorage(): IStorage {
+  return {
+    // Property methods
+    getProperty: (id: string) => initializeStorage().getProperty(id),
+    createProperty: (property: any) => initializeStorage().createProperty(property),
+
+    // Deal analysis methods
+    getDealAnalysis: (id: string) => initializeStorage().getDealAnalysis(id),
+    createDealAnalysis: (analysis: any) => initializeStorage().createDealAnalysis(analysis),
+    updateDealAnalysis: (id: string, analysis: any) => initializeStorage().updateDealAnalysis(id, analysis),
+    findAnalysisByPropertyAddress: (address: string) => initializeStorage().findAnalysisByPropertyAddress(address),
+    getAnalysisHistory: () => initializeStorage().getAnalysisHistory(),
+
+    // Email deal methods
+    getEmailDeals: (userId?: string) => initializeStorage().getEmailDeals(userId),
+    getEmailDeal: (id: string, userId?: string) => initializeStorage().getEmailDeal(id, userId),
+    createEmailDeal: (deal: any) => initializeStorage().createEmailDeal(deal),
+    updateEmailDeal: (id: string, updates: any, userId?: string) => initializeStorage().updateEmailDeal(id, updates, userId),
+    deleteEmailDeal: (id: string, userId?: string) => initializeStorage().deleteEmailDeal(id, userId),
+    findEmailDealByContentHash: (contentHash: string, userId?: string) => initializeStorage().findEmailDealByContentHash(contentHash, userId),
+
+    // Comparison methods
+    createComparison: (propertyIds: string[], name?: string) => initializeStorage().createComparison(propertyIds, name),
+    getComparison: (id: string) => initializeStorage().getComparison(id),
+    getComparisons: () => initializeStorage().getComparisons(),
+    deleteComparison: (id: string) => initializeStorage().deleteComparison(id),
+
+    // Market Intelligence methods
+    getNeighborhoodTrends: (city?: string, state?: string) => initializeStorage().getNeighborhoodTrends(city, state),
+    getNeighborhoodTrend: (id: string) => initializeStorage().getNeighborhoodTrend(id),
+    createNeighborhoodTrend: (trend: any) => initializeStorage().createNeighborhoodTrend(trend),
+    updateNeighborhoodTrend: (id: string, updates: any) => initializeStorage().updateNeighborhoodTrend(id, updates),
+    getComparableSales: (address: string, radius?: number) => initializeStorage().getComparableSales(address, radius),
+    getComparableSale: (id: string) => initializeStorage().getComparableSale(id),
+    createComparableSale: (sale: any) => initializeStorage().createComparableSale(sale),
+    getMarketHeatMapData: (bounds?: any) => initializeStorage().getMarketHeatMapData(bounds),
+    getMarketHeatMapDataByZip: (zipCode: string) => initializeStorage().getMarketHeatMapDataByZip(zipCode),
+    createMarketHeatMapData: (data: any) => initializeStorage().createMarketHeatMapData(data),
+    updateMarketHeatMapData: (id: string, updates: any) => initializeStorage().updateMarketHeatMapData(id, updates),
+
+    // Advanced Filtering & Search methods
+    getSavedFilters: () => initializeStorage().getSavedFilters(),
+    getSavedFilter: (id: string) => initializeStorage().getSavedFilter(id),
+    createSavedFilter: (filter: any) => initializeStorage().createSavedFilter(filter),
+    updateSavedFilter: (id: string, updates: any) => initializeStorage().updateSavedFilter(id, updates),
+    deleteSavedFilter: (id: string) => initializeStorage().deleteSavedFilter(id),
+    incrementFilterUsage: (id: string) => initializeStorage().incrementFilterUsage(id),
+    searchNaturalLanguage: (query: string, userId?: string) => initializeStorage().searchNaturalLanguage(query, userId),
+    getSearchHistory: (userId?: string) => initializeStorage().getSearchHistory(userId),
+    getPropertyClassification: (propertyId: string) => initializeStorage().getPropertyClassification(propertyId),
+    createPropertyClassification: (classification: any) => initializeStorage().createPropertyClassification(classification),
+    updatePropertyClassification: (propertyId: string, updates: any) => initializeStorage().updatePropertyClassification(propertyId, updates),
+    searchProperties: (filters: any) => initializeStorage().searchProperties(filters),
+
+    // AI Recommendations methods
+    getSmartPropertyRecommendations: (sourcePropertyId: string) => initializeStorage().getSmartPropertyRecommendations(sourcePropertyId),
+    createSmartPropertyRecommendation: (recommendation: any) => initializeStorage().createSmartPropertyRecommendation(recommendation),
+    getRentPricingRecommendation: (propertyId: string) => initializeStorage().getRentPricingRecommendation(propertyId),
+    createRentPricingRecommendation: (recommendation: any) => initializeStorage().createRentPricingRecommendation(recommendation),
+    updateRentPricingRecommendation: (id: string, updates: any) => initializeStorage().updateRentPricingRecommendation(id, updates),
+    getInvestmentTimingAdvice: (propertyId: string) => initializeStorage().getInvestmentTimingAdvice(propertyId),
+    createInvestmentTimingAdvice: (advice: any) => initializeStorage().createInvestmentTimingAdvice(advice),
+    updateInvestmentTimingAdvice: (id: string, updates: any) => initializeStorage().updateInvestmentTimingAdvice(id, updates),
+
+    // Templates & Presets methods
+    getAnalysisTemplates: () => initializeStorage().getAnalysisTemplates(),
+    getAnalysisTemplate: (id: string) => initializeStorage().getAnalysisTemplate(id),
+    createAnalysisTemplate: (template: any) => initializeStorage().createAnalysisTemplate(template),
+    updateAnalysisTemplate: (id: string, updates: any) => initializeStorage().updateAnalysisTemplate(id, updates),
+    deleteAnalysisTemplate: (id: string) => initializeStorage().deleteAnalysisTemplate(id),
+    getDefaultTemplates: () => initializeStorage().getDefaultTemplates(),
+
+    // API Integration methods
+    createApiIntegration: (integration: any) => initializeStorage().createApiIntegration(integration),
+    getUserApiIntegrations: (userId: string) => initializeStorage().getUserApiIntegrations(userId),
+    getApiIntegration: (id: string) => initializeStorage().getApiIntegration(id),
+    updateApiIntegration: (id: string, updates: any) => initializeStorage().updateApiIntegration(id, updates),
+    deleteApiIntegration: (id: string) => initializeStorage().deleteApiIntegration(id),
+
+    // Photo Analysis methods
+    getPhotoAnalyses: (propertyId: string) => initializeStorage().getPhotoAnalyses(propertyId),
+    getPhotoAnalysis: (id: string) => initializeStorage().getPhotoAnalysis(id),
+    createPhotoAnalysis: (analysis: any) => initializeStorage().createPhotoAnalysis(analysis),
+    deletePhotoAnalysis: (id: string) => initializeStorage().deletePhotoAnalysis(id),
+  };
+}
+
+export const storage: IStorage = createLazyStorage();
 
 // Lazy import Convex storage to avoid errors when not configured
 async function getConvexStorage() {
