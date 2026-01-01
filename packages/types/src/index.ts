@@ -25,6 +25,25 @@ export type { EmailDeal } from "./email";
 
 // Market exports
 export * from "./market";
+export type {
+  NeighborhoodTrend,
+  ComparableSale,
+  MarketHeatMapData,
+  SavedFilter,
+  NaturalLanguageSearch,
+  SmartPropertyRecommendation,
+  RentPricingRecommendation,
+  InvestmentTimingAdvice,
+  AnalysisTemplate,
+  InsertNeighborhoodTrend,
+  InsertComparableSale,
+  InsertMarketHeatMapData,
+  InsertSavedFilter,
+  InsertNaturalLanguageSearch,
+  InsertSmartPropertyRecommendation,
+  InsertRentPricingRecommendation,
+  InsertInvestmentTimingAdvice
+} from "./market";
 
 // Export/Import exports
 export * from "./export";
