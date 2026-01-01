@@ -16,6 +16,16 @@ const nextConfig = {
   compress: true,
   // Standalone output for better monorepo support on Vercel
   output: 'standalone',
+  // Ensure dependencies from other workspace packages are traced correctly
+  outputFileTracingRoot: path.join(__dirname, '../../'),
+  // Exclude large folders from tracing to avoid package size issues
+  outputFileTracingExcludes: {
+    '*': [
+      'node_modules/@next/swc-linux-x64-gnu',
+      'node_modules/@next/swc-linux-x64-musl',
+      'node_modules/@esbuild/linux-x64',
+    ],
+  },
   // Transpile workspace packages
   transpilePackages: [
     '@dealanalyzer/types',
@@ -33,8 +43,6 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '50mb',
     },
-    // Ensure dependencies from other workspace packages are traced correctly
-    outputFileTracingRoot: path.join(__dirname, '../../'),
     // Optimize package imports - tree-shake large libraries
     optimizePackageImports: [
       'lucide-react',
