@@ -1,14 +1,15 @@
 // Property exports
-export * from "./property.js";
+// Property exports
+export * from "./property";
 
 // Analysis exports
-export * from "./analysis.js";
+export * from "./analysis";
 
 // Email exports
-export * from "./email.js";
+export * from "./email";
 
 // Market exports
-export * from "./market.js";
+export * from "./market";
 
 // Export/Import exports
-export * from "./export.js";
+export * from "./export";
