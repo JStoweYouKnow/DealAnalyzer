@@ -1,5 +1,5 @@
 import type { NeighborhoodTrend, ComparableSale, MarketHeatMapData } from '@dealanalyzer/types';
-import { rentCastCache } from './cache';
+import { rentCastCache } from './cache.js';
 import { logger, fetchWithTimeout, TIMEOUTS } from '@dealanalyzer/utils';
 
 interface RentCastPropertyData {

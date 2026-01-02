@@ -1,4 +1,4 @@
-import { geocodingCache } from './cache';
+import { geocodingCache } from './cache.js';
 import { logger } from '@dealanalyzer/utils';
 
 export interface GeocodeResult {
