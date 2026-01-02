@@ -4,20 +4,15 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "composite": true,
+    "declaration": true,
+    "declarationMap": true,
     "lib": ["es2017", "dom"],
     "types": ["node"],
-    "moduleResolution": "NodeNext",
-    "module": "NodeNext",
-    "baseUrl": ".",
-    "paths": {
-      "@dealanalyzer/types": ["../types/dist/index.d.ts"],
-      "@dealanalyzer/types/*": ["../types/dist/*.d.ts"],
-      "@dealanalyzer/utils": ["../utils/dist/index.d.ts"],
-      "@dealanalyzer/utils/*": ["../utils/dist/*.d.ts"]
-    }
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "../types", "../utils", "../**/dist"],
+  "exclude": ["node_modules", "dist"],
   "references": [
     { "path": "../types" },
     { "path": "../utils" }
