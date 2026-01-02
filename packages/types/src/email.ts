@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dealAnalysisSchema } from "./analysis.js";
+import { dealAnalysisSchema } from "./analysis";
 
 // Email Deal schemas
 export const emailDealStatus = z.enum(['new', 'reviewed', 'analyzed', 'archived']);
