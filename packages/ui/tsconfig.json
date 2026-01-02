@@ -2,8 +2,6 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
-    "composite": false,
     "jsx": "react-jsx",
     "lib": ["dom", "dom.iterable", "esnext"],
     "declaration": true,
@@ -14,8 +12,5 @@
     "moduleResolution": "Bundler"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"],
-  "references": [
-    { "path": "../types" }
-  ]
+  "exclude": ["node_modules", "dist"]
 }

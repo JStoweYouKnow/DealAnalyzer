@@ -1,1 +1,1 @@
-export * from "./property-analyzer.js";
+export * from "./property-analyzer";

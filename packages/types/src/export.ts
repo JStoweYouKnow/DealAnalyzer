@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { propertySchema } from "./property.js";
+import { propertySchema } from "./property";
 
 // Import/Export & BiggerPockets Integration schemas
 export const biggerPocketsImportSchema = z.object({
