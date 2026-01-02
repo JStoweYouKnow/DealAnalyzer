@@ -2,13 +2,21 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    
+    "rootDir": "./src",
     "declaration": true,
     "declarationMap": true,
     "lib": ["es2017", "dom"],
     "types": ["node"],
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@dealanalyzer/types": ["../types/dist/index"],
+      "@dealanalyzer/types/*": ["../types/dist/*"],
+      "@dealanalyzer/utils": ["../utils/dist/index"],
+      "@dealanalyzer/utils/*": ["../utils/dist/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

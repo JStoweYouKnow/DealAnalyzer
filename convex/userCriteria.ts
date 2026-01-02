@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import type { CriteriaResponse } from "../packages/types/src/index";
+import type { CriteriaResponse } from "@dealanalyzer/types";
 
 // Default criteria (same as in criteria-service.ts)
 const DEFAULT_CRITERIA = {
