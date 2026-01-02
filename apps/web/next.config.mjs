@@ -14,8 +14,6 @@ const nextConfig = {
   reactStrictMode: true,
   // Enable compression for better performance
   compress: true,
-  // Standalone output for better monorepo support on Vercel
-  output: 'standalone',
   // Ensure dependencies from other workspace packages are traced correctly
   outputFileTracingRoot: path.join(__dirname, '../../'),
   // Exclude large folders from tracing to avoid package size issues
