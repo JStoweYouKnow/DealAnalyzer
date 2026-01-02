@@ -108,11 +108,13 @@ export function Reports({ analyses, comparisonList }: ReportsProps) {
         }));
 
         // Update local map for quick id translation
-        results.forEach((stored) => {
+        results.forEach((stored: DealAnalysis) => {
           // Find the corresponding UI key(s) that referenced this analysis
           const matchingEntries = [...idToAnalysis.entries()].filter(([, a]) => a.propertyId === stored.propertyId);
           for (const [uiId] of matchingEntries) {
-            persistedIdMap.set(uiId, (stored as any).id);
+            if (stored.id) {
+              persistedIdMap.set(uiId, stored.id);
+            }
           }
         });
       }

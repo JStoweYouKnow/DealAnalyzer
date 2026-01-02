@@ -77,7 +77,7 @@ export function AIInsights({ aiAnalysis }: AIInsightsProps) {
                   Strengths
                 </h5>
                 <ul className="space-y-1">
-                  {aiAnalysis.propertyAssessment.strengths.map((strength, index) => (
+                  {aiAnalysis.propertyAssessment.strengths.map((strength: string, index: number) => (
                     <li key={index} className="text-sm text-muted-foreground flex items-start">
                       <i className="fas fa-plus text-green-600 mr-2 mt-1 text-xs"></i>
                       {strength}
@@ -94,7 +94,7 @@ export function AIInsights({ aiAnalysis }: AIInsightsProps) {
                   Red Flags
                 </h5>
                 <ul className="space-y-1">
-                  {aiAnalysis.propertyAssessment.redFlags.map((flag, index) => (
+                  {aiAnalysis.propertyAssessment.redFlags.map((flag: string, index: number) => (
                     <li key={index} className="text-sm text-muted-foreground flex items-start">
                       <i className="fas fa-minus text-red-600 mr-2 mt-1 text-xs"></i>
                       {flag}
@@ -139,7 +139,7 @@ export function AIInsights({ aiAnalysis }: AIInsightsProps) {
               <div>
                 <h5 className="font-medium text-card-foreground mb-2">Market Trends</h5>
                 <ul className="space-y-1">
-                  {aiAnalysis.marketIntelligence.marketTrends.map((trend, index) => (
+                  {aiAnalysis.marketIntelligence.marketTrends.map((trend: string, index: number) => (
                     <li key={index} className="text-sm text-muted-foreground flex items-start">
                       <i className="fas fa-chart-line text-primary mr-2 mt-1 text-xs"></i>
                       {trend}
@@ -179,7 +179,7 @@ export function AIInsights({ aiAnalysis }: AIInsightsProps) {
               <div>
                 <h5 className="font-medium text-card-foreground mb-2">Key Reasoning</h5>
                 <ul className="space-y-1">
-                  {aiAnalysis.investmentRecommendation.reasoning.map((reason, index) => (
+                  {aiAnalysis.investmentRecommendation.reasoning.map((reason: string, index: number) => (
                     <li key={index} className="text-sm text-muted-foreground flex items-start">
                       <i className="fas fa-lightbulb text-yellow-600 mr-2 mt-1 text-xs"></i>
                       {reason}
@@ -217,7 +217,7 @@ export function AIInsights({ aiAnalysis }: AIInsightsProps) {
               <div>
                 <h5 className="font-medium text-card-foreground mb-2">Key Risks to Monitor</h5>
                 <ul className="space-y-1">
-                  {aiAnalysis.predictiveAnalysis.keyRisks.map((risk, index) => (
+                  {aiAnalysis.predictiveAnalysis.keyRisks.map((risk: string, index: number) => (
                     <li key={index} className="text-sm text-muted-foreground flex items-start">
                       <i className="fas fa-shield-alt text-orange-600 mr-2 mt-1 text-xs"></i>
                       {risk}

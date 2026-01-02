@@ -1767,8 +1767,8 @@ export default function DealsPage() {
                             <div className="mt-4">
                               <span className="text-sm text-muted-foreground">Property Images:</span>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                                {deal.extractedProperty.imageUrls.slice(0, 3).map((imageUrl, index) => {
-                                  const imageScore = deal.extractedProperty?.imageScores?.find(img => img.url === imageUrl);
+                                {deal.extractedProperty.imageUrls.slice(0, 3).map((imageUrl: string, index: number) => {
+                                  const imageScore = deal.extractedProperty?.imageScores?.find((img: { url: string; aiScore?: number; aiCategory?: string; aiReasoning?: string }) => img.url === imageUrl);
                                   return (
                                     <div key={index} className="relative aspect-square">
                                       <img

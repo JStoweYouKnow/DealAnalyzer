@@ -158,7 +158,7 @@ export function AnalysisViewer({ analysis }: AnalysisViewerProps) {
                 <div>
                   <h4 className="font-medium mb-2 text-green-600">Strengths</h4>
                   <ul className="list-disc list-inside space-y-1">
-                    {analysis.aiAnalysis.propertyAssessment.strengths.map((strength, idx) => (
+                    {analysis.aiAnalysis.propertyAssessment.strengths.map((strength: string, idx: number) => (
                       <li key={idx} className="text-sm text-muted-foreground">{strength}</li>
                     ))}
                   </ul>
@@ -169,7 +169,7 @@ export function AnalysisViewer({ analysis }: AnalysisViewerProps) {
                 <div>
                   <h4 className="font-medium mb-2 text-red-600">Red Flags</h4>
                   <ul className="list-disc list-inside space-y-1">
-                    {analysis.aiAnalysis.propertyAssessment.redFlags.map((flag, idx) => (
+                    {analysis.aiAnalysis.propertyAssessment.redFlags.map((flag: string, idx: number) => (
                       <li key={idx} className="text-sm text-muted-foreground">{flag}</li>
                     ))}
                   </ul>
@@ -209,7 +209,7 @@ export function AnalysisViewer({ analysis }: AnalysisViewerProps) {
                 <div>
                   <h4 className="font-medium mb-2">Reasoning</h4>
                   <ul className="list-disc list-inside space-y-1">
-                    {analysis.aiAnalysis.investmentRecommendation.reasoning.map((reason, idx) => (
+                    {analysis.aiAnalysis.investmentRecommendation.reasoning.map((reason: string, idx: number) => (
                       <li key={idx} className="text-sm text-muted-foreground">{reason}</li>
                     ))}
                   </ul>
@@ -244,7 +244,7 @@ export function AnalysisViewer({ analysis }: AnalysisViewerProps) {
                 <div>
                   <h4 className="font-medium mb-2">Market Trends</h4>
                   <ul className="list-disc list-inside space-y-1">
-                    {analysis.aiAnalysis.marketIntelligence.marketTrends.map((trend, idx) => (
+                    {analysis.aiAnalysis.marketIntelligence.marketTrends.map((trend: string, idx: number) => (
                       <li key={idx} className="text-sm text-muted-foreground">{trend}</li>
                     ))}
                   </ul>
@@ -279,7 +279,7 @@ export function AnalysisViewer({ analysis }: AnalysisViewerProps) {
                 <div>
                   <h4 className="font-medium mb-2 text-yellow-600">Key Risks</h4>
                   <ul className="list-disc list-inside space-y-1">
-                    {analysis.aiAnalysis.predictiveAnalysis.keyRisks.map((risk, idx) => (
+                    {analysis.aiAnalysis.predictiveAnalysis.keyRisks.map((risk: string, idx: number) => (
                       <li key={idx} className="text-sm text-muted-foreground">{risk}</li>
                     ))}
                   </ul>

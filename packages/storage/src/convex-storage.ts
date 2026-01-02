@@ -718,7 +718,8 @@ class ConvexStorageImpl implements ConvexStorage {
 let convexStorageInstance: ConvexStorage | null = null;
 let convexStorageInitError: Error | null = null;
 
-export const convexStorage = (() => {
+// Lazy getter function to avoid initialization during build time
+export function getConvexStorage(): ConvexStorage {
   if (convexStorageInstance) {
     return convexStorageInstance;
   }
@@ -738,4 +739,11 @@ export const convexStorage = (() => {
     });
     throw convexStorageInitError;
   }
-})();
+}
+
+// Export a getter that can be used for compatibility
+export const convexStorage = new Proxy({} as ConvexStorage, {
+  get(_target, prop) {
+    return getConvexStorage()[prop as keyof ConvexStorage];
+  }
+});

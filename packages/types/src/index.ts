@@ -20,7 +20,9 @@ export * from "./analysis.js";
 export type {
   DealAnalysis,
   AIAnalysis,
+  AnalyzePropertyResponse,
   CriteriaResponse,
+  ConfigurableCriteria,
   PropertyComparison,
   PropertyClassification,
   PhotoAnalysis,
@@ -31,7 +33,7 @@ export type {
 
 // Email exports
 export * from "./email.js";
-export type { EmailDeal } from "./email.js";
+export type { EmailDeal, EmailMonitoringResponse } from "./email.js";
 
 // Market exports
 export * from "./market.js";
