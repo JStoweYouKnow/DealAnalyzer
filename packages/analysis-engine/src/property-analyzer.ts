@@ -1,7 +1,7 @@
 // TypeScript property analyzer to replace Python backend for Vercel deployment
 import type { Property, FundingSource, MortgageValues } from "@dealanalyzer/types";
 import { FUNDING_SOURCE_DOWN_PAYMENTS } from "@dealanalyzer/types";
-import { parseEmailContentOptimized } from './optimizations';
+import { parseEmailContentOptimized } from './optimizations.js';
 import { logger } from "@dealanalyzer/utils";
 
 export interface PropertyAnalysis {

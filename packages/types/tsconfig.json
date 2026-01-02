@@ -9,8 +9,8 @@
     "lib": ["es2017"],
     "jsx": "preserve",
     "types": [],
-    "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

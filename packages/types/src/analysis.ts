@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { propertySchema, fundingSourceSchema, mortgageValuesSchema } from "./property";
+import { propertySchema, fundingSourceSchema, mortgageValuesSchema } from "./property.js";
 
 // AI Analysis schema
 export const aiAnalysisSchema = z.object({

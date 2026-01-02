@@ -1461,7 +1461,7 @@ export const storage: IStorage = createLazyStorage();
 async function getConvexStorage() {
   if (!globalForStorage.convexStorage) {
     try {
-      const { convexStorage } = await import("./convex-storage");
+      const { convexStorage } = await import("./convex-storage.js");
       globalForStorage.convexStorage = convexStorage;
       console.log('[Storage] Convex storage module loaded successfully');
     } catch (error) {

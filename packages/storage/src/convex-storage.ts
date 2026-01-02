@@ -1,6 +1,6 @@
 import { ConvexHttpClient } from "convex/browser";
 import { EmailDeal, PhotoAnalysis, DealAnalysis } from "@dealanalyzer/types";
-import { IStorage } from "./storage";
+import { IStorage } from "./storage.js";
 import { logger } from "@dealanalyzer/utils";
 
 // Conditional imports for Convex API - only when generated files exist

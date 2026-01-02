@@ -1,3 +1,3 @@
-export * from "./storage";
-export * from "./convex-storage";
-export * from "./blob-storage";
+export * from "./storage.js";
+export * from "./convex-storage.js";
+export * from "./blob-storage.js";
