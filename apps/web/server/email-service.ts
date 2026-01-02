@@ -19,7 +19,9 @@ async function initializeConvexForTokens() {
     }
 
     if (!convexApi) {
-      const apiModule = await import('../../convex/_generated/api');
+      // Use Function constructor to prevent static analysis by bundlers
+      const importFn = new Function('p', 'return import(p)');
+      const apiModule = await importFn('../../../convex/_generated/api');
       convexApi = apiModule.api;
     }
 

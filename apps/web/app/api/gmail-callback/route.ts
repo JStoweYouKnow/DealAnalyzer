@@ -213,9 +213,12 @@ export async function GET(request: NextRequest) {
 
     if (!refreshToken && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
       try {
-        const { ConvexHttpClient } = await import('convex/browser');
-        const apiModule = await import('../../../../../convex/_generated/api');
-        const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+        const { getConvexForApiRoute } = await import('@/lib/convex-client');
+        const { client: convexClient, api: apiModule } = await getConvexForApiRoute('../../../../..');
+        if (!convexClient || !apiModule) {
+          console.warn('[Gmail Callback] Convex not available for token retrieval');
+          throw new Error('Convex not available');
+        }
 
         const dbTokens = await convexClient.action(
           apiModule.api.userOAuthTokens.retrieveTokensForServer,
@@ -290,9 +293,15 @@ export async function GET(request: NextRequest) {
         console.log('[Gmail Callback] 💾 Attempting to persist tokens to Convex for user:', userId);
         // Initialize Convex client for token persistence
         if (process.env.NEXT_PUBLIC_CONVEX_URL) {
-          const { ConvexHttpClient } = await import('convex/browser');
-          const apiModule = await import('../../../../../convex/_generated/api');
-          const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+          const { getConvexForApiRoute } = await import('@/lib/convex-client');
+          const { client: convexClient, api: apiModule } = await getConvexForApiRoute('../../../../..');
+          
+          if (!convexClient || !apiModule) {
+            console.error('[Gmail Callback] ❌ Convex API not available - CANNOT PERSIST TOKENS');
+            persistenceSuccess = false;
+            persistenceError = 'convex_api_unavailable';
+            throw new Error('Convex API not available');
+          }
 
           console.log('[Gmail Callback] Convex Client initialized with URL:', process.env.NEXT_PUBLIC_CONVEX_URL?.substring(0, 30) + '...');
           console.log('[Gmail Callback] Calling upsertTokens for userId:', userId);

@@ -230,18 +230,15 @@ export async function GET(request: NextRequest) {
 
     try {
       // Fetch users from Convex
-      const { ConvexHttpClient } = await import('convex/browser');
-      const client = new ConvexHttpClient(CONVEX_URL);
+      const { getConvexForApiRoute } = await import('@/lib/convex-client');
+      const { client, api: apiModule } = await getConvexForApiRoute('../../../../../..');
 
-      // Try to import Convex API - use relative path to avoid path alias issues
-      let api;
-      try {
-        const apiModule = await import('../../../../../../convex/_generated/api');
-        api = apiModule.api;
-      } catch (importError) {
-        console.warn('[Cron] Could not import Convex API (codegen may not be run):', importError);
+      if (!client || !apiModule) {
+        console.warn('[Cron] Could not load Convex API (codegen may not be run)');
         return await sendMockDigests();
       }
+      
+      const api = apiModule.api;
 
       // Get all users who should receive digest
       const users = await client.query(api.weeklyDigest.getUsersForDigest, {});

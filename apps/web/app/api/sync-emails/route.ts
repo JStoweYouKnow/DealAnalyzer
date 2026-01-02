@@ -66,9 +66,13 @@ export async function POST() {
     if (!gmailTokens && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
       try {
         console.log('[Sync Emails] Attempting to retrieve tokens from database for userId:', userId.substring(0, 8) + '...');
-        const { ConvexHttpClient } = await import('convex/browser');
-        const apiModule = await import('../../../../../convex/_generated/api');
-        const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+        const { getConvexForApiRoute } = await import('@/lib/convex-client');
+        const { client: convexClient, api: apiModule } = await getConvexForApiRoute('../../../../..');
+        
+        if (!convexClient || !apiModule) {
+          console.warn('[Sync Emails] Convex not available');
+          throw new Error('Convex not available');
+        }
         
         // SECURITY: Use action to retrieve tokens server-side only
         // This ensures tokens are never exposed to client code

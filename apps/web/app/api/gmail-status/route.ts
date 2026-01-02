@@ -136,9 +136,13 @@ export async function GET(request: NextRequest) {
     if (!isConnected && userId && process.env.NEXT_PUBLIC_CONVEX_URL) {
       try {
         console.log('[Gmail Status Check] Checking database for tokens, userId:', userId.substring(0, 20) + '...');
-        const { ConvexHttpClient } = await import('convex/browser');
-        const apiModule = await import('../../../../../convex/_generated/api');
-        const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+        const { getConvexForApiRoute } = await import('@/lib/convex-client');
+        const { client: convexClient, api: apiModule } = await getConvexForApiRoute('../../../../..');
+        
+        if (!convexClient || !apiModule) {
+          console.warn('[Gmail Status Check] Convex not available');
+          throw new Error('Convex not available');
+        }
 
         console.log('[Gmail Status Check] Calling retrieveTokensForServer action for userId:', userId);
 

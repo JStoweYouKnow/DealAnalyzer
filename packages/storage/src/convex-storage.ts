@@ -14,23 +14,18 @@ async function initializeConvex() {
     return convexInitialized;
   }
 
+  try {
+    // Use Function constructor to prevent static analysis by bundlers
+    // This is necessary because Turbopack/Webpack try to resolve dynamic imports at build time
+    const importFn = new Function('p', 'return import(p)');
+    const basePath = '../../..';
+    let apiModule;
+    
     try {
-      // Try importing the generated API file - handle both .js and .ts extensions
-      // Using dynamic imports with relative paths that work in both Node.js and Next.js
-      // Note: These files are generated at runtime by Convex, so they may not exist at build time
-      let apiModule;
-      try {
-        // @ts-ignore - Generated file may not exist at build time
-        apiModule = await import('../../../convex/_generated/api.js');
-      } catch (jsError) {
-        // Fallback: try without extension (TypeScript/ESM resolution)
-        try {
-          // @ts-ignore - Generated file may not exist at build time
-          apiModule = await import('../../../convex/_generated/api');
-        } catch (tsError) {
-          throw new Error(`Convex API not found. JS error: ${jsError}, TS error: ${tsError}`);
-        }
-      }
+      apiModule = await importFn(basePath + '/convex/_generated/api');
+    } catch (importError) {
+      throw new Error(`Convex API not found: ${importError}`);
+    }
     
     if (!apiModule || !apiModule.api) {
       throw new Error('Convex API module loaded but api object is missing');

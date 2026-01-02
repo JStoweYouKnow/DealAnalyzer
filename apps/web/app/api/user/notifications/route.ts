@@ -1,30 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { getConvexForApiRoute } from "@/lib/convex-client";
 
-async function getConvexClient() {
-  const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
-  if (!CONVEX_URL) {
-    return null;
-  }
-
-  try {
-    const { ConvexHttpClient } = await import('convex/browser');
-    const client = new ConvexHttpClient(CONVEX_URL);
-    return client;
-  } catch (error) {
-    console.error('Failed to initialize Convex client:', error);
-    return null;
-  }
-}
-
-async function getConvexApi() {
-  try {
-    const apiModule = await import('../../../../../convex/_generated/api');
-    return apiModule.api;
-  } catch (error) {
-    console.error('Failed to import Convex API:', error);
-    return null;
-  }
+async function getConvexClientAndApi() {
+  const { client, api: apiModule } = await getConvexForApiRoute('../../../..');
+  return { client, api: apiModule?.api || null };
 }
 
 export async function GET() {
@@ -34,8 +14,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const client = await getConvexClient();
-    const api = await getConvexApi();
+    const { client, api } = await getConvexClientAndApi();
 
     if (!client || !api || !api.userPreferences) {
       // Return defaults if Convex is not available or userPreferences not generated yet
@@ -77,8 +56,7 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
-    const client = await getConvexClient();
-    const api = await getConvexApi();
+    const { client, api } = await getConvexClientAndApi();
 
     if (!client || !api || !api.userPreferences) {
       return NextResponse.json(

@@ -53,22 +53,12 @@ async function checkConvexDatabase(): Promise<ServiceStatus> {
     // Try to import and initialize Convex
     const checkResult = await checkServiceWithTimeout(async () => {
       try {
-        // Dynamic import to avoid build-time errors
-        const apiModule = await import('../../../../../convex/_generated/api.js').catch(() => 
-          import('../../../../../convex/_generated/api')
-        );
-        
-        if (!apiModule?.api) {
-          throw new Error("Convex API not available");
-        }
-        
-        // Try a simple query to verify connectivity
-        // Use the ConvexHttpClient if available
+        // Use the ConvexHttpClient to verify connectivity
         const { ConvexHttpClient } = await import("convex/browser");
         const client = new ConvexHttpClient(convexUrl);
         
-        // Note: We can't actually query without a valid query function,
-        // so we'll just verify the client can be created and URL is valid
+        // Verify the client can be created and URL is valid
+        // We don't need the API module for basic connectivity check
         return true;
       } catch (error) {
         throw error;
