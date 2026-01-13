@@ -399,6 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Analyze property from uploaded file
   app.post("/api/analyze-file", (req, res, next) => {
+    // Make file upload optional - allow propertyData instead
     upload.single('file')(req, res, (err) => {
       if (err) {
         // Handle specific multer errors
@@ -414,26 +415,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
             error: err.message
           });
         }
-        // Handle other multer errors
-        return res.status(400).json({
-          success: false,
-          error: `File upload error: ${err.message}`
-        });
+        // Handle other multer errors - but allow if propertyData is provided
+        const propertyData = req.body?.propertyData;
+        if (!propertyData) {
+          return res.status(400).json({
+            success: false,
+            error: `File upload error: ${err.message}`
+          });
+        }
+        // If propertyData exists, continue even if file upload failed
       }
       next();
     });
   }, async (req, res) => {
     try {
-      if (!req.file) {
+      const propertyDataJson = req.body?.propertyData;
+      
+      // Allow either file or propertyData (for URL-extracted properties)
+      if (!req.file && !propertyDataJson) {
         res.status(400).json({
           success: false,
-          error: "No file uploaded"
+          error: "No file uploaded and no property data provided. Please select a file, extract from URL, or provide property data."
         });
         return;
       }
-
-      const filePath = req.file.path;
-      const fileExtension = path.extname(req.file.originalname).toLowerCase();
+      
+      let filePath: string | null = null;
+      let fileExtension: string = '.txt';
+      let isTemporaryFile = false;
+      
+      if (req.file) {
+        filePath = req.file.path;
+        fileExtension = path.extname(req.file.originalname).toLowerCase();
+      } else if (propertyDataJson) {
+        // Create temporary file from propertyData
+        try {
+          const propertyData = JSON.parse(propertyDataJson);
+          console.log('Property data received from URL extraction:', propertyData);
+          
+          // Format property data as text content (same format as Next.js route)
+          const fileContent = `Property Listing:
+Address: ${propertyData.address || 'N/A'}
+City: ${propertyData.city || 'N/A'}
+State: ${propertyData.state || 'N/A'}
+Zip Code: ${propertyData.zipCode || 'N/A'}
+Purchase Price: $${propertyData.purchasePrice || 'N/A'}
+Bedrooms: ${propertyData.bedrooms || 'N/A'}
+Bathrooms: ${propertyData.bathrooms || 'N/A'}
+Square Footage: ${propertyData.squareFootage || 'N/A'}
+Lot Size: ${propertyData.lotSize || 'N/A'}
+Year Built: ${propertyData.yearBuilt || 'N/A'}
+Property Type: ${propertyData.propertyType || 'N/A'}
+Monthly Rent: $${propertyData.monthlyRent || 'N/A'}
+HOA: $${propertyData.hoa || 'N/A'}
+Property Taxes (Annual): $${propertyData.propertyTaxes || 'N/A'}
+Description: ${propertyData.description || 'N/A'}
+Listing URL: ${propertyData.listingUrl || propertyData.url || 'N/A'}
+Source: ${propertyData.source || 'N/A'}`;
+          
+          // Create temporary file
+          const tempDir = path.join(process.cwd(), 'tmp');
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+          filePath = path.join(tempDir, `property-data-${Date.now()}.txt`);
+          fs.writeFileSync(filePath, fileContent, 'utf-8');
+          fileExtension = '.txt';
+          isTemporaryFile = true;
+        } catch (parseError) {
+          console.error('Failed to parse propertyData JSON:', parseError);
+          res.status(400).json({
+            success: false,
+            error: "Invalid property data format"
+          });
+          return;
+        }
+      }
       
       // Parse additional form data
       let strMetrics, monthlyExpenses;
@@ -449,13 +506,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Run Python file analysis
-      const analysisResult = await runPythonFileAnalysis(filePath, fileExtension, strMetrics, monthlyExpenses);
+      const analysisResult = await runPythonFileAnalysis(filePath!, fileExtension, strMetrics, monthlyExpenses);
       
-      // Clean up uploaded file
-      try {
-        fs.unlinkSync(filePath);
-      } catch (e) {
-        console.warn("Failed to clean up uploaded file:", e);
+      // Clean up uploaded or temporary file
+      if (filePath) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (e) {
+          console.warn("Failed to clean up file:", e);
+        }
       }
       
       if (!analysisResult.success) {
