@@ -257,8 +257,16 @@ export default function HomeScreen() {
         Alert.alert('Error', response.data.error || 'Failed to analyze property');
       }
     } catch (error: any) {
-      console.error('[HomeScreen] Analyze error:', error.response?.data || error.message);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to analyze property';
+      const errorResponse = error.response?.data || {};
+      const errorMessage = errorResponse.error || error.message || 'Failed to analyze property';
+      
+      console.error('[HomeScreen] Analyze error:', {
+        errorMessage,
+        fullResponse: errorResponse,
+        statusCode: error.response?.status,
+        hasPropertyData: !!extractedPropertyData,
+        serverVersion: errorMessage.includes('[v2.0]') ? 'v2.0' : errorMessage.includes('[v2.1]') ? 'v2.1' : 'old'
+      });
       
       // Check if server supports propertyData by looking for the new error message format
       const serverSupportsPropertyData = errorMessage.includes('[v2.0]') || errorMessage.includes('[v2.1]');
@@ -281,6 +289,7 @@ export default function HomeScreen() {
         );
       } else {
         // Server supports propertyData or it's a different error
+        // Show the actual error message from server (which should now include [v2.1] if updated)
         Alert.alert('Error', errorMessage);
       }
     } finally {
