@@ -16,61 +16,110 @@ export async function POST(request: NextRequest) {
     console.log('Request headers:', Object.fromEntries(request.headers.entries()));
     
     const formData = await request.formData();
-    console.log('FormData received, entries:', Array.from(formData.keys()));
+    const formDataKeys = Array.from(formData.keys());
+    console.log('FormData received, entries:', formDataKeys);
+    console.log('FormData entries details:', formDataKeys.map(key => ({
+      key,
+      value: formData.get(key)?.toString().substring(0, 100) || 'null/undefined'
+    })));
     
-    const file = formData.get('file') as File;
+    const file = formData.get('file') as File | null;
+    const propertyDataJson = formData.get('propertyData') as string | null;
     
-    if (!file) {
-      console.error('No file found in formData');
-      return NextResponse.json(
-        { success: false, error: "No file uploaded. Please select a file and try again." },
-        { status: 400 }
-      );
-    }
-    
-    console.log('File received:', {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: file.lastModified
+    console.log('File check:', { 
+      hasFile: !!file, 
+      fileType: file?.constructor?.name,
+      fileSize: (file as any)?.size,
+      hasPropertyData: !!propertyDataJson,
+      propertyDataLength: propertyDataJson?.length 
     });
-
-    // Get file extension first to determine how to read it
-    const originalName = file.name;
-    const fileExtension = originalName.substring(originalName.lastIndexOf('.')).toLowerCase();
     
-    // Validate file size (max 50MB)
-    const maxFileSize = 50 * 1024 * 1024; // 50MB
-    if (file.size > maxFileSize) {
+    // Allow either file or propertyData (for URL-extracted properties)
+    if (!file && !propertyDataJson) {
+      console.error('No file or propertyData found in formData. Keys:', formDataKeys);
       return NextResponse.json(
-        { success: false, error: `File size exceeds maximum allowed size of 50MB. File size: ${(file.size / 1024 / 1024).toFixed(2)}MB` },
+        { success: false, error: "No file uploaded and no property data provided. Please select a file, extract from URL, or provide property data." },
         { status: 400 }
       );
     }
-
-    // Read file content directly into memory (no temp files needed for Vercel)
-    // For PDFs, extract text using PDF.js; for other files, read as text
+    
     let fileContent: string;
-    try {
-      if (fileExtension === '.pdf') {
-        console.log(`Extracting text from PDF file: ${originalName}, size: ${file.size} bytes`);
-        // Lazy load PDF extractor only when needed
-        const { extractTextFromPDF } = await getPdfExtractor();
-        fileContent = await extractTextFromPDF(file);
-        
-        if (!fileContent || fileContent.trim().length === 0) {
-          throw new Error('PDF extraction returned empty content. The PDF may be image-based or encrypted.');
-        }
-        
-        console.log(`PDF text extracted successfully - length: ${fileContent.length} characters`);
-        console.log(`PDF text preview (first 500 chars): ${fileContent.substring(0, 500)}`);
-      } else {
-        fileContent = await file.text();
-        console.log(`File content length: ${fileContent.length} characters`);
-        console.log(`File content preview (first 500 chars): ${fileContent.substring(0, 500)}`);
+    let propertyData: any = null;
+    
+    // If propertyData is provided, use it instead of parsing a file
+    if (propertyDataJson) {
+      try {
+        propertyData = JSON.parse(propertyDataJson);
+        console.log('Property data received from URL extraction:', propertyData);
+        // Format property data as text content for parsing
+        fileContent = `Property Listing:
+Address: ${propertyData.address || 'N/A'}
+City: ${propertyData.city || 'N/A'}
+State: ${propertyData.state || 'N/A'}
+Zip Code: ${propertyData.zipCode || 'N/A'}
+Purchase Price: $${propertyData.purchasePrice || 'N/A'}
+Bedrooms: ${propertyData.bedrooms || 'N/A'}
+Bathrooms: ${propertyData.bathrooms || 'N/A'}
+Square Footage: ${propertyData.squareFootage || 'N/A'}
+Lot Size: ${propertyData.lotSize || 'N/A'}
+Year Built: ${propertyData.yearBuilt || 'N/A'}
+Property Type: ${propertyData.propertyType || 'N/A'}
+Monthly Rent: $${propertyData.monthlyRent || 'N/A'}
+HOA: $${propertyData.hoa || 'N/A'}
+Property Taxes (Annual): $${propertyData.propertyTaxes || 'N/A'}
+Description: ${propertyData.description || 'N/A'}
+Listing URL: ${propertyData.listingUrl || propertyData.url || 'N/A'}
+Source: ${propertyData.source || 'N/A'}`;
+      } catch (parseError) {
+        console.error('Failed to parse propertyData JSON:', parseError);
+        return NextResponse.json(
+          { success: false, error: "Invalid property data format" },
+          { status: 400 }
+        );
       }
-    } catch (error) {
-      console.error('Error reading/extracting file:', error);
+    } else if (file) {
+      console.log('File received:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified
+      });
+
+      // Get file extension first to determine how to read it
+      const originalName = file.name;
+      const fileExtension = originalName.substring(originalName.lastIndexOf('.')).toLowerCase();
+      
+      // Validate file size (max 50MB)
+      const maxFileSize = 50 * 1024 * 1024; // 50MB
+      if (file.size > maxFileSize) {
+        return NextResponse.json(
+          { success: false, error: `File size exceeds maximum allowed size of 50MB. File size: ${(file.size / 1024 / 1024).toFixed(2)}MB` },
+          { status: 400 }
+        );
+      }
+
+      // Read file content directly into memory (no temp files needed for Vercel)
+      // For PDFs, extract text using PDF.js; for other files, read as text
+      try {
+        if (fileExtension === '.pdf') {
+          console.log(`Extracting text from PDF file: ${originalName}, size: ${file.size} bytes`);
+          // Lazy load PDF extractor only when needed
+          const { extractTextFromPDF } = await getPdfExtractor();
+          fileContent = await extractTextFromPDF(file);
+          
+          if (!fileContent || fileContent.trim().length === 0) {
+            throw new Error('PDF extraction returned empty content. The PDF may be image-based or encrypted.');
+          }
+          
+          console.log(`PDF text extracted successfully - length: ${fileContent.length} characters`);
+          console.log(`PDF text preview (first 500 chars): ${fileContent.substring(0, 500)}`);
+        } else {
+          fileContent = await file.text();
+          console.log(`File content length: ${fileContent.length} characters`);
+          console.log(`File content preview (first 500 chars): ${fileContent.substring(0, 500)}`);
+        }
+      } catch (error) {
+        console.error('Error reading/extracting file:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Full error details:', {
         name: error instanceof Error ? error.name : 'Unknown',

@@ -2,6 +2,37 @@ import { NextRequest, NextResponse } from "next/server";
 import { storage } from "../../../server/storage";
 import type { DealAnalysis } from "@dealanalyzer/types";
 
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Analysis ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const analysis = await storage.getDealAnalysis(id);
+
+    if (!analysis) {
+      return NextResponse.json(
+        { success: false, error: "Analysis not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(analysis);
+  } catch (error) {
+    console.error("Error fetching analysis:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
