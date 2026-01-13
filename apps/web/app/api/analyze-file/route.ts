@@ -49,8 +49,9 @@ export async function POST(request: NextRequest) {
     // Allow either file or propertyData (for URL-extracted properties)
     if (!file && !propertyDataJson) {
       console.error('No file or propertyData found in formData. Keys:', formDataKeys);
+      console.error('FormData entries:', Array.from(formData.entries()).map(([k, v]) => [k, typeof v, v instanceof File ? 'File' : String(v).substring(0, 50)]));
       return NextResponse.json(
-        { success: false, error: "No file uploaded and no property data provided. Please select a file, extract from URL, or provide property data." },
+        { success: false, error: "No file uploaded and no property data provided. Please select a file, extract from URL, or provide property data. [v2.0]" },
         { status: 400 }
       );
     }

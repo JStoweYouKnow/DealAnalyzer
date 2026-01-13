@@ -433,9 +433,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Allow either file or propertyData (for URL-extracted properties)
       if (!req.file && !propertyDataJson) {
+        console.error('Express route: No file or propertyData found. Body keys:', Object.keys(req.body || {}));
         res.status(400).json({
           success: false,
-          error: "No file uploaded and no property data provided. Please select a file, extract from URL, or provide property data."
+          error: "No file uploaded and no property data provided. Please select a file, extract from URL, or provide property data. [v2.0-express]"
         });
         return;
       }
