@@ -9,10 +9,14 @@ import { FUNDING_SOURCE_DOWN_PAYMENTS, mortgageValuesSchema } from "@dealanalyze
 import { getPdfExtractor } from "../../lib/lazy-load";
 import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 
+// VERSION CHECK: This file was last updated 2026-01-13
+// If you see "=== Analyze File API Called ===" without [v2.1], the serverless function is running old code
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
+    // CRITICAL: This log message MUST include [v2.1] to verify the new code is running
     console.log('=== Analyze File API Called [v2.1 - ' + new Date().toISOString() + '] ===');
+    console.log('VERSION CHECK: If you see this message without [v2.1], the serverless function is OLD CODE');
     console.log('Request headers:', Object.fromEntries(request.headers.entries()));
     console.log('Content-Type:', request.headers.get('content-type'));
     
