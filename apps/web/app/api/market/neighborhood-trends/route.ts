@@ -120,9 +120,11 @@ export async function GET(request: NextRequest) {
         else if (attomProperties.length > 0 && !attomMarketStats) {
           console.log('[Market Trends] Creating basic trend from Attom properties without stats');
           // Calculate basic stats manually
-          const prices = attomProperties.map(p => p.lastSalePrice).filter((p): p is number => p != null && p > 0);
+          const prices: number[] = attomProperties
+            .map(p => p.lastSalePrice)
+            .filter((p): p is number => typeof p === 'number' && p > 0);
           const medianPrice = prices.length > 0
-            ? prices.sort((a, b) => a - b)[Math.floor(prices.length / 2)]
+            ? prices.sort((a, b) => a - b)[Math.floor(prices.length / 2)]!
             : undefined;
           
           enrichedTrends.push({
