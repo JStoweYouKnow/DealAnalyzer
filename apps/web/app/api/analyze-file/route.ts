@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
     
     let fileContent: string;
     let propertyData: any = null;
+    let fileExtension: string = '.txt'; // Default extension
+    let originalName: string = 'property-data'; // Default name
     
     // If propertyData is provided, use it instead of parsing a file
     if (propertyDataJson) {
@@ -86,8 +88,8 @@ Source: ${propertyData.source || 'N/A'}`;
       });
 
       // Get file extension first to determine how to read it
-      const originalName = file.name;
-      const fileExtension = originalName.substring(originalName.lastIndexOf('.')).toLowerCase();
+      originalName = file.name;
+      fileExtension = originalName.substring(originalName.lastIndexOf('.')).toLowerCase();
       
       // Validate file size (max 50MB)
       const maxFileSize = 50 * 1024 * 1024; // 50MB
@@ -134,6 +136,7 @@ Source: ${propertyData.source || 'N/A'}`;
         },
         { status: 400 }
       );
+      }
     }
 
     // Parse additional form data
