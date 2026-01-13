@@ -237,13 +237,14 @@ export default function HomeScreen() {
         'fundingSource'
       ].filter(Boolean));
 
+      // Don't set Content-Type manually - axios will set it with the correct boundary
       const response = await axios.post(
         `${API_BASE_URL}/api/analyze-file`,
         formData,
         {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            'Content-Type': 'multipart/form-data',
+            // Let axios automatically set Content-Type with boundary for FormData
           },
         }
       );

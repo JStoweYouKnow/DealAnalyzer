@@ -26,12 +26,24 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File | null;
     const propertyDataJson = formData.get('propertyData') as string | null;
     
+    // Debug: Log raw FormData values
+    console.log('=== FormData Debug ===');
+    console.log('All FormData entries:', Array.from(formData.entries()).map(([key, value]) => ({
+      key,
+      valueType: typeof value,
+      valuePreview: value instanceof File 
+        ? `File: ${value.name}, size: ${value.size}` 
+        : String(value).substring(0, 200)
+    })));
+    
     console.log('File check:', { 
       hasFile: !!file, 
       fileType: file?.constructor?.name,
       fileSize: (file as any)?.size,
       hasPropertyData: !!propertyDataJson,
-      propertyDataLength: propertyDataJson?.length 
+      propertyDataLength: propertyDataJson?.length,
+      propertyDataType: typeof propertyDataJson,
+      propertyDataValue: propertyDataJson ? propertyDataJson.substring(0, 200) : null
     });
     
     // Allow either file or propertyData (for URL-extracted properties)
