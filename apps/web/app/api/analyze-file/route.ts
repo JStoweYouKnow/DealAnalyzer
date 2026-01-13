@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    let fileContent: string;
+    let fileContent: string = ''; // Initialize to empty string
     let propertyData: any = null;
     let fileExtension: string = '.txt'; // Default extension
     let originalName: string = 'property-data'; // Default name
@@ -170,6 +170,14 @@ Source: ${propertyData.source || 'N/A'}`;
       }
     } catch (e) {
       console.warn("Failed to parse form data:", e);
+    }
+
+    // Ensure fileContent is set before parsing
+    if (!fileContent) {
+      return NextResponse.json(
+        { success: false, error: "No file content or property data available to parse" },
+        { status: 400 }
+      );
     }
 
     console.log(`Running TypeScript file analysis for: ${originalName}, extension: ${fileExtension}`);
