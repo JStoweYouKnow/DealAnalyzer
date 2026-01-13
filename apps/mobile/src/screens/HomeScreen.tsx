@@ -260,8 +260,12 @@ export default function HomeScreen() {
       console.error('[HomeScreen] Analyze error:', error.response?.data || error.message);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to analyze property';
       
-      // If error mentions "No file uploaded" and we have propertyData, it means server doesn't support it yet
-      if (errorMessage.includes('No file uploaded') && extractedPropertyData) {
+      // Check if server supports propertyData by looking for the new error message format
+      const serverSupportsPropertyData = errorMessage.includes('[v2.0]') || errorMessage.includes('[v2.1]');
+      
+      // If error mentions "No file uploaded" but NOT the new format, server doesn't support propertyData yet
+      if (errorMessage.includes('No file uploaded') && !serverSupportsPropertyData && extractedPropertyData) {
+        console.warn('[HomeScreen] Server is running old code - error message:', errorMessage);
         Alert.alert(
           'Error', 
           'Server needs to be updated to support URL-extracted properties. Please upload a file instead, or contact support.',
@@ -276,6 +280,7 @@ export default function HomeScreen() {
           ]
         );
       } else {
+        // Server supports propertyData or it's a different error
         Alert.alert('Error', errorMessage);
       }
     } finally {
