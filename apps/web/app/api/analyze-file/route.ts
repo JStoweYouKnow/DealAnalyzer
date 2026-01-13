@@ -12,7 +12,7 @@ import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
-    console.log('=== Analyze File API Called [v2.0] ===');
+    console.log('=== Analyze File API Called [v2.1 - ' + new Date().toISOString() + '] ===');
     console.log('Request headers:', Object.fromEntries(request.headers.entries()));
     console.log('Content-Type:', request.headers.get('content-type'));
     
