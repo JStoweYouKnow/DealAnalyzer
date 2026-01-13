@@ -175,7 +175,7 @@ Source: ${propertyData.source || 'N/A'}`;
     console.log(`Running TypeScript file analysis for: ${originalName}, extension: ${fileExtension}`);
 
     // Parse file content
-    const propertyData = await parseFileContent(fileContent, fileExtension, strMetrics, monthlyExpenses);
+    propertyData = await parseFileContent(fileContent, fileExtension, strMetrics, monthlyExpenses);
     
     // Log parsed data for debugging
     console.log('Parsed property data:', {
