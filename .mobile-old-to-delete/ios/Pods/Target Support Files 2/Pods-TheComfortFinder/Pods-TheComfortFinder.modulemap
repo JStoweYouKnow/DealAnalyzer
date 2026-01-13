@@ -1,0 +1,6 @@
+module Pods_TheComfortFinder {
+  umbrella header "Pods-TheComfortFinder-umbrella.h"
+
+  export *
+  module * { export * }
+}

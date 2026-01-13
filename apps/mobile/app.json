@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#6B806B"
     },
     "ios": {
       "supportsTablet": true,
@@ -52,7 +52,8 @@
       "eas": {
         "projectId": "256e912e-3a30-479d-8524-c2c92a08f80a"
       },
-      "clerkPublishableKey": "pk_live_Y2xlcmsuY29tZm9ydGZpbmRlci5wcm9qY29tZm9ydC5jb20k",
+      "clerkPublishableKey": "pk_test_bGFyZ2Utd29sZi01LmNsZXJrLmFjY291bnRzLmRldiQ",
+      "convexUrl": "https://strong-condor-993.convex.cloud",
       "apiUrl": "https://comfortfinder.projcomfort.com"
     }
   }

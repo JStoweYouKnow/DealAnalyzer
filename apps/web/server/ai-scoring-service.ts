@@ -5,11 +5,11 @@ let openai: OpenAI | null = null;
 
 function getOpenAIClient(): OpenAI {
   if (!openai) {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY environment variable is not set. Please configure it in your .env file.');
     }
-    openai = new OpenAI({ 
+    openai = new OpenAI({
       apiKey: apiKey 
     });
   }

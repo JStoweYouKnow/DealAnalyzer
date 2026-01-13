@@ -1,3 +1,4 @@
+import React, { useEffect } from 'react';
 import 'react-native-url-polyfill/auto';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, Platform } from 'react-native';
@@ -6,14 +7,19 @@ import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/reac
 import { ClerkProvider } from '@clerk/clerk-expo';
 import * as SecureStore from 'expo-secure-store';
 import * as Linking from 'expo-linking';
-import { useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
+import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import { setupGlobalErrorHandlers } from './src/utils/crashPrevention';
 import { initializeScreens } from './src/screens/ScreensConfig';
+import AppNavigator from './src/navigation/AppNavigator';
+import { CONFIG } from './src/config';
+
+console.log('🚀 [App.tsx] MODULE LOADING - Top of file');
 
 // Initialize react-native-screens BEFORE any navigation
 // This prevents the RNSScreen.setViewToSnapshot crash
 initializeScreens();
+console.log('✅ [App.tsx] Screens initialized');
 
 // Create a token cache for Clerk using SecureStore
 const tokenCache = {
@@ -33,26 +39,13 @@ const tokenCache = {
     }
   },
 };
-import { ConvexProvider, ConvexReactClient } from 'convex/react';
-import Constants from 'expo-constants';
-import AppNavigator from './src/navigation/AppNavigator';
-
-// Get environment variables (prioritize EXPO_PUBLIC_ env vars for security)
-const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ||
-  Constants.expoConfig?.extra?.clerkPublishableKey || '';
-
-const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL ||
-  Constants.expoConfig?.extra?.convexUrl || '';
-
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ||
-  Constants.expoConfig?.extra?.apiUrl || '';
 
 // Validate configuration
-if (!clerkPublishableKey || clerkPublishableKey.trim() === '') {
+if (!CONFIG.clerkPublishableKey || CONFIG.clerkPublishableKey.trim() === '') {
   console.error('❌ Clerk publishable key is not configured. Authentication will not work.');
   console.error('Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in eas.json or .env file');
 } else {
-  const keyType = clerkPublishableKey.startsWith('pk_live') ? 'PRODUCTION' : 'TEST';
+  const keyType = CONFIG.clerkPublishableKey.startsWith('pk_live') ? 'PRODUCTION' : 'TEST';
   console.log(`✅ Clerk ${keyType} key configured`);
 
   // Warn if using test key in production build
@@ -61,26 +54,37 @@ if (!clerkPublishableKey || clerkPublishableKey.trim() === '') {
   }
 }
 
-if (!convexUrl) {
+if (!CONFIG.convexUrl) {
   console.warn('⚠️ Convex URL not configured. Database features may not work.');
 }
 
-if (!apiUrl) {
+if (!CONFIG.apiUrl) {
   console.warn('⚠️ API URL not configured. Some features may not work.');
 }
 
-// Export for use in other parts of the app
-export const CONFIG = {
-  clerkPublishableKey,
-  convexUrl,
-  apiUrl,
-};
-
 // Create Convex client only if URL is provided
 // If not provided, Convex will be disabled (components should handle this gracefully)
-const convex = convexUrl && convexUrl.trim() !== '' && convexUrl !== 'undefined'
-  ? new ConvexReactClient(convexUrl.trim())
-  : new ConvexReactClient('https://placeholder.convex.cloud'); // Placeholder to prevent errors
+let convex;
+try {
+  console.log('[App.tsx] Creating Convex client with URL:', CONFIG.convexUrl || 'placeholder');
+  // Always use placeholder to avoid network errors on startup
+  // The actual Convex URL will only be used if explicitly configured
+  const convexUrlToUse = (CONFIG.convexUrl && CONFIG.convexUrl.trim() !== '' && CONFIG.convexUrl !== 'undefined')
+    ? CONFIG.convexUrl.trim()
+    : 'https://placeholder.convex.cloud';
+
+  convex = new ConvexReactClient(convexUrlToUse, {
+    // Disable automatic connection on startup to prevent crashes
+    unsavedChangesWarning: false,
+  });
+  console.log('✅ [App.tsx] Convex client created successfully');
+} catch (error) {
+  console.error('❌ [App.tsx] Failed to create Convex client:', error);
+  // Create a fallback placeholder that won't try to connect
+  convex = new ConvexReactClient('https://placeholder.convex.cloud', {
+    unsavedChangesWarning: false,
+  });
+}
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -202,7 +206,12 @@ function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetError
   );
 }
 
+console.log('✅ [App.tsx] All module-level code executed successfully');
+console.log('✅ [App.tsx] About to define App component');
+
 export default function App() {
+  console.log('🎯 [App] Component RENDERING');
+
   // Setup global error handlers to catch unhandled errors
   useEffect(() => {
     setupGlobalErrorHandlers();
@@ -230,31 +239,41 @@ export default function App() {
   useEffect(() => {
     console.log('[App] ========== INITIALIZATION ==========');
     console.log('[App] Initializing...');
-    console.log('[App] Clerk key loaded:', !!clerkPublishableKey);
-    console.log('[App] Clerk key type:', clerkPublishableKey?.startsWith('pk_live') ? 'PRODUCTION' : 'TEST');
-    console.log('[App] Clerk key length:', clerkPublishableKey?.length);
-    console.log('[App] Clerk key preview:', clerkPublishableKey?.substring(0, 30) + '...');
-    console.log('[App] Full Clerk key:', clerkPublishableKey);
+    console.log('[App] Clerk key loaded:', !!CONFIG.clerkPublishableKey);
+    console.log('[App] Clerk key type:', CONFIG.clerkPublishableKey?.startsWith('pk_live') ? 'PRODUCTION' : 'TEST');
+    console.log('[App] Clerk key length:', CONFIG.clerkPublishableKey?.length);
+    console.log('[App] Clerk key preview:', CONFIG.clerkPublishableKey?.substring(0, 30) + '...');
+    console.log('[App] Full Clerk key:', CONFIG.clerkPublishableKey);
     console.log('[App] Platform:', Platform.OS);
-    console.log('[App] Is Expo Go:', __DEV__ && !Constants.expoConfig?.ios?.bundleIdentifier);
+    console.log('[App] Is Expo Go:', __DEV__ && !process.env.NODE_ENV);
+    console.log('[App] API URL:', CONFIG.apiUrl || 'not configured');
+    console.log('[App] Convex URL:', CONFIG.convexUrl || 'not configured');
     console.log('[App] ====================================');
 
-    // Test network connectivity from mobile app
-    if (clerkPublishableKey) {
+    // Test network connectivity from mobile app (optional, non-blocking)
+    if (CONFIG.clerkPublishableKey) {
       console.log('[App] Testing network connectivity to Clerk...');
-      fetch('https://clerk.com', { method: 'HEAD', mode: 'no-cors' })
+      // Use a timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Network test timeout')), 5000)
+      );
+
+      Promise.race([
+        fetch('https://clerk.com', { method: 'HEAD', mode: 'no-cors' }),
+        timeoutPromise
+      ])
         .then(() => {
           console.log('[App] ✅ Network connectivity test: SUCCESS');
         })
         .catch((error) => {
-          console.warn('[App] ⚠️ Network connectivity test: FAILED', error);
+          console.warn('[App] ⚠️ Network connectivity test: FAILED (non-critical):', error.message);
         });
     }
   }, []);
 
 
   // Ensure we have a valid publishable key before rendering ClerkProvider
-  if (!clerkPublishableKey || clerkPublishableKey.trim() === '') {
+  if (!CONFIG.clerkPublishableKey || CONFIG.clerkPublishableKey.trim() === '') {
     return (
       <SafeAreaProvider>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
@@ -268,7 +287,7 @@ export default function App() {
   }
 
   // Validate key format before passing to ClerkProvider
-  const trimmedKey = clerkPublishableKey.trim();
+  const trimmedKey = CONFIG.clerkPublishableKey.trim();
   if (!trimmedKey.startsWith('pk_')) {
     console.error('[App] ❌ Invalid Clerk key format. Key must start with "pk_"');
     return (
@@ -295,6 +314,8 @@ export default function App() {
   if (trimmedKey.length < 50) {
     console.error('[App] ❌ Clerk key seems too short. Expected 50+ characters, got:', trimmedKey.length);
   }
+
+  console.log('[App] 🎨 About to render main app UI...');
 
   return (
     <ErrorBoundary

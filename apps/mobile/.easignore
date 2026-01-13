@@ -1,0 +1,68 @@
+# Files and directories to exclude from EAS builds
+# This reduces upload time and prevents hanging
+
+# Dependencies - exclude all node_modules
+node_modules/
+**/node_modules/
+**/node_modules/**
+
+# Build artifacts
+dist/
+build/
+.expo/
+.expo-shared/
+*.log
+
+# iOS - exclude everything in ios/ except source files
+ios/Pods/
+ios/build/
+ios/DerivedData/
+ios/*.xcworkspace/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/
+ios/main.jsbundle
+ios/*.jsbundle
+*.xcarchive/
+*.xcworkspace/
+
+# React Native artifacts
+ios/Pods/ReactNativeCore-artifacts/
+ios/Pods/React-Core-prebuilt/
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/.idea/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Test files
+**/__tests__/
+**/*.test.*
+**/*.spec.*
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+
+
