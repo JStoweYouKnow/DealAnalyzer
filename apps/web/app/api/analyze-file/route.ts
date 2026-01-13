@@ -12,16 +12,34 @@ import { withRateLimit, expensiveRateLimit } from "../../lib/rate-limit";
 export async function POST(request: NextRequest) {
   return withRateLimit(request, expensiveRateLimit, async (req) => {
   try {
-    console.log('=== Analyze File API Called ===');
+    console.log('=== Analyze File API Called [v2.0] ===');
     console.log('Request headers:', Object.fromEntries(request.headers.entries()));
+    console.log('Content-Type:', request.headers.get('content-type'));
     
     const formData = await request.formData();
     const formDataKeys = Array.from(formData.keys());
     console.log('FormData received, entries:', formDataKeys);
-    console.log('FormData entries details:', formDataKeys.map(key => ({
-      key,
-      value: formData.get(key)?.toString().substring(0, 100) || 'null/undefined'
-    })));
+    console.log('FormData entries details:', formDataKeys.map(key => {
+      const value = formData.get(key);
+      return {
+        key,
+        type: typeof value,
+        isFile: value instanceof File,
+        value: value instanceof File 
+          ? `File: ${value.name}, size: ${value.size}` 
+          : String(value).substring(0, 200)
+      };
+    }));
+    
+    // Log all entries with full details
+    console.log('=== Full FormData dump ===');
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        console.log(`${key}: File - name: ${value.name}, size: ${value.size}, type: ${value.type}`);
+      } else {
+        console.log(`${key}: ${typeof value} - ${String(value).substring(0, 500)}`);
+      }
+    }
     
     const file = formData.get('file') as File | null;
     const propertyDataJson = formData.get('propertyData') as string | null;
