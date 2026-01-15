@@ -4,6 +4,20 @@ import { withRateLimit, expensiveRateLimit } from '../../lib/rate-limit';
 
 // Lazy initialization of OpenAI client to ensure env vars are loaded
 let openaiClient: OpenAI | null = null;
+const FETCH_TIMEOUT_MS = 10000;
+const OPENAI_TIMEOUT_MS = 15000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeoutId: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
+}
 
 function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
@@ -28,7 +42,7 @@ async function fetchListingHtml(targetUrl: string): Promise<
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     const response = await fetch(targetUrl, {
       headers,
@@ -135,7 +149,7 @@ export async function POST(request: NextRequest) {
     const html = fetchResult.html;
 
     // Truncate HTML to avoid token limits (keep first 100k characters to capture more price data)
-    const truncatedHtml = html.substring(0, 100000);
+    const truncatedHtml = html.substring(0, 60000);
 
     // Use OpenAI to extract property information
     let openai;
@@ -155,7 +169,8 @@ export async function POST(request: NextRequest) {
     console.log('[extract-property-url] Calling OpenAI API');
     let completion;
     try {
-      completion = await openai.chat.completions.create({
+      completion = await withTimeout(
+        openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
           {
@@ -225,8 +240,11 @@ Important: Return ONLY the JSON object, no additional text or markdown.`,
           },
         ],
         temperature: 0.1,
-        max_tokens: 1000,
-      });
+        max_tokens: 800,
+      }),
+      OPENAI_TIMEOUT_MS,
+      'OpenAI request'
+      );
     } catch (openaiError: any) {
       console.error('[extract-property-url] OpenAI request failed:', {
         message: openaiError?.message || openaiError,
