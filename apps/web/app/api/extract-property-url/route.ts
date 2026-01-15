@@ -4,20 +4,10 @@ import { withRateLimit, expensiveRateLimit } from '../../lib/rate-limit';
 
 // Lazy initialization of OpenAI client to ensure env vars are loaded
 let openaiClient: OpenAI | null = null;
-const FETCH_TIMEOUT_MS = 10000;
-const OPENAI_TIMEOUT_MS = 15000;
-
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  let timeoutId: NodeJS.Timeout;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
-  });
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    clearTimeout(timeoutId!);
-  }
-}
+const SCRAPER_PROVIDER = (process.env.SCRAPER_PROVIDER || '').toLowerCase();
+const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY?.trim();
+const SCRAPER_RENDER = process.env.SCRAPER_RENDER === 'true';
+const FETCH_TIMEOUT_MS = 15000;
 
 function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
@@ -32,65 +22,45 @@ function getOpenAIClient(): OpenAI {
   return openaiClient;
 }
 
-async function fetchListingHtml(targetUrl: string): Promise<
-  | { ok: true; html: string; finalUrl: string; usedReader: boolean }
-  | { ok: false; status: number; error: string; usedReader: boolean }
-> {
-  const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'Accept-Language': 'en-US,en;q=0.9',
-  };
+function getScraperUrl(targetUrl: string): string | null {
+  if (!SCRAPER_API_KEY) {
+    return null;
+  }
 
+  if (SCRAPER_PROVIDER === 'scraperapi') {
+    const params = new URLSearchParams({
+      api_key: SCRAPER_API_KEY,
+      url: targetUrl,
+    });
+    if (SCRAPER_RENDER) {
+      params.set('render', 'true');
+    }
+    return `https://api.scraperapi.com/?${params.toString()}`;
+  }
+
+  if (SCRAPER_PROVIDER === 'zenrows') {
+    const params = new URLSearchParams({
+      apikey: SCRAPER_API_KEY,
+      url: targetUrl,
+    });
+    if (SCRAPER_RENDER) {
+      params.set('js_render', 'true');
+    }
+    return `https://api.zenrows.com/v1/?${params.toString()}`;
+  }
+
+  return null;
+}
+
+async function fetchWithTimeout(targetUrl: string, headers: Record<string, string>) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(targetUrl, {
+    return await fetch(targetUrl, {
       headers,
       redirect: 'follow',
       signal: controller.signal,
     });
-    if (response.ok) {
-      const html = await response.text();
-      return { ok: true, html, finalUrl: response.url, usedReader: false };
-    }
-
-    // If blocked, try the Jina reader fallback for static HTML.
-    if ([401, 403, 429].includes(response.status)) {
-      const readerUrl = targetUrl.startsWith('https://')
-        ? `https://r.jina.ai/https://${targetUrl.slice('https://'.length)}`
-        : `https://r.jina.ai/http://${targetUrl.slice('http://'.length)}`;
-      console.warn('[extract-property-url] Primary fetch blocked. Trying reader fallback.', {
-        status: response.status,
-        readerUrl,
-      });
-      const readerResponse = await fetch(readerUrl, {
-        headers,
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-      if (readerResponse.ok) {
-        const html = await readerResponse.text();
-        return { ok: true, html, finalUrl: readerResponse.url, usedReader: true };
-      }
-      return {
-        ok: false,
-        status: readerResponse.status,
-        error: `Failed to fetch URL (reader fallback): ${readerResponse.statusText}`,
-        usedReader: true,
-      };
-    }
-
-    return {
-      ok: false,
-      status: response.status,
-      error: `Failed to fetch URL: ${response.statusText}`,
-      usedReader: false,
-    };
-  } catch (fetchError: any) {
-    const errorMessage = fetchError?.name === 'AbortError'
-      ? 'Request timed out while fetching listing URL.'
-      : fetchError?.message || 'Connection error while fetching listing URL.';
-    return { ok: false, status: 502, error: errorMessage, usedReader: false };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -134,22 +104,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const fetchResult = await fetchListingHtml(url);
-    if (!fetchResult.ok) {
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9',
+    };
+
+    // Fetch the HTML content (prefer scraper API when configured)
+    const scraperUrl = getScraperUrl(url);
+    const response = scraperUrl
+      ? await fetchWithTimeout(scraperUrl, headers)
+      : await fetchWithTimeout(url, headers);
+
+    if (!response.ok) {
       return NextResponse.json(
         {
           success: false,
-          error: fetchResult.error,
-          hint: 'Some listing sites block automated requests. Try a different listing or upload a file instead.',
+          error: `Failed to fetch URL: ${response.statusText}`,
+          hint: scraperUrl
+            ? 'Scraper API request failed. Check SCRAPER_PROVIDER/SCRAPER_API_KEY or try another listing.'
+            : 'Listing site may block automated requests. Configure SCRAPER_PROVIDER/SCRAPER_API_KEY or try uploading a file instead.',
         },
-        { status: fetchResult.status }
+        { status: response.status }
       );
     }
 
-    const html = fetchResult.html;
+    const html = await response.text();
 
     // Truncate HTML to avoid token limits (keep first 100k characters to capture more price data)
-    const truncatedHtml = html.substring(0, 60000);
+    const truncatedHtml = html.substring(0, 100000);
 
     // Use OpenAI to extract property information
     let openai;
@@ -167,15 +149,12 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('[extract-property-url] Calling OpenAI API');
-    let completion;
-    try {
-      completion = await withTimeout(
-        openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a property data extraction assistant. Extract property listing information from HTML and return it as JSON.
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a property data extraction assistant. Extract property listing information from HTML and return it as JSON.
 
 Return ONLY a valid JSON object with these fields (use null for missing values):
 {
@@ -234,31 +213,14 @@ PRICE EXTRACTION RULES:
 
 Important: Return ONLY the JSON object, no additional text or markdown.`,
         },
-          {
-            role: 'user',
-            content: `Extract property information from this HTML:\n\nURL: ${url}\n\nHTML:\n${truncatedHtml}`,
-          },
-        ],
-        temperature: 0.1,
-        max_tokens: 800,
-      }),
-      OPENAI_TIMEOUT_MS,
-      'OpenAI request'
-      );
-    } catch (openaiError: any) {
-      console.error('[extract-property-url] OpenAI request failed:', {
-        message: openaiError?.message || openaiError,
-        name: openaiError?.name,
-        status: openaiError?.status,
-        code: openaiError?.code,
-        type: openaiError?.type,
-        cause: openaiError?.cause,
-      });
-      return NextResponse.json(
-        { success: false, error: openaiError?.message || 'OpenAI request failed' },
-        { status: 502 }
-      );
-    }
+        {
+          role: 'user',
+          content: `Extract property information from this HTML:\n\nURL: ${url}\n\nHTML:\n${truncatedHtml}`,
+        },
+      ],
+      temperature: 0.1,
+      max_tokens: 1000,
+    });
 
     const extractedText = completion.choices[0]?.message?.content?.trim();
 
