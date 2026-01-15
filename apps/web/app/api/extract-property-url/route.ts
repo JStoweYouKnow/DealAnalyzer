@@ -18,6 +18,70 @@ function getOpenAIClient(): OpenAI {
   return openaiClient;
 }
 
+async function fetchListingHtml(targetUrl: string): Promise<
+  | { ok: true; html: string; finalUrl: string; usedReader: boolean }
+  | { ok: false; status: number; error: string; usedReader: boolean }
+> {
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.9',
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(targetUrl, {
+      headers,
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    if (response.ok) {
+      const html = await response.text();
+      return { ok: true, html, finalUrl: response.url, usedReader: false };
+    }
+
+    // If blocked, try the Jina reader fallback for static HTML.
+    if ([401, 403, 429].includes(response.status)) {
+      const readerUrl = targetUrl.startsWith('https://')
+        ? `https://r.jina.ai/https://${targetUrl.slice('https://'.length)}`
+        : `https://r.jina.ai/http://${targetUrl.slice('http://'.length)}`;
+      console.warn('[extract-property-url] Primary fetch blocked. Trying reader fallback.', {
+        status: response.status,
+        readerUrl,
+      });
+      const readerResponse = await fetch(readerUrl, {
+        headers,
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+      if (readerResponse.ok) {
+        const html = await readerResponse.text();
+        return { ok: true, html, finalUrl: readerResponse.url, usedReader: true };
+      }
+      return {
+        ok: false,
+        status: readerResponse.status,
+        error: `Failed to fetch URL (reader fallback): ${readerResponse.statusText}`,
+        usedReader: true,
+      };
+    }
+
+    return {
+      ok: false,
+      status: response.status,
+      error: `Failed to fetch URL: ${response.statusText}`,
+      usedReader: false,
+    };
+  } catch (fetchError: any) {
+    const errorMessage = fetchError?.name === 'AbortError'
+      ? 'Request timed out while fetching listing URL.'
+      : fetchError?.message || 'Connection error while fetching listing URL.';
+    return { ok: false, status: 502, error: errorMessage, usedReader: false };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('[extract-property-url] Request received');
@@ -56,45 +120,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch the HTML content with a timeout and better diagnostics
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
+    const fetchResult = await fetchListingHtml(url);
+    if (!fetchResult.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: fetchResult.error,
+          hint: 'Some listing sites block automated requests. Try a different listing or upload a file instead.',
         },
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-    } catch (fetchError: any) {
-      const errorMessage = fetchError?.name === 'AbortError'
-        ? 'Request timed out while fetching listing URL.'
-        : fetchError?.message || 'Connection error while fetching listing URL.';
-      console.error('[extract-property-url] URL fetch failed:', {
-        url,
-        error: fetchError?.message || fetchError,
-        name: fetchError?.name,
-        cause: fetchError?.cause,
-      });
-      return NextResponse.json(
-        { success: false, error: errorMessage },
-        { status: 502 }
-      );
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { success: false, error: `Failed to fetch URL: ${response.statusText}` },
-        { status: response.status }
+        { status: fetchResult.status }
       );
     }
 
-    const html = await response.text();
+    const html = fetchResult.html;
 
     // Truncate HTML to avoid token limits (keep first 100k characters to capture more price data)
     const truncatedHtml = html.substring(0, 100000);
