@@ -64,7 +64,7 @@ if (!CONFIG.apiUrl) {
 
 // Create Convex client only if URL is provided
 // If not provided, Convex will be disabled (components should handle this gracefully)
-let convex;
+let convex: ConvexReactClient;
 try {
   console.log('[App.tsx] Creating Convex client with URL:', CONFIG.convexUrl || 'placeholder');
   // Always use placeholder to avoid network errors on startup
@@ -141,12 +141,6 @@ function DeepLinkHandler() {
         const reason = urlObj.queryParams?.reason || 'Unknown error';
         console.error('[Deep Link] ❌ Gmail auth failed:', reason);
 
-        // Show alert to user
-        // We need to import Alert first, but since this is a functional component inside App.tsx
-        // and App.tsx imports View, Text, Platform from react-native, we can use require or assume Alert is available
-        // But App.tsx doesn't import Alert at top level. Let's rely on console error for now or add Alert import if possible
-        // Actually simpler: just log it and maybe the UI will reflect "disconnected".
-        // But better: show Alert.
         const { Alert } = require('react-native');
         Alert.alert(
           'Connection Failed',
@@ -215,14 +209,14 @@ export default function App() {
   // Setup global error handlers to catch unhandled errors
   useEffect(() => {
     setupGlobalErrorHandlers();
-    
+
     // Disable React Native error overlay for API errors in development
     if (__DEV__) {
       const originalError = console.error;
       console.error = (...args: any[]) => {
         // Check if this is an API error that we want to suppress
         const errorMessage = args[0]?.toString() || '';
-        if (errorMessage.includes('[API Client]') || 
+        if (errorMessage.includes('[API Client]') ||
             errorMessage.includes('Request failed') ||
             errorMessage.includes('Network Error')) {
           // Use console.warn instead to prevent error overlay
@@ -271,7 +265,6 @@ export default function App() {
     }
   }, []);
 
-
   // Ensure we have a valid publishable key before rendering ClerkProvider
   if (!CONFIG.clerkPublishableKey || CONFIG.clerkPublishableKey.trim() === '') {
     return (
@@ -317,6 +310,32 @@ export default function App() {
 
   console.log('[App] 🎨 About to render main app UI...');
 
+  // DEBUG: Render a simple test view to verify rendering works
+  // Set to true to bypass all providers and test basic rendering
+  const BYPASS_PROVIDERS_FOR_DEBUG = false;
+
+  if (__DEV__ && BYPASS_PROVIDERS_FOR_DEBUG) {
+    console.log('[App] ⚠️ DEBUG MODE: Bypassing all providers, rendering simple test view');
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#4CAF50' }}>
+          <Text style={{ fontSize: 24, color: 'white', fontWeight: 'bold' }}>
+            ✅ DEBUG MODE: App is rendering!
+          </Text>
+          <Text style={{ fontSize: 16, color: 'white', marginTop: 20 }}>
+            React Native is working correctly
+          </Text>
+          <Text style={{ fontSize: 14, color: 'white', marginTop: 10 }}>
+            Clerk Key: {trimmedKey.substring(0, 20)}...
+          </Text>
+          <Text style={{ fontSize: 12, color: 'white', marginTop: 20, textAlign: 'center', paddingHorizontal: 20 }}>
+            Set BYPASS_PROVIDERS_FOR_DEBUG to false in App.tsx to enable full app
+          </Text>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
   return (
     <ErrorBoundary
       FallbackComponent={ErrorFallback}
@@ -334,9 +353,9 @@ export default function App() {
         <ClerkProvider
           publishableKey={trimmedKey}
           tokenCache={tokenCache}
-        // Enable native API support for mobile apps
-        // If you get "native api disabled" error, enable Native API in Clerk Dashboard
-        // Settings → API Keys → Enable "Native API" or "Mobile SDK Support"
+          // Enable native API support for mobile apps
+          // If you get "native api disabled" error, enable Native API in Clerk Dashboard
+          // Settings → API Keys → Enable "Native API" or "Mobile SDK Support"
         >
           <ConvexProvider client={convex}>
             <QueryClientProvider client={queryClient}>
